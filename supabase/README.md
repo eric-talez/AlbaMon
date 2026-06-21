@@ -11,6 +11,7 @@ supabase/
     20260621000000_init_schema.sql    # full initial schema + RLS
     20260622000000_audit_hardening.sql # role revocation + safe public job view
     20260623000000_application_submission.sql # submitted-only seeker inserts + note limit
+    20260624000000_application_listing_functions.sql # caller-bound dashboard RPCs
   seed.sql                            # LA/OC demo companies + jobs
 ```
 
@@ -45,6 +46,14 @@ including for an unverified company, without exposing the rest of that company
 row. Production runtime DB/configuration failures are surfaced; mock jobs are
 limited to development, tests, and production builds.
 
+Application dashboards call two authenticated, parameterless RPCs. The seeker
+RPC is bound to `auth.uid()`; the employer RPC is limited to caller-owned
+companies and returns applicant display name/email only. Both re-check the
+runtime database role, use a pinned empty `search_path`, and have default execute
+privileges revoked. No service-role client or broader profile-read policy is
+used. Without Supabase, application dashboards show an unavailable state and do
+not fabricate records.
+
 ## What the seed contains
 
 - 3 fictional employer accounts (`employer{1,2,3}@example.com`) + profiles
@@ -68,6 +77,9 @@ Korean-only, visa-status, or under-the-table-cash phrasing).
   auto-creates each `profiles` row, which the seed then promotes to `employer`.
 - RLS is the authorization gate. The `service_role` key bypasses RLS for trusted
   server-side flows; never expose it to the client.
+- Live execution of the application listing functions still requires Supabase
+  CLI and Docker; static migration tests cover their role, ownership, field, and
+  grant boundaries when that environment is unavailable.
 - Runtime authorization reads `profiles.role`, not client-influenced
   `user_metadata.role`. Ownership policies also require the actor's current
   employer/admin role, so demotion revokes private owner access.

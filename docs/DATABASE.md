@@ -80,6 +80,15 @@ or use a service-role client. Duplicate, RLS, and foreign-key failures are mappe
 to safe application outcomes; unconfigured environments never perform mock
 writes.
 
+The same module reads application dashboards through the parameterless
+`list_seeker_applications()` and `list_employer_applications()` RPCs. Both are
+`security definer` functions with an empty pinned `search_path`, derive identity
+from `auth.uid()`, and re-check the caller's runtime `profiles.role`. The seeker
+function returns only the caller's submissions. The employer function returns
+only applications for jobs under caller-owned companies and exposes only the
+applicant's `display_name` and `email`. Default execution is revoked before
+`authenticated` receives execute access; profile RLS remains unchanged.
+
 [`src/lib/db/jobs.ts`](../src/lib/db/jobs.ts) exposes `getApprovedJobs()`,
 `getApprovedJobById(id)`, and `searchApprovedJobs(params)`:
 
@@ -93,8 +102,10 @@ writes.
 ## Known limitations
 
 - Runtime auth reads `profiles.role`; missing/error profile reads fail closed.
-- No employer posting, application submit, or admin moderation UI yet — only the
-  read path is wired.
+- Application status transitions, employer posting, and admin moderation UI are
+  not yet implemented.
+- Application dashboard reads are unavailable rather than mocked when Supabase
+  is not configured.
 - Seed uses fixed UUIDs and inserts into `auth.users`; intended for local/demo
   use, not production data.
 - RLS behavior is covered by static migration tests; a live Supabase policy
