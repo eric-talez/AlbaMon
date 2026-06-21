@@ -6,6 +6,8 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import {
+  getApprovedJobById,
+  getApprovedJobs,
   parseJobSearchParams,
   searchApprovedJobs,
   filterAndSortMockJobs,
@@ -21,6 +23,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.mocked(createSupabaseServerClient).mockReset();
+  vi.restoreAllMocks();
 });
 
 function setUnconfigured(): void {
@@ -55,7 +58,8 @@ function dbJobRow(overrides: Record<string, unknown> = {}) {
     moderation_status: "approved",
     boost: null,
     posted_at: "2026-06-19T12:00:00Z",
-    companies: { name: "Pacific Trade Logistics", is_verified: true },
+    company_name: "Pacific Trade Logistics",
+    company_is_verified: false,
     ...overrides,
   };
 }
@@ -169,21 +173,24 @@ describe("searchApprovedJobs — Supabase configured", () => {
         id: "22222222-2222-4222-8222-222222222222",
         title: "Dental Receptionist",
         description: "Welcome patients and manage appointments.",
-        companies: { name: "Irvine Smile Dental", is_verified: true },
+        company_name: "Irvine Smile Dental",
+        company_is_verified: true,
       }),
       dbJobRow({
         id: "33333333-3333-4333-8333-333333333333",
         title: "Cafe Server",
         description: "Learn specialty coffee preparation.",
-        companies: { name: "Gangnam Kitchen", is_verified: true },
+        company_name: "Gangnam Kitchen",
+        company_is_verified: true,
       }),
     ];
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify(rows), {
+    const fetchMock = vi.fn(async (_input: string | URL | Request) => {
+      void _input;
+      return new Response(JSON.stringify(rows), {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }),
-    );
+      });
+    });
     const client = createClient(REAL_URL, REAL_KEY, {
       global: { fetch: fetchMock },
     });
@@ -198,7 +205,62 @@ describe("searchApprovedJobs — Supabase configured", () => {
       const jobs = await searchApprovedJobs({ q: query });
       expect(jobs.map((job) => job.id)).toEqual([expectedId]);
     }
-    expect(fetchMock).toHaveBeenCalledTimes(cases.length);
+    const unverifiedCompanyJobs = await searchApprovedJobs({ q: "pacific trade" });
+    expect(unverifiedCompanyJobs).toHaveLength(1);
+    expect(unverifiedCompanyJobs[0]).toMatchObject({
+      companyName: "Pacific Trade Logistics",
+      employerVerified: false,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(cases.length + 1);
+    for (const [request] of fetchMock.mock.calls) {
+      expect(String(request)).toContain("/rest/v1/public_job_listings?");
+      expect(String(request)).toContain("company_name.ilike");
+    }
+  });
+});
+
+describe("public jobs — production fallback safety", () => {
+  it("keeps deterministic mocks available during a production build", async () => {
+    setUnconfigured();
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PHASE", "phase-production-build");
+
+    expect((await getApprovedJobs()).length).toBeGreaterThan(0);
+    expect(await getApprovedJobById("kw-001")).toBeDefined();
+    expect((await searchApprovedJobs({ q: "강남" })).map((job) => job.id)).toEqual([
+      "kw-001",
+    ]);
+  });
+
+  it("rejects an unconfigured production runtime instead of showing mocks", async () => {
+    setUnconfigured();
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PHASE", "phase-production-server");
+
+    await expect(getApprovedJobs()).rejects.toThrow(/mock job fallback is disabled/i);
+    await expect(getApprovedJobById("kw-001")).rejects.toThrow(
+      /mock job fallback is disabled/i,
+    );
+    await expect(searchApprovedJobs({})).rejects.toThrow(
+      /mock job fallback is disabled/i,
+    );
+  });
+
+  it("rethrows configured production DB failures instead of showing mocks", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", REAL_URL);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", REAL_KEY);
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PHASE", "phase-production-server");
+    const failure = new Error("database unavailable");
+    vi.mocked(createSupabaseServerClient).mockRejectedValue(failure);
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(getApprovedJobs()).rejects.toBe(failure);
+    await expect(getApprovedJobById("kw-001")).rejects.toBe(failure);
+    await expect(searchApprovedJobs({})).rejects.toBe(failure);
+    expect(errorLog).toHaveBeenCalledTimes(3);
+    errorLog.mockRestore();
   });
 });
 

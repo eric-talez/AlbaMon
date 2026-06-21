@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { formatPayRange } from "@/lib/types";
 import { MOCK_JOBS, getMockJobs, getMockJobById } from "@/lib/mock/jobs";
 
@@ -41,5 +43,16 @@ describe("getMockJobs", () => {
     expect(getMockJobById("kw-101")).toBeUndefined(); // pending
     expect(getMockJobById("kw-102")).toBeUndefined(); // draft
     expect(getMockJobById("kw-001")?.moderationStatus).toBe("approved");
+  });
+});
+
+describe("pre-application job detail", () => {
+  it("does not link to the unimplemented Slice 5 application route", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src", "app", "(public)", "jobs", "[id]", "page.tsx"),
+      "utf8",
+    );
+    expect(source).not.toMatch(/href=\{`\/jobs\/\$\{job\.id\}\/apply`\}/);
+    expect(source).toContain('aria-disabled="true"');
   });
 });

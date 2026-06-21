@@ -93,21 +93,17 @@ client-only) and Supabase RLS.
 ## Current status
 
 - **Slice 0 — Project baseline:** ✅ done.
-- **Slice 1 — Public shell:** ✅ done (`/`, `/jobs`, `/jobs/[id]` on mock data;
-  header / mobile bottom-nav / footer; job card, filter placeholders, disclaimer).
+- **Slice 1 — Public shell:** ✅ done (`/`, `/jobs`, `/jobs/[id]`; header,
+  mobile bottom-nav, footer, job cards, and work-authorization disclaimer).
 - **Slice 2 — Auth & roles:** ✅ done.
   - Supabase SSR clients (browser/server) + `proxy.ts` session refresh
     (Next 16 renamed `middleware` → `proxy`).
   - Roles `seeker` / `employer` / `admin`; central permission matrix in
     `lib/auth/access.ts`; **server-side** guards in `lib/auth/guards.ts`.
-  - Routes: `/login`, `/signup`, `/auth/callback`, `/dashboard`, `/employer`,
-    `/admin`, `/forbidden` (wrong-role state).
   - **Dev-auth fallback:** while Supabase env vars are placeholders, a
     cookie-based mock session lets you pick a role to exercise guards locally.
-  - **Limitations (intentional this slice):** no real Supabase project wired;
-    roles read from a dev cookie / `user_metadata`, not a `profiles` table yet;
-    login/signup are minimal; no email/password or OAuth UI; public header stays
-    static (signed-in chrome lives on protected pages via `AccountBar`).
+  - Configured runtime authorization reads `profiles.role`; `user_metadata.role`
+    is not trusted. Email/password and OAuth initiation UI remain future work.
 - **Slice 3 — Database schema & seed:** ✅ done.
   - Migrations are the source of truth: `supabase/migrations/` (enums, six core
     tables, constraints/indexes, `updated_at` trigger, auth helper functions) +
@@ -116,11 +112,14 @@ client-only) and Supabase RLS.
   - **Row Level Security** on all tables: public reads only `approved` jobs;
     profile self-update cannot change role; employer job inserts are forced to
     `pending`; audit logs are admin-read / service-role-write only.
-  - Public job pages now read via `src/lib/db/jobs.ts`, which queries Supabase
-    when configured and falls back to mock data otherwise (approved-only).
-  - **Limitations (intentional this slice):** `getCurrentUser()` still reads the
-    role from `user_metadata`/dev-auth, not `profiles` (the DB is prepared as the
-    source of truth; switching the runtime read needs a live Supabase project and
-    is deferred). No posting/application/admin UI; browse/search stays on Slice 4.
-- **Slice 4 — Job browse/search:** next. Filters/sort/pagination over DB jobs;
-  switch `getCurrentUser()` to `profiles`.
+  - Slice 4.5 owner policies require the actor's current employer/admin role, so
+    role demotion revokes private ownership-based access.
+- **Slice 4 — Job browse/search:** ✅ scoped implementation done.
+  - Server-rendered GET search supports keyword, city, category, job type,
+    language, minimum pay, and newest/pay sorting with URL state.
+  - Configured reads use an approved-only public view with safe company identity;
+    local/test/build use deterministic approved-only mocks.
+  - Original roadmap items still deferred: schedule filter, featured-first sort,
+    pagination/load-more, expiry filtering, and a dedicated loading state.
+- **Slice 5 — Job detail & apply:** next. The job detail page intentionally shows
+  a disabled coming-soon control until application submission exists.

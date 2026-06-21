@@ -9,6 +9,7 @@ supabase/
   config.toml                         # minimal Supabase CLI config (no secrets)
   migrations/
     20260621000000_init_schema.sql    # full initial schema + RLS
+    20260622000000_audit_hardening.sql # role revocation + safe public job view
   seed.sql                            # LA/OC demo companies + jobs
 ```
 
@@ -30,12 +31,18 @@ new migrations to an already-running DB without wiping data, use `supabase db pu
 2. Push migrations: `supabase db push`
 3. (Optional) load demo data by pasting `seed.sql` into the **SQL editor**.
 
-Or, without the CLI: open the Supabase **SQL editor**, paste the contents of
-`migrations/20260621000000_init_schema.sql`, run it, then paste `seed.sql`.
+Or, without the CLI: open the Supabase **SQL editor**, run every file in
+`migrations/` in filename order, then run `seed.sql`.
 
 After setting the project URL + anon key in `.env.local` (see `.env.example`),
 the app automatically switches from mock data to live DB reads — see
 [`docs/DATABASE.md`](../docs/DATABASE.md).
+
+Public job pages query the approved-only `public_job_listings` view. The view
+includes only the company name and verification flag needed by public listings,
+including for an unverified company, without exposing the rest of that company
+row. Production runtime DB/configuration failures are surfaced; mock jobs are
+limited to development, tests, and production builds.
 
 ## What the seed contains
 
@@ -54,5 +61,6 @@ Korean-only, visa-status, or under-the-table-cash phrasing).
   auto-creates each `profiles` row, which the seed then promotes to `employer`.
 - RLS is the authorization gate. The `service_role` key bypasses RLS for trusted
   server-side flows; never expose it to the client.
-- In Slice 3 the runtime auth role is still read from Supabase `user_metadata`
-  (not `profiles`). Switching `getCurrentUser()` to `profiles` is a next-slice task.
+- Runtime authorization reads `profiles.role`, not client-influenced
+  `user_metadata.role`. Ownership policies also require the actor's current
+  employer/admin role, so demotion revokes private owner access.
