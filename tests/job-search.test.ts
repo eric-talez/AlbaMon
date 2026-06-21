@@ -1,9 +1,16 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
+import { createClient } from "@supabase/supabase-js";
+
+vi.mock("@/lib/supabase/server", () => ({
+  createSupabaseServerClient: vi.fn(),
+}));
+
 import {
   parseJobSearchParams,
   searchApprovedJobs,
   filterAndSortMockJobs,
 } from "@/lib/db/jobs";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
  * Public browse/search over the mock fallback (Supabase unconfigured — the
@@ -13,11 +20,44 @@ import {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.mocked(createSupabaseServerClient).mockReset();
 });
 
 function setUnconfigured(): void {
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://your-project.supabase.co");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "your-anon-key");
+}
+
+const REAL_URL = "https://abcdefghijklmnop.supabase.co";
+const REAL_KEY = "sb_publishable_realisha_key_value_1234567890";
+
+function dbJobRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "11111111-1111-4111-8111-111111111111",
+    title: "Warehouse Associate",
+    category: "logistics_warehouse",
+    job_type: "full_time",
+    city: "Buena Park",
+    state: "CA",
+    address_display: "Buena Park, CA",
+    address_display_mode: "city_only",
+    pay_min: 20,
+    pay_max: 24,
+    pay_unit: "hour",
+    tips_available: false,
+    schedule_days: "Monday-Friday",
+    schedule_time_range: "8:00 AM - 5:00 PM",
+    language_requirement: "korean_helpful",
+    description: "Handle incoming inventory.",
+    responsibilities: [],
+    requirements: [],
+    benefits: [],
+    moderation_status: "approved",
+    boost: null,
+    posted_at: "2026-06-19T12:00:00Z",
+    companies: { name: "Pacific Trade Logistics", is_verified: true },
+    ...overrides,
+  };
 }
 
 describe("searchApprovedJobs — mock fallback", () => {
@@ -115,6 +155,50 @@ describe("searchApprovedJobs — mock fallback", () => {
     setUnconfigured();
     const jobs = await searchApprovedJobs({ city: "Nowhere" });
     expect(jobs).toEqual([]);
+  });
+});
+
+describe("searchApprovedJobs — Supabase configured", () => {
+  it("matches q against title, joined company name, and description", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", REAL_URL);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", REAL_KEY);
+
+    const rows = [
+      dbJobRow(),
+      dbJobRow({
+        id: "22222222-2222-4222-8222-222222222222",
+        title: "Dental Receptionist",
+        description: "Welcome patients and manage appointments.",
+        companies: { name: "Irvine Smile Dental", is_verified: true },
+      }),
+      dbJobRow({
+        id: "33333333-3333-4333-8333-333333333333",
+        title: "Cafe Server",
+        description: "Learn specialty coffee preparation.",
+        companies: { name: "Gangnam Kitchen", is_verified: true },
+      }),
+    ];
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify(rows), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const client = createClient(REAL_URL, REAL_KEY, {
+      global: { fetch: fetchMock },
+    });
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(client);
+
+    const cases = [
+      ["warehouse associate", rows[0].id],
+      ["irvine smile", rows[1].id],
+      ["coffee preparation", rows[2].id],
+    ];
+    for (const [query, expectedId] of cases) {
+      const jobs = await searchApprovedJobs({ q: query });
+      expect(jobs.map((job) => job.id)).toEqual([expectedId]);
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(cases.length);
   });
 });
 

@@ -191,14 +191,8 @@ export function parseJobSearchParams(
  * `getMockJobs()` already returns approved-only.
  */
 export function filterAndSortMockJobs(params: JobSearchParams): Job[] {
-  const q = params.q?.toLowerCase();
-
   const filtered = getMockJobs().filter((job) => {
-    if (q) {
-      const haystack =
-        `${job.title} ${job.companyName} ${job.description}`.toLowerCase();
-      if (!haystack.includes(q)) return false;
-    }
+    if (params.q && !matchesKeyword(job, params.q)) return false;
     if (params.city && job.city !== params.city) return false;
     if (params.category && job.category !== params.category) return false;
     if (params.jobType && job.jobType !== params.jobType) return false;
@@ -216,6 +210,14 @@ export function filterAndSortMockJobs(params: JobSearchParams): Job[] {
   return sortJobs(filtered, params.sort);
 }
 
+/** Keep keyword semantics identical across mock and Supabase-backed results. */
+function matchesKeyword(job: Job, query: string): boolean {
+  const keyword = query.toLowerCase();
+  return `${job.title} ${job.companyName} ${job.description}`
+    .toLowerCase()
+    .includes(keyword);
+}
+
 function sortJobs(jobs: Job[], sort: JobSort | undefined): Job[] {
   const sorted = [...jobs];
   switch (sort) {
@@ -231,11 +233,6 @@ function sortJobs(jobs: Job[], sort: JobSort | undefined): Job[] {
       break;
   }
   return sorted;
-}
-
-/** Escape PostgREST `or`/`ilike` metacharacters in a user-supplied term. */
-function escapeIlike(term: string): string {
-  return term.replace(/[%,()\\]/g, "\\$&");
 }
 
 /**
@@ -269,11 +266,6 @@ export async function searchApprovedJobs(
     if (params.payMin !== undefined) {
       query = query.gte("pay_max", params.payMin);
     }
-    if (params.q) {
-      const term = escapeIlike(params.q);
-      query = query.or(`title.ilike.%${term}%,description.ilike.%${term}%`);
-    }
-
     switch (params.sort) {
       case "pay_high":
         query = query.order("pay_max", { ascending: false });
@@ -290,7 +282,18 @@ export async function searchApprovedJobs(
     const { data, error } = await query;
     if (error) throw error;
     const rows = (data ?? []) as unknown as JobWithCompanyRow[];
-    return rows.map(mapRow);
+    const jobs = rows.map(mapRow);
+
+    // PostgREST cannot OR filters across `jobs` and the joined `companies`
+    // table. Apply only the keyword predicate after the structured DB filters
+    // so `q` consistently searches title + companyName + description in both
+    // configured and mock paths. This route currently fetches the full result
+    // set (no pagination); move this predicate into an SQL function when server-
+    // side pagination is introduced.
+    const keyword = params.q;
+    return keyword
+      ? jobs.filter((job) => matchesKeyword(job, keyword))
+      : jobs;
   } catch (err) {
     console.error(
       "[db] searchApprovedJobs failed; falling back to mock:",
