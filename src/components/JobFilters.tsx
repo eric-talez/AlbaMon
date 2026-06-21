@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   JOB_CATEGORIES,
   JOB_CATEGORY_LABELS,
@@ -6,6 +7,7 @@ import {
   LANGUAGE_REQUIREMENTS,
   LANGUAGE_REQUIREMENT_LABELS,
 } from "@/lib/types";
+import type { JobSearchParams } from "@/lib/db/jobs";
 import { LAUNCH_CITIES } from "@/lib/site";
 
 function Field({
@@ -23,21 +25,34 @@ function Field({
   );
 }
 
-const selectClass =
+const controlClass =
   "h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground";
 
 /**
- * Filter UI placeholders (Slice 1). These are visual only; real URL-based
- * filtering is wired up in Slice 4. Controls are disabled to signal that.
+ * Public job filters (Slice 4). A plain GET form that submits the query params
+ * read by `/jobs` — it works without JavaScript and keeps the filter state in
+ * the URL. `values` are the currently-applied filters (echoed back as defaults).
  */
-export function JobFilters() {
+export function JobFilters({ values = {} }: { values?: JobSearchParams }) {
   return (
     <form
+      method="get"
+      action="/jobs"
       className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-surface p-4 sm:grid-cols-2 lg:grid-cols-3"
-      aria-label="공고 필터 (준비 중)"
+      aria-label="공고 필터"
     >
+      <Field label="검색어 (Keyword)">
+        <input
+          type="text"
+          name="q"
+          defaultValue={values.q ?? ""}
+          placeholder="직무, 회사, 내용"
+          className={controlClass}
+        />
+      </Field>
+
       <Field label="지역 (City)">
-        <select className={selectClass} defaultValue="" disabled>
+        <select name="city" className={controlClass} defaultValue={values.city ?? ""}>
           <option value="">전체 지역</option>
           {LAUNCH_CITIES.map((c) => (
             <option key={c} value={c}>
@@ -48,7 +63,11 @@ export function JobFilters() {
       </Field>
 
       <Field label="업종 (Category)">
-        <select className={selectClass} defaultValue="" disabled>
+        <select
+          name="category"
+          className={controlClass}
+          defaultValue={values.category ?? ""}
+        >
           <option value="">전체 업종</option>
           {JOB_CATEGORIES.map((c) => (
             <option key={c} value={c}>
@@ -59,7 +78,11 @@ export function JobFilters() {
       </Field>
 
       <Field label="고용 형태 (Job type)">
-        <select className={selectClass} defaultValue="" disabled>
+        <select
+          name="jobType"
+          className={controlClass}
+          defaultValue={values.jobType ?? ""}
+        >
           <option value="">전체</option>
           {JOB_TYPES.map((t) => (
             <option key={t} value={t}>
@@ -70,7 +93,11 @@ export function JobFilters() {
       </Field>
 
       <Field label="언어 요건 (Language)">
-        <select className={selectClass} defaultValue="" disabled>
+        <select
+          name="languageRequirement"
+          className={controlClass}
+          defaultValue={values.languageRequirement ?? ""}
+        >
           <option value="">전체</option>
           {LANGUAGE_REQUIREMENTS.map((l) => (
             <option key={l} value={l}>
@@ -80,28 +107,45 @@ export function JobFilters() {
         </select>
       </Field>
 
-      <Field label="최소 시급 (Min pay)">
-        <select className={selectClass} defaultValue="" disabled>
-          <option value="">무관</option>
-          <option value="17">$17+</option>
-          <option value="20">$20+</option>
-          <option value="25">$25+</option>
+      <Field label="최소 급여 (Min pay)">
+        <input
+          type="number"
+          name="payMin"
+          min={0}
+          step={1}
+          inputMode="numeric"
+          defaultValue={values.payMin ?? ""}
+          placeholder="예: 20"
+          className={controlClass}
+        />
+      </Field>
+
+      <Field label="정렬 (Sort)">
+        <select
+          name="sort"
+          className={controlClass}
+          defaultValue={values.sort ?? "newest"}
+        >
+          <option value="newest">최신순</option>
+          <option value="pay_high">급여 높은순</option>
+          <option value="pay_low">급여 낮은순</option>
         </select>
       </Field>
 
-      <Field label="근무 시간대 (Schedule)">
-        <select className={selectClass} defaultValue="" disabled>
-          <option value="">무관</option>
-          <option value="morning">오전</option>
-          <option value="afternoon">오후</option>
-          <option value="evening">저녁</option>
-          <option value="weekend">주말</option>
-        </select>
-      </Field>
-
-      <p className="col-span-full text-xs text-muted">
-        필터는 Slice 4에서 실제 검색과 연동됩니다. 현재는 미리보기입니다.
-      </p>
+      <div className="col-span-full flex items-center gap-3">
+        <button
+          type="submit"
+          className="flex h-10 items-center justify-center rounded-full bg-brand px-5 text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90"
+        >
+          검색 (Search)
+        </button>
+        <Link
+          href="/jobs"
+          className="text-sm text-muted transition-colors hover:text-brand"
+        >
+          필터 초기화 / Reset
+        </Link>
+      </div>
     </form>
   );
 }
