@@ -1,11 +1,32 @@
 import { describe, it, expect } from "vitest";
-import { SITE_NAME, LAUNCH_CITIES } from "@/lib/site";
+import {
+  SITE_NAME,
+  SITE_TAGLINE,
+  SITE_DESCRIPTION,
+  LAUNCH_MARKET,
+  LAUNCH_CITIES,
+} from "@/lib/site";
 
 describe("site config", () => {
-  it("uses the K-Work US brand and avoids forbidden brand names", () => {
+  it("uses the K-Work US brand", () => {
     expect(SITE_NAME).toBe("K-Work US");
-    expect(SITE_NAME.toLowerCase()).not.toContain("albamon");
-    expect(SITE_NAME.toLowerCase()).not.toContain("알바몬");
+  });
+
+  it("never exposes a forbidden/confusable brand name in UI config", () => {
+    const forbidden = ["albamon", "알바몬"];
+    const configStrings = [
+      SITE_NAME,
+      SITE_TAGLINE,
+      SITE_DESCRIPTION,
+      LAUNCH_MARKET,
+      ...LAUNCH_CITIES,
+    ];
+    for (const value of configStrings) {
+      const lower = value.toLowerCase();
+      for (const bad of forbidden) {
+        expect(lower).not.toContain(bad);
+      }
+    }
   });
 
   it("seeds LA/OC launch cities", () => {

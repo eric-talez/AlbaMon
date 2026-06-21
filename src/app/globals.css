@@ -5,6 +5,15 @@
  * Brand: trustworthy, bilingual, community-friendly local hiring.
  */
 :root {
+  /*
+   * Korean-first system font stack — no web-font fetch, no bundled binaries.
+   * Falls through native Korean UI fonts (macOS/iOS, Windows, common installs)
+   * before generic sans-serif, keeping Hangul readable everywhere.
+   */
+  --font-sans-kr: "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic",
+    "맑은 고딕", "Noto Sans KR", system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
   --background: #ffffff;
   --foreground: #18181b;
   --muted: #71717a;
@@ -53,5 +62,5 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans-kr), system-ui, sans-serif;
+  font-family: var(--font-sans-kr);
 }
