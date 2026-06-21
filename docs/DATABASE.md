@@ -50,6 +50,10 @@ policy, preventing recursion) with a pinned `search_path`:
 - `is_admin()` / `is_employer()` → boolean
 - `owns_company(company_id uuid)` → boolean
 - `handle_new_user()` → trigger that auto-provisions a `profiles` row on signup
+- `prevent_profile_role_self_update()` → `before update of role on profiles`
+  trigger; hard-blocks any role change by a non-admin (defense in depth beyond
+  the RLS `WITH CHECK`). Admins may still change roles, and trusted server-side
+  flows (service role / migrations / seed, where `auth.uid()` is null) pass through.
 
 ## Row Level Security summary
 
@@ -57,10 +61,10 @@ RLS is enabled on **all six tables** and is the authorization gate.
 
 | Table | Read | Write |
 | --- | --- | --- |
-| `profiles` | self; admin all | self-update only, and **role cannot change** (pinned to current role); admin all |
-| `companies` | verified (public); owner; admin | owner insert/update own; admin all |
+| `profiles` | self; admin all | self-update only, and **role cannot change** (RLS pins it + a `before update of role` trigger hard-blocks non-admins); admin all |
+| `companies` | verified (public); owner; admin | owner insert/update own — **requires employer or admin role** (seekers cannot); admin all |
 | `jobs` | **`approved` only (public)**; owner; admin | owner insert **forced to `pending`**; owner update but **cannot set `approved`**; admin all |
-| `applications` | own (seeker); employer for their jobs; admin | seeker insert only for `approved` jobs, as self; admin update |
+| `applications` | own (seeker); employer for their jobs; admin | insert only by a **`seeker`-role profile**, as self, for `approved` jobs; admin update |
 | `reports` | own (reporter); admin | any authenticated insert; admin update |
 | `audit_logs` | admin only | **no policy** — service-role only |
 

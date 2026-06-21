@@ -107,6 +107,45 @@ describe("no unsafe RLS patterns", () => {
     );
   });
 
+  it("has a defensive trigger blocking profile role self-update", () => {
+    // Function + the BEFORE UPDATE OF role trigger must both be present.
+    expect(sql).toMatch(/function\s+public\.prevent_profile_role_self_update/i);
+    expect(sql).toMatch(
+      /before\s+update\s+of\s+role\s+on\s+public\.profiles[\s\S]*?execute\s+function\s+public\.prevent_profile_role_self_update/i,
+    );
+  });
+
+  it("the role trigger raises unless the actor is an admin", () => {
+    // Body must compare old/new role and gate on is_admin(), then raise.
+    const fn = sql.match(
+      /function\s+public\.prevent_profile_role_self_update[\s\S]*?\$\$;/i,
+    )?.[0];
+    expect(fn).toBeTruthy();
+    expect(fn).toMatch(/new\.role\s+is\s+distinct\s+from\s+old\.role/i);
+    expect(fn).toMatch(/not\s+public\.is_admin\(\)/i);
+    expect(fn).toMatch(/raise\s+exception/i);
+  });
+
+  it("only seeker-role profiles may insert applications", () => {
+    expect(sql).toMatch(
+      /applications_insert_seeker[\s\S]*?current_profile_role\(\)\s*=\s*'seeker'/i,
+    );
+  });
+
+  it("company insert/update require an employer or admin role", () => {
+    const insert = sql.match(
+      /create\s+policy\s+companies_insert_owner[\s\S]*?;/i,
+    )?.[0];
+    const update = sql.match(
+      /create\s+policy\s+companies_update_owner[\s\S]*?;/i,
+    )?.[0];
+    for (const policy of [insert, update]) {
+      expect(policy).toBeTruthy();
+      expect(policy).toMatch(/public\.is_employer\(\)/i);
+      expect(policy).toMatch(/public\.is_admin\(\)/i);
+    }
+  });
+
   it("audit_logs has no insert/update/delete policy (service-role only)", () => {
     const auditPolicies = [...sql.matchAll(/create\s+policy\s+\w+\s+on\s+public\.audit_logs\s+for\s+(\w+)/gi)].map(
       (m) => m[1].toLowerCase(),

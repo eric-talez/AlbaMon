@@ -273,6 +273,31 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
+-- Defense in depth for role escalation: even if an RLS WITH CHECK is ever
+-- loosened or bypassed, this trigger hard-blocks a non-admin from changing the
+-- `role` of any profile. Admins (per is_admin()) may still change roles, and
+-- trusted server-side flows (service role / migrations / seed, where there is no
+-- authenticated user so auth.uid() is null) are allowed through.
+create or replace function public.prevent_profile_role_self_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.role is distinct from old.role
+     and auth.uid() is not null
+     and not public.is_admin() then
+    raise exception 'Only an admin may change a profile role';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger profiles_prevent_role_self_update
+  before update of role on public.profiles
+  for each row execute function public.prevent_profile_role_self_update();
+
 -- ----------------------------------------------------------------------------
 -- 6. Row Level Security
 -- ----------------------------------------------------------------------------
@@ -313,13 +338,25 @@ create policy companies_select_owner on public.companies
 create policy companies_select_admin on public.companies
   for select using (public.is_admin());
 
+-- Only employers (or admins) may create/own companies — seekers cannot create
+-- or edit a company through the owner path.
 create policy companies_insert_owner on public.companies
-  for insert with check (owner_id = auth.uid());
+  for insert
+  with check (
+    owner_id = auth.uid()
+    and (public.is_employer() or public.is_admin())
+  );
 
 create policy companies_update_owner on public.companies
   for update
-  using (owner_id = auth.uid())
-  with check (owner_id = auth.uid());
+  using (
+    owner_id = auth.uid()
+    and (public.is_employer() or public.is_admin())
+  )
+  with check (
+    owner_id = auth.uid()
+    and (public.is_employer() or public.is_admin())
+  );
 
 create policy companies_update_admin on public.companies
   for update
@@ -355,11 +392,13 @@ create policy jobs_update_admin on public.jobs
   with check (public.is_admin());
 
 -- --- applications -----------------------------------------------------------
--- Seekers may apply only to approved jobs, and only as themselves.
+-- Seekers may apply only to approved jobs, only as themselves, and only when
+-- their DB profile role is actually `seeker`.
 create policy applications_insert_seeker on public.applications
   for insert
   with check (
     seeker_id = auth.uid()
+    and public.current_profile_role() = 'seeker'
     and exists (
       select 1 from public.jobs j
       where j.id = job_id and j.moderation_status = 'approved'
