@@ -31,7 +31,7 @@ Without the CLI, run every file in `migrations/` in filename order, then run
 | `profiles` | One row per `auth.users` user; DB-level source of truth for role. | Auto-created by the `on_auth_user_created` trigger (defaults to `seeker`). |
 | `companies` | Employer companies. | `owner_id → profiles`; `is_verified` gates public visibility. |
 | `jobs` | Job postings. | `company_id → companies`; `moderation_status` gates public visibility; `address_display_mode` is `full`/`city_only`. |
-| `applications` | Seeker applications. | `unique(job_id, seeker_id)` blocks duplicates. |
+| `applications` | Seeker applications. | `unique(job_id, seeker_id)` blocks duplicates; optional `cover_note` is limited to 1,000 characters. |
 | `reports` | Abuse/quality reports. | Nullable `reporter_id`/`job_id`/`company_id`. |
 | `audit_logs` | Append-only audit trail. | No `updated_at`; writes via service-role only. |
 
@@ -68,11 +68,17 @@ RLS is enabled on **all six tables** and is the authorization gate.
 | `profiles` | self; admin all | self-update only, and **role cannot change** (RLS pins it + a `before update of role` trigger hard-blocks non-admins); admin all |
 | `companies` | verified (public); current-role owner; admin | owner insert/update own — **requires employer or admin role**; admin all |
 | `jobs` | **`approved` only (public)**; current-role owner; admin | employer/admin owner insert **forced to `pending`**; owner update cannot set `approved`; admin all |
-| `applications` | own (seeker); current-role employer for owned jobs; admin | insert only by a **`seeker`-role profile**, as self, for `approved` jobs; admin update |
+| `applications` | own (seeker); current-role employer for owned jobs; admin | insert only by a **`seeker`-role profile**, as self, for `approved` jobs with initial status `submitted`; admin update |
 | `reports` | own (reporter); admin | any authenticated insert; admin update |
 | `audit_logs` | admin only | **no policy** — service-role only |
 
 ## App access layer
+
+[`src/lib/db/applications.ts`](../src/lib/db/applications.ts) creates applications
+through the caller's authenticated Supabase session. It does not accept a status
+or use a service-role client. Duplicate, RLS, and foreign-key failures are mapped
+to safe application outcomes; unconfigured environments never perform mock
+writes.
 
 [`src/lib/db/jobs.ts`](../src/lib/db/jobs.ts) exposes `getApprovedJobs()`,
 `getApprovedJobById(id)`, and `searchApprovedJobs(params)`:

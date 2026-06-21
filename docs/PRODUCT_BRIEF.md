@@ -121,5 +121,9 @@ client-only) and Supabase RLS.
     local/test/build use deterministic approved-only mocks.
   - Original roadmap items still deferred: schedule filter, featured-first sort,
     pagination/load-more, expiry filtering, and a dedicated loading state.
-- **Slice 5 — Job detail & apply:** next. The job detail page intentionally shows
-  a disabled coming-soon control until application submission exists.
+- **Slice 5 — Job detail & apply:** scoped implementation done.
+  - Approved job details link to a guarded application route.
+  - Seekers may submit one optional 1,000-character cover note per job.
+  - Employer/admin roles, unapproved jobs, duplicate writes, and missing profiles
+    fail closed through server checks plus database RLS/constraints.
+  - Supabase-unconfigured environments do not simulate application writes.

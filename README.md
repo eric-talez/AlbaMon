@@ -129,9 +129,17 @@ Owner RLS policies also require the caller's current `employer`/`admin` profile
 role. Removing an employer role therefore revokes private company/job/applicant
 access even if the old company ownership row remains.
 
-> Not yet built: application submission, employer job-posting, and admin
-> moderation UIs. The recommended next slice is the **job-seeker application
-> submission flow** (writing to `applications` under the existing RLS).
+## Application submission (Slice 5)
+
+Approved job details link to `/jobs/[id]/apply`. Authenticated seekers can submit
+one optional cover note (maximum 1,000 characters); the server action rechecks
+the runtime profile role and approved job status, while RLS and the unique
+`(job_id, seeker_id)` constraint remain the final authorization and duplicate
+gates. Employer/admin accounts are blocked. Without Supabase, public mock jobs
+remain browsable but application writes are unavailable and are never mocked.
+
+> Not yet built: resume upload, employer applicant management, job posting, and
+> admin moderation UIs.
 
 ## Development approach
 

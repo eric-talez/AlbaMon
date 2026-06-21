@@ -46,13 +46,15 @@ describe("getMockJobs", () => {
   });
 });
 
-describe("pre-application job detail", () => {
-  it("does not link to the unimplemented Slice 5 application route", () => {
+describe("application job detail", () => {
+  it("links approved job details to the Slice 5 application route", () => {
     const source = readFileSync(
       join(process.cwd(), "src", "app", "(public)", "jobs", "[id]", "page.tsx"),
       "utf8",
     );
-    expect(source).not.toMatch(/href=\{`\/jobs\/\$\{job\.id\}\/apply`\}/);
-    expect(source).toContain('aria-disabled="true"');
+    expect(source).toContain(
+      "href={`/jobs/${encodeURIComponent(job.id)}/apply`}",
+    );
+    expect(source).not.toContain('aria-disabled="true"');
   });
 });
