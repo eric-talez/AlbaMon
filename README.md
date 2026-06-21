@@ -11,8 +11,9 @@ community. Mobile-first. Initial market: **LA / Orange County**.
 
 - **Next.js 16** (App Router) + **React 19** + **TypeScript** (strict)
 - **Tailwind CSS v4**
+- **Supabase Auth + Postgres + Row Level Security**
 - **Vitest** for unit tests
-- Planned: Supabase (Auth + Postgres + RLS), Stripe Checkout, Resend/SendGrid
+- Planned: Stripe Checkout, Resend/SendGrid
 
 ## Local setup
 
@@ -98,10 +99,11 @@ supabase db reset   # apply migrations/ + seed.sql to a local DB (CLI + Docker)
 **Mock fallback:** the public job pages read through
 [`src/lib/db/jobs.ts`](src/lib/db/jobs.ts) (`getApprovedJobs` /
 `getApprovedJobById` / `searchApprovedJobs`). When Supabase is **not** configured
-(the default for dev/test/build) they return the existing mock data; once real
-Supabase env vars are set they query the DB and return **only `approved` jobs**
-(mirroring the public RLS policy). Tests and `next build` stay deterministic on
-mock data.
+in development, tests, or `next build`, they return deterministic mock data. A
+production runtime never substitutes mock listings for missing configuration or
+a DB outage; those errors are surfaced instead. Configured reads use the
+approved-only `public_job_listings` view, which exposes safe company identity
+without making the rest of an unverified company profile public.
 
 ## Browse, search & roles (Slice 4)
 
@@ -123,6 +125,10 @@ A Supabase-authenticated user **without a profile row fails closed** (treated as
 unauthenticated until the profile exists). Dev-auth (Supabase unconfigured,
 non-production) is unchanged, as is the Slice 2 production fail-closed behavior.
 
+Owner RLS policies also require the caller's current `employer`/`admin` profile
+role. Removing an employer role therefore revokes private company/job/applicant
+access even if the old company ownership row remains.
+
 > Not yet built: application submission, employer job-posting, and admin
 > moderation UIs. The recommended next slice is the **job-seeker application
 > submission flow** (writing to `applications` under the existing RLS).
@@ -134,7 +140,7 @@ See the slice table in [`docs/PRODUCT_BRIEF.md`](docs/PRODUCT_BRIEF.md).
 
 ## Compliance
 
-Employment-compliance rules are enforced in code (`lib/compliance`, added in later
-slices): blocked discriminatory / visa-preference / illegal-cash phrasing, required
-pay range, and work-authorization disclaimers. The platform provides **information
-only** and does not give legal advice or determine work eligibility.
+Current controls require pay ranges in the schema and show work-authorization
+disclaimers. Automated discriminatory / visa-preference / illegal-cash wording
+validation is planned for a later compliance slice. The platform provides
+**information only** and does not give legal advice or determine work eligibility.

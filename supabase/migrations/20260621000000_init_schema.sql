@@ -59,8 +59,8 @@ create type public.boost_type as enum ('featured', 'urgent');
 -- ----------------------------------------------------------------------------
 
 -- profiles: one row per auth user. The DB-level source of truth for role.
--- (Runtime auth still reads role from user_metadata in Slice 3; switching
---  getCurrentUser() to this table is deferred to the next slice.)
+-- At the time Slice 3 shipped, runtime auth still read user_metadata; Slice 4
+-- moved authorization to this DB-owned role.
 create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   role public.user_role not null default 'seeker',

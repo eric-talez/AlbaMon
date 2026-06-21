@@ -30,6 +30,18 @@ function seedSql(): string {
   return readFileSync(SEED_PATH, "utf8");
 }
 
+function latestPolicy(sql: string, name: string): string | undefined {
+  const matches = [
+    ...sql.matchAll(
+      new RegExp(
+        `create\\s+policy\\s+${name}\\s+on\\s+public\\.\\w+[\\s\\S]*?;`,
+        "gi",
+      ),
+    ),
+  ];
+  return matches.at(-1)?.[0];
+}
+
 describe("migration exists and enables RLS", () => {
   it("ships a timestamp-named initial migration", () => {
     const files = migrationFiles();
@@ -144,6 +156,35 @@ describe("no unsafe RLS patterns", () => {
       expect(policy).toMatch(/public\.is_employer\(\)/i);
       expect(policy).toMatch(/public\.is_admin\(\)/i);
     }
+  });
+
+  it("all owner-only reads and job writes require the current employer/admin role", () => {
+    const policyNames = [
+      "companies_select_owner",
+      "jobs_select_owner",
+      "jobs_insert_owner",
+      "jobs_update_owner",
+      "applications_select_employer",
+    ];
+    for (const name of policyNames) {
+      const policy = latestPolicy(sql, name);
+      expect(policy, name).toBeTruthy();
+      expect(policy, name).toMatch(/public\.is_employer\(\)/i);
+      expect(policy, name).toMatch(/public\.is_admin\(\)/i);
+    }
+  });
+
+  it("exposes approved jobs through a read-only view with safe company identity", () => {
+    const view = sql.match(
+      /create\s+view\s+public\.public_job_listings[\s\S]*?where\s+j\.moderation_status\s*=\s*'approved'\s*;/i,
+    )?.[0];
+    expect(view).toBeTruthy();
+    expect(view).toMatch(/c\.name\s+as\s+company_name/i);
+    expect(view).toMatch(/c\.is_verified\s+as\s+company_is_verified/i);
+    expect(view).not.toMatch(/c\.(?:phone|website|address_display)/i);
+    expect(sql).toMatch(
+      /grant\s+select\s+on\s+public\.public_job_listings\s+to\s+anon,\s*authenticated/i,
+    );
   });
 
   it("audit_logs has no insert/update/delete policy (service-role only)", () => {

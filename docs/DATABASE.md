@@ -1,4 +1,4 @@
-# Database — K-Work US (Slice 3)
+# Database — K-Work US (Slices 3–4.5)
 
 The Postgres schema is defined by SQL migrations under
 [`supabase/migrations/`](../supabase/migrations/), which are the **source of
@@ -15,8 +15,8 @@ supabase db reset   # apply migrations/ then seed.sql from scratch
 # hosted: supabase link --project-ref <ref> && supabase db push
 ```
 
-Without the CLI, paste `migrations/20260621000000_init_schema.sql` then
-`seed.sql` into the Supabase SQL editor.
+Without the CLI, run every file in `migrations/` in filename order, then run
+`seed.sql` in the Supabase SQL editor.
 
 ## Enums
 
@@ -34,6 +34,10 @@ Without the CLI, paste `migrations/20260621000000_init_schema.sql` then
 | `applications` | Seeker applications. | `unique(job_id, seeker_id)` blocks duplicates. |
 | `reports` | Abuse/quality reports. | Nullable `reporter_id`/`job_id`/`company_id`. |
 | `audit_logs` | Append-only audit trail. | No `updated_at`; writes via service-role only. |
+
+`public_job_listings` is a read-only, approved-only view used by public job
+pages. It includes job fields plus `company_name` / `company_is_verified`, but
+does not expose private company profile columns.
 
 Constraints: `pay_min >= 0`, `pay_max >= pay_min`, non-empty `jobs.title`,
 `companies.name`, `jobs.description`. Indexes cover the public query
@@ -62,31 +66,30 @@ RLS is enabled on **all six tables** and is the authorization gate.
 | Table | Read | Write |
 | --- | --- | --- |
 | `profiles` | self; admin all | self-update only, and **role cannot change** (RLS pins it + a `before update of role` trigger hard-blocks non-admins); admin all |
-| `companies` | verified (public); owner; admin | owner insert/update own — **requires employer or admin role** (seekers cannot); admin all |
-| `jobs` | **`approved` only (public)**; owner; admin | owner insert **forced to `pending`**; owner update but **cannot set `approved`**; admin all |
-| `applications` | own (seeker); employer for their jobs; admin | insert only by a **`seeker`-role profile**, as self, for `approved` jobs; admin update |
+| `companies` | verified (public); current-role owner; admin | owner insert/update own — **requires employer or admin role**; admin all |
+| `jobs` | **`approved` only (public)**; current-role owner; admin | employer/admin owner insert **forced to `pending`**; owner update cannot set `approved`; admin all |
+| `applications` | own (seeker); current-role employer for owned jobs; admin | insert only by a **`seeker`-role profile**, as self, for `approved` jobs; admin update |
 | `reports` | own (reporter); admin | any authenticated insert; admin update |
 | `audit_logs` | admin only | **no policy** — service-role only |
 
 ## App access layer
 
-[`src/lib/db/jobs.ts`](../src/lib/db/jobs.ts) exposes `getApprovedJobs()` and
-`getApprovedJobById(id)`:
+[`src/lib/db/jobs.ts`](../src/lib/db/jobs.ts) exposes `getApprovedJobs()`,
+`getApprovedJobById(id)`, and `searchApprovedJobs(params)`:
 
-- **Supabase not configured** (default in dev/test/build) → returns mock data
-  from `src/lib/mock/jobs.ts`.
-- **Configured** → queries the DB (joining the company), filtering
-  `moderation_status = 'approved'` as defense in depth beyond RLS, and maps rows
-  to the camelCase `Job` view type. Query errors log and fall back to mock; the
-  public path never throws.
+- **Development/test/production build without Supabase** → deterministic mock
+  data from `src/lib/mock/jobs.ts`.
+- **Production runtime without Supabase, or with a DB failure** → throws instead
+  of silently presenting fictional listings.
+- **Configured** → queries `public_job_listings`, filters approved rows again as
+  defense in depth, and maps rows to the camelCase `Job` type.
 
 ## Known limitations
 
-- Runtime auth still reads the role from Supabase `user_metadata`/dev-auth, not
-  `profiles`. The table + helpers + RLS are ready; switching `getCurrentUser()`
-  to `profiles` is deferred to the next slice (needs a live Supabase project to
-  verify the auth hot path).
+- Runtime auth reads `profiles.role`; missing/error profile reads fail closed.
 - No employer posting, application submit, or admin moderation UI yet — only the
   read path is wired.
 - Seed uses fixed UUIDs and inserts into `auth.users`; intended for local/demo
   use, not production data.
+- RLS behavior is covered by static migration tests; a live Supabase policy
+  integration suite is still recommended before production launch.

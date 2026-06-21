@@ -87,9 +87,32 @@ export interface JobRow {
   updated_at: string;
 }
 
-/** A `jobs` row with its company joined in, as returned by the public query. */
-export interface JobWithCompanyRow extends JobRow {
-  companies: Pick<CompanyRow, "name" | "is_verified"> | null;
+/** Approved-only row returned by the safe `public_job_listings` view. */
+export interface PublicJobListingRow {
+  id: string;
+  title: string;
+  category: JobCategory;
+  job_type: JobType;
+  city: string;
+  state: string;
+  address_display: string | null;
+  address_display_mode: AddressDisplayMode;
+  pay_min: number;
+  pay_max: number;
+  pay_unit: PayUnit;
+  tips_available: boolean;
+  schedule_days: string;
+  schedule_time_range: string;
+  language_requirement: LanguageRequirement;
+  description: string;
+  responsibilities: string[];
+  requirements: string[];
+  benefits: string[];
+  moderation_status: ModerationStatus;
+  boost: BoostType | null;
+  posted_at: string | null;
+  company_name: string;
+  company_is_verified: boolean;
 }
 
 export interface ApplicationRow {

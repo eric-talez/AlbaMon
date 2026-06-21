@@ -1,5 +1,6 @@
 import "server-only";
 
+import { PHASE_PRODUCTION_BUILD } from "next/constants";
 import {
   JOB_CATEGORIES,
   JOB_TYPES,
@@ -10,40 +11,59 @@ import {
   type LanguageRequirement,
 } from "@/lib/types";
 import { getMockJobById, getMockJobs } from "@/lib/mock/jobs";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { isProduction, isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { AddressDisplayMode, JobWithCompanyRow } from "@/lib/db/types";
+import type { AddressDisplayMode, PublicJobListingRow } from "@/lib/db/types";
 
 /**
  * Public job reads for K-Work US.
  *
  * Behavior:
- * - Supabase NOT configured (default in dev/test/build): returns mock data, so
- *   the public shell and the test/build pipeline stay deterministic.
- * - Supabase configured: reads from the DB, joining the company. Only
- *   `approved` jobs are returned — this mirrors the public RLS policy and adds
- *   defense in depth so a misconfiguration can never leak unapproved jobs.
- * - On any query error we log and fall back to mock data; the public path never
- *   throws.
+ * - Supabase NOT configured in dev/test/build: deterministic approved mocks.
+ * - Supabase configured: reads the approved-only public view, including safe
+ *   company identity fields for verified and unverified companies.
+ * - Production runtime configuration/query failures are surfaced; they never
+ *   silently replace real listings with mock data.
  *
  * This is intentionally read-only and approved-only. Employer and admin write
  * paths arrive in later slices.
  */
 
-const JOB_SELECT =
+const PUBLIC_JOB_SELECT =
   "id, title, category, job_type, city, state, address_display, " +
   "address_display_mode, pay_min, pay_max, pay_unit, tips_available, " +
   "schedule_days, schedule_time_range, language_requirement, description, " +
   "responsibilities, requirements, benefits, moderation_status, boost, " +
-  "posted_at, companies(name, is_verified)";
+  "posted_at, company_name, company_is_verified";
+
+/**
+ * Mock jobs are a local/test/build fixture, never a production-runtime outage
+ * fallback. Next sets NEXT_PHASE during `next build`, where deterministic mock
+ * data is still required to prerender the mock job detail paths.
+ */
+function assertMockJobsAllowed(operation: string): void {
+  const isBuild = process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD;
+  if (isProduction() && !isBuild) {
+    throw new Error(
+      `[db] ${operation} requires Supabase in production runtime; ` +
+        "mock job fallback is disabled.",
+    );
+  }
+}
+
+function mayFallbackToMockJobs(): boolean {
+  return (
+    !isProduction() || process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD
+  );
+}
 
 /** Map a DB row (snake_case + joined company) to the app's `Job` view type. */
-function mapRow(row: JobWithCompanyRow): Job {
+function mapRow(row: PublicJobListingRow): Job {
   return {
     id: row.id,
     title: row.title,
-    companyName: row.companies?.name ?? "",
-    employerVerified: row.companies?.is_verified ?? false,
+    companyName: row.company_name,
+    employerVerified: row.company_is_verified,
     category: row.category,
     jobType: row.job_type,
     city: row.city,
@@ -70,42 +90,52 @@ function mapRow(row: JobWithCompanyRow): Job {
 
 /** Approved jobs for the public board. */
 export async function getApprovedJobs(): Promise<Job[]> {
-  if (!isSupabaseConfigured()) return getMockJobs();
+  if (!isSupabaseConfigured()) {
+    assertMockJobsAllowed("getApprovedJobs");
+    return getMockJobs();
+  }
 
   try {
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
-      .from("jobs")
-      .select(JOB_SELECT)
+      .from("public_job_listings")
+      .select(PUBLIC_JOB_SELECT)
       .eq("moderation_status", "approved")
       .order("posted_at", { ascending: false });
 
     if (error) throw error;
-    const rows = (data ?? []) as unknown as JobWithCompanyRow[];
+    const rows = (data ?? []) as unknown as PublicJobListingRow[];
     return rows.map(mapRow);
   } catch (err) {
-    console.error("[db] getApprovedJobs failed; falling back to mock:", err);
+    console.error("[db] getApprovedJobs failed:", err);
+    if (!mayFallbackToMockJobs()) throw err;
+    console.warn("[db] getApprovedJobs falling back to mock data");
     return getMockJobs();
   }
 }
 
 /** A single approved job by id, or `undefined` if not found / not approved. */
 export async function getApprovedJobById(id: string): Promise<Job | undefined> {
-  if (!isSupabaseConfigured()) return getMockJobById(id);
+  if (!isSupabaseConfigured()) {
+    assertMockJobsAllowed("getApprovedJobById");
+    return getMockJobById(id);
+  }
 
   try {
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
-      .from("jobs")
-      .select(JOB_SELECT)
+      .from("public_job_listings")
+      .select(PUBLIC_JOB_SELECT)
       .eq("id", id)
       .eq("moderation_status", "approved")
       .maybeSingle();
 
     if (error) throw error;
-    return data ? mapRow(data as unknown as JobWithCompanyRow) : undefined;
+    return data ? mapRow(data as unknown as PublicJobListingRow) : undefined;
   } catch (err) {
-    console.error("[db] getApprovedJobById failed; falling back to mock:", err);
+    console.error("[db] getApprovedJobById failed:", err);
+    if (!mayFallbackToMockJobs()) throw err;
+    console.warn("[db] getApprovedJobById falling back to mock data");
     return getMockJobById(id);
   }
 }
@@ -235,26 +265,34 @@ function sortJobs(jobs: Job[], sort: JobSort | undefined): Job[] {
   return sorted;
 }
 
+/** Escape PostgREST `or`/`ilike` metacharacters in a user-supplied term. */
+function escapeIlike(term: string): string {
+  return term.replace(/[%,()_\\]/g, "\\$&");
+}
+
 /**
  * Approved jobs matching `params` for the public board.
  *
  * - Supabase NOT configured: filter/sort the mock data in memory (approved-only).
- * - Supabase configured: query `jobs` (+ joined company), `moderation_status =
- *   'approved'`, applying each provided filter. On any error we log and fall
- *   back to the same in-memory filter so the public path never throws.
+ * - Supabase configured: query the approved-only `public_job_listings` view and
+ *   apply each structured filter. Non-production errors may use the same mock
+ *   filter; production runtime errors are rethrown.
  *
  * Pending/draft/rejected jobs are never returned (RLS + the explicit filter).
  */
 export async function searchApprovedJobs(
   params: JobSearchParams,
 ): Promise<Job[]> {
-  if (!isSupabaseConfigured()) return filterAndSortMockJobs(params);
+  if (!isSupabaseConfigured()) {
+    assertMockJobsAllowed("searchApprovedJobs");
+    return filterAndSortMockJobs(params);
+  }
 
   try {
     const supabase = await createSupabaseServerClient();
     let query = supabase
-      .from("jobs")
-      .select(JOB_SELECT)
+      .from("public_job_listings")
+      .select(PUBLIC_JOB_SELECT)
       .eq("moderation_status", "approved");
 
     if (params.city) query = query.eq("city", params.city);
@@ -265,6 +303,13 @@ export async function searchApprovedJobs(
     }
     if (params.payMin !== undefined) {
       query = query.gte("pay_max", params.payMin);
+    }
+    if (params.q) {
+      const term = escapeIlike(params.q);
+      query = query.or(
+        `title.ilike.%${term}%,company_name.ilike.%${term}%,` +
+          `description.ilike.%${term}%`,
+      );
     }
     switch (params.sort) {
       case "pay_high":
@@ -281,24 +326,20 @@ export async function searchApprovedJobs(
 
     const { data, error } = await query;
     if (error) throw error;
-    const rows = (data ?? []) as unknown as JobWithCompanyRow[];
+    const rows = (data ?? []) as unknown as PublicJobListingRow[];
     const jobs = rows.map(mapRow);
 
-    // PostgREST cannot OR filters across `jobs` and the joined `companies`
-    // table. Apply only the keyword predicate after the structured DB filters
-    // so `q` consistently searches title + companyName + description in both
-    // configured and mock paths. This route currently fetches the full result
-    // set (no pagination); move this predicate into an SQL function when server-
-    // side pagination is introduced.
+    // The public view flattens safe company identity into `company_name`, so the
+    // DB can search all three fields in one OR. Re-check the mapped rows to keep
+    // exact case-insensitive substring semantics aligned with the mock path.
     const keyword = params.q;
     return keyword
       ? jobs.filter((job) => matchesKeyword(job, keyword))
       : jobs;
   } catch (err) {
-    console.error(
-      "[db] searchApprovedJobs failed; falling back to mock:",
-      err,
-    );
+    console.error("[db] searchApprovedJobs failed:", err);
+    if (!mayFallbackToMockJobs()) throw err;
+    console.warn("[db] searchApprovedJobs falling back to mock data");
     return filterAndSortMockJobs(params);
   }
 }
