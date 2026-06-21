@@ -1,6 +1,9 @@
 import { requireUser } from "@/lib/auth/guards";
 import { AccountBar } from "@/components/auth/AccountBar";
 
+// Auth-gated: depends on the request session, so never statically prerender.
+export const dynamic = "force-dynamic";
+
 /** Any authenticated user may access /dashboard. Guarded server-side. */
 export default async function DashboardLayout({
   children,

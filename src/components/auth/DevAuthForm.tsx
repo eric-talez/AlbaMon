@@ -31,8 +31,8 @@ export function DevAuthForm({ mode, next, error }: DevAuthFormProps) {
       <div className="rounded-xl border border-border bg-surface p-6 text-center">
         <h1 className="text-2xl font-bold">{title}</h1>
         <p className="mt-2 text-sm text-muted">
-          Supabase 인증이 연결되어 있습니다. 실제 이메일/소셜 로그인 UI는 다음
-          단계에서 제공됩니다.
+          이메일/소셜 로그인 UI는 다음 단계에서 제공됩니다. (Email/social sign-in
+          coming soon.)
         </p>
       </div>
     );

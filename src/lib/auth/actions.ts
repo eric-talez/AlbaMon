@@ -3,7 +3,12 @@
 import { redirect } from "next/navigation";
 import { ROLES, type Role } from "@/lib/types";
 import { roleHome } from "@/lib/auth/access";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import {
+  isSupabaseConfigured,
+  isDevAuthEnabled,
+  assertAuthConfiguredForProduction,
+} from "@/lib/supabase/config";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { writeDevSession, clearDevSession } from "@/lib/auth/dev-session";
 
 function parseRole(value: FormDataEntryValue | null): Role {
@@ -24,8 +29,10 @@ function normalizeNext(value: FormDataEntryValue | null): string | null {
  * surface a clear message instead of silently faking a session.
  */
 export async function signInDev(formData: FormData): Promise<void> {
-  if (isSupabaseConfigured()) {
-    // Real auth is configured — dev sign-in is disabled on purpose.
+  if (!isDevAuthEnabled()) {
+    // In production without Supabase this throws (fail closed); otherwise
+    // Supabase is configured and real auth handles sign-in.
+    assertAuthConfiguredForProduction();
     redirect("/login?error=use_real_auth");
   }
 
@@ -41,12 +48,18 @@ export async function signInDev(formData: FormData): Promise<void> {
   redirect(next ?? roleHome(role));
 }
 
-/** Sign out of the current session (dev mode clears the dev cookie). */
+/**
+ * Sign out of the current session.
+ * - Supabase mode: revoke the session server-side via `supabase.auth.signOut()`.
+ * - Dev mode: clear the dev-session cookie.
+ * Then redirect home.
+ */
 export async function signOut(): Promise<void> {
-  if (!isSupabaseConfigured()) {
+  if (isSupabaseConfigured()) {
+    const supabase = await createSupabaseServerClient();
+    await supabase.auth.signOut();
+  } else {
     await clearDevSession();
   }
-  // In Supabase mode the client SDK + proxy handle token clearing; a future
-  // slice wires supabase.auth.signOut() here.
   redirect("/");
 }

@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/auth/session";
+import { requireUser } from "@/lib/auth/guards";
 import { ROLE_LABELS } from "@/lib/auth/types";
 import { roleHome } from "@/lib/auth/access";
 
 export const metadata: Metadata = { title: "대시보드" };
 
 export default async function DashboardPage() {
-  // The layout guard guarantees a user; read it for display.
-  const user = (await getCurrentUser())!;
+  // Re-assert the guard at the page level (never trust a non-null assumption).
+  const user = await requireUser("/dashboard");
   const home = roleHome(user.role);
 
   return (

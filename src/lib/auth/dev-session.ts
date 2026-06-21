@@ -1,53 +1,38 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { ROLES, type Role } from "@/lib/types";
 import type { AuthUser } from "@/lib/auth/types";
+import { isDevAuthEnabled } from "@/lib/supabase/config";
+import {
+  DEV_COOKIE,
+  decodeDevSession,
+  encodeDevSession,
+  type DevSessionPayload,
+} from "@/lib/auth/dev-session-core";
 
 /**
- * Dev-mode session, used ONLY when Supabase is not configured (placeholder env).
- * Stores a base64 JSON blob in a cookie so the role-guard flow is fully
- * exercisable locally without a live auth provider.
+ * Cookie wrapper around the pure dev-session core (see `dev-session-core.ts`).
  *
- * This is intentionally NOT cryptographically signed — it is a developer
- * convenience and must never be enabled in production. Real auth uses Supabase.
+ * Every entry point is gated on `isDevAuthEnabled()` so the unsigned dev cookie
+ * can never read OR write a session in production (or once Supabase is wired up).
  */
-const DEV_COOKIE = "kw_dev_session";
-
-interface DevSessionPayload {
-  id: string;
-  email: string;
-  role: Role;
-}
-
-function isValidPayload(value: unknown): value is DevSessionPayload {
-  if (typeof value !== "object" || value === null) return false;
-  const v = value as Record<string, unknown>;
-  return (
-    typeof v.id === "string" &&
-    typeof v.email === "string" &&
-    typeof v.role === "string" &&
-    (ROLES as readonly string[]).includes(v.role)
-  );
-}
 
 export async function readDevSession(): Promise<AuthUser | null> {
+  // Production / Supabase-configured → `allowDevAuth` is false → always null.
+  if (!isDevAuthEnabled()) return null;
   const store = await cookies();
-  const raw = store.get(DEV_COOKIE)?.value;
-  if (!raw) return null;
-  try {
-    const json = JSON.parse(Buffer.from(raw, "base64").toString("utf8"));
-    if (!isValidPayload(json)) return null;
-    return { id: json.id, email: json.email, role: json.role, isDev: true };
-  } catch {
-    return null;
-  }
+  return decodeDevSession(store.get(DEV_COOKIE)?.value, true);
 }
 
 /** Must be called from a Server Action or Route Handler. */
 export async function writeDevSession(payload: DevSessionPayload): Promise<void> {
+  if (!isDevAuthEnabled()) {
+    throw new Error(
+      "Refusing to write a dev session: dev-auth is disabled " +
+        "(production, or Supabase is configured).",
+    );
+  }
   const store = await cookies();
-  const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
-  store.set(DEV_COOKIE, encoded, {
+  store.set(DEV_COOKIE, encodeDevSession(payload), {
     httpOnly: true,
     sameSite: "lax",
     path: "/",

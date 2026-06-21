@@ -1,6 +1,9 @@
 import { requireArea } from "@/lib/auth/guards";
 import { AccountBar } from "@/components/auth/AccountBar";
 
+// Auth-gated: depends on the request session, so never statically prerender.
+export const dynamic = "force-dynamic";
+
 /**
  * Employer area. Seekers are rejected (→ /forbidden); admins are allowed.
  * Guarded server-side, so every nested route (incl. /employer/jobs/new) is
