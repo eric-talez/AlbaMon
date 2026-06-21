@@ -97,14 +97,35 @@ supabase db reset   # apply migrations/ + seed.sql to a local DB (CLI + Docker)
 
 **Mock fallback:** the public job pages read through
 [`src/lib/db/jobs.ts`](src/lib/db/jobs.ts) (`getApprovedJobs` /
-`getApprovedJobById`). When Supabase is **not** configured (the default for
-dev/test/build) they return the existing mock data; once real Supabase env vars
-are set they query the DB and return **only `approved` jobs** (mirroring the
-public RLS policy). Tests and `next build` stay deterministic on mock data.
+`getApprovedJobById` / `searchApprovedJobs`). When Supabase is **not** configured
+(the default for dev/test/build) they return the existing mock data; once real
+Supabase env vars are set they query the DB and return **only `approved` jobs**
+(mirroring the public RLS policy). Tests and `next build` stay deterministic on
+mock data.
 
-> Slice 3 prepares the DB as the role source of truth but does **not** yet change
-> `getCurrentUser()` — runtime auth still reads the role from `user_metadata`.
-> Switching it to `profiles` is a next-slice task.
+## Browse, search & roles (Slice 4)
+
+**DB-backed browse/search.** `/jobs` is a server-rendered page driven by URL query
+params. [`src/components/JobFilters.tsx`](src/components/JobFilters.tsx) is a plain
+**GET form** (works without JavaScript) that submits `q`, `city`, `category`,
+`jobType`, `languageRequirement`, `payMin`, and `sort` (`newest` | `pay_high` |
+`pay_low`). `searchApprovedJobs()` applies these filters against the DB when
+Supabase is configured and against the mock data otherwise — always approved-only,
+so pending/draft/rejected jobs are never exposed. Invalid query values are ignored
+safely (`parseJobSearchParams`), and a **필터 초기화 / Reset** link clears them.
+
+**Runtime role source is now `profiles.role`.** When Supabase is configured,
+`getCurrentUser()` ([`src/lib/auth/session.ts`](src/lib/auth/session.ts)) verifies
+the user with `supabase.auth.getUser()` and then reads the role from the
+`profiles` table via [`src/lib/db/profiles.ts`](src/lib/db/profiles.ts). The
+client-influenced `user_metadata.role` is **no longer trusted** for authorization.
+A Supabase-authenticated user **without a profile row fails closed** (treated as
+unauthenticated until the profile exists). Dev-auth (Supabase unconfigured,
+non-production) is unchanged, as is the Slice 2 production fail-closed behavior.
+
+> Not yet built: application submission, employer job-posting, and admin
+> moderation UIs. The recommended next slice is the **job-seeker application
+> submission flow** (writing to `applications` under the existing RLS).
 
 ## Development approach
 
