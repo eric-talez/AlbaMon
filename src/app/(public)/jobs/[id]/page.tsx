@@ -7,7 +7,7 @@ import {
   JOB_CATEGORY_LABELS,
   LANGUAGE_REQUIREMENT_LABELS,
 } from "@/lib/types";
-import { getMockJobById, getMockJobs } from "@/lib/mock/jobs";
+import { getApprovedJobById, getApprovedJobs } from "@/lib/db/jobs";
 import { Badge, BoostBadge, VerifiedBadge } from "@/components/Badge";
 import { WorkAuthorizationDisclaimer } from "@/components/WorkAuthorizationDisclaimer";
 
@@ -19,7 +19,7 @@ export async function generateMetadata({
   params: Promise<Params>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const job = getMockJobById(id);
+  const job = await getApprovedJobById(id);
   if (!job) return { title: "공고를 찾을 수 없습니다" };
   return {
     title: `${job.title} — ${job.companyName}`,
@@ -31,8 +31,9 @@ export async function generateMetadata({
   };
 }
 
-export function generateStaticParams() {
-  return getMockJobs().map((job) => ({ id: job.id }));
+export async function generateStaticParams() {
+  const jobs = await getApprovedJobs();
+  return jobs.map((job) => ({ id: job.id }));
 }
 
 function Section({
@@ -61,7 +62,7 @@ export default async function JobDetailPage({
   params: Promise<Params>;
 }) {
   const { id } = await params;
-  const job = getMockJobById(id);
+  const job = await getApprovedJobById(id);
   if (!job) notFound();
 
   return (

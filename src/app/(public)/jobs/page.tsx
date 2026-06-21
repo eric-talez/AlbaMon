@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { JobCard } from "@/components/JobCard";
 import { JobFilters } from "@/components/JobFilters";
-import { getMockJobs } from "@/lib/mock/jobs";
+import { getApprovedJobs } from "@/lib/db/jobs";
 import { LAUNCH_MARKET } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -9,8 +9,8 @@ export const metadata: Metadata = {
   description: `${LAUNCH_MARKET} 한인 커뮤니티 Korean-English bilingual 로컬 채용 공고.`,
 };
 
-export default function JobsPage() {
-  const jobs = getMockJobs();
+export default async function JobsPage() {
+  const jobs = await getApprovedJobs();
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-6">

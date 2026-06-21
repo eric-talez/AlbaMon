@@ -1,0 +1,14 @@
+# Minimal Supabase CLI config for K-Work US.
+# Enables `supabase db reset` / `supabase db push` against migrations/ and seed.sql.
+# This file holds NO secrets — real credentials live in environment variables.
+
+project_id = "k-work-us"
+
+[db]
+# Port for the local Postgres started by `supabase start`.
+port = 54322
+major_version = 15
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
