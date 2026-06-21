@@ -4,7 +4,7 @@ const ITEMS = [
   { href: "/", label: "홈", icon: "🏠" },
   { href: "/jobs", label: "공고", icon: "🔍" },
   { href: "/employer/jobs/new", label: "등록", icon: "➕" },
-  { href: "/seeker/applications", label: "내 지원", icon: "📋" },
+  { href: "/dashboard", label: "내 지원", icon: "📋" },
   { href: "/login", label: "내정보", icon: "👤" },
 ];
 
