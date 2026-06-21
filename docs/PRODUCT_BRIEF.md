@@ -108,5 +108,19 @@ client-only) and Supabase RLS.
     roles read from a dev cookie / `user_metadata`, not a `profiles` table yet;
     login/signup are minimal; no email/password or OAuth UI; public header stays
     static (signed-in chrome lives on protected pages via `AccountBar`).
-- **Slice 3 — Database schema & seed:** next. Move roles into a `profiles`
-  table, add core tables + migrations + RLS, replace mock jobs with DB queries.
+- **Slice 3 — Database schema & seed:** ✅ done.
+  - Migrations are the source of truth: `supabase/migrations/` (enums, six core
+    tables, constraints/indexes, `updated_at` trigger, auth helper functions) +
+    `supabase/seed.sql` (3 fictional LA/OC companies, 8 approved + 1 pending +
+    1 draft job). See [`DATABASE.md`](DATABASE.md).
+  - **Row Level Security** on all tables: public reads only `approved` jobs;
+    profile self-update cannot change role; employer job inserts are forced to
+    `pending`; audit logs are admin-read / service-role-write only.
+  - Public job pages now read via `src/lib/db/jobs.ts`, which queries Supabase
+    when configured and falls back to mock data otherwise (approved-only).
+  - **Limitations (intentional this slice):** `getCurrentUser()` still reads the
+    role from `user_metadata`/dev-auth, not `profiles` (the DB is prepared as the
+    source of truth; switching the runtime read needs a live Supabase project and
+    is deferred). No posting/application/admin UI; browse/search stays on Slice 4.
+- **Slice 4 — Job browse/search:** next. Filters/sort/pagination over DB jobs;
+  switch `getCurrentUser()` to `profiles`.
