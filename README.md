@@ -47,11 +47,37 @@ npm run dev
 ```
 src/
   app/                 # App Router routes (public, auth, employer, admin)
-  lib/                 # site config, db, auth, validation, compliance (added per slice)
+  components/           # UI + auth components
+  lib/
+    auth/               # roles, permission matrix, server-side guards, sessions
+    supabase/           # browser/server clients + proxy session helper
+    ...                 # site config, types, mock data (db/validation/compliance later)
+  proxy.ts              # Next 16 "proxy" (renamed middleware): Supabase session refresh
 tests/                 # Vitest unit tests
 docs/                  # PRODUCT_BRIEF, development plan, policies
 supabase/migrations/   # DB migrations (added in Slice 3)
 ```
+
+## Auth & roles (Slice 2)
+
+Three roles: **seeker**, **employer**, **admin**. Authorization is enforced
+**server-side** — the central permission matrix lives in
+[`src/lib/auth/access.ts`](src/lib/auth/access.ts) and guards in
+[`src/lib/auth/guards.ts`](src/lib/auth/guards.ts) redirect unauthenticated users
+to `/login` and wrong-role users to `/forbidden`. UI checks are never the only
+protection.
+
+| Area | Allowed roles |
+| --- | --- |
+| `/dashboard` | any signed-in user |
+| `/employer/**` | employer, admin |
+| `/admin/**` | admin only |
+
+**Dev-auth mode:** with the placeholder Supabase values in `.env.example`, the app
+runs in a cookie-based **dev-auth mode** — open `/login`, pick a role, and the
+guards behave as in production. Fill in real `NEXT_PUBLIC_SUPABASE_URL` /
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` to switch to real Supabase auth. No secrets are
+committed.
 
 ## Development approach
 

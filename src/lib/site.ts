@@ -1,9 +1,10 @@
 /**
  * Central site/brand configuration.
  *
- * Naming note: the product is "K-Work US". We deliberately avoid "AlbaMon"
- * or any confusingly similar brand name (trademark / brand-confusion risk).
- * Positioning is Korean-English bilingual local jobs — NOT Korean-only hiring.
+ * Naming note: the product is "K-Work US". We deliberately avoid any existing
+ * Korean job-board brand name or confusingly similar wording (trademark /
+ * brand-confusion risk). Positioning is Korean-English bilingual local jobs —
+ * NOT Korean-only hiring.
  */
 export const SITE_NAME = "K-Work US";
 export const SITE_TAGLINE = "한인 커뮤니티 로컬 채용";

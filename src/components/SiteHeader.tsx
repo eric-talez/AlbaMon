@@ -4,7 +4,7 @@ import { SITE_NAME } from "@/lib/site";
 const NAV_LINKS = [
   { href: "/jobs", label: "공고" },
   { href: "/employer/jobs/new", label: "공고 등록" },
-  { href: "/employer/dashboard", label: "고용주" },
+  { href: "/employer", label: "고용주" },
 ];
 
 export function SiteHeader() {

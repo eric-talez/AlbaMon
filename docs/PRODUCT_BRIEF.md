@@ -95,4 +95,18 @@ client-only) and Supabase RLS.
 - **Slice 0 — Project baseline:** ✅ done.
 - **Slice 1 — Public shell:** ✅ done (`/`, `/jobs`, `/jobs/[id]` on mock data;
   header / mobile bottom-nav / footer; job card, filter placeholders, disclaimer).
-- **Slice 2 — Auth & roles:** next.
+- **Slice 2 — Auth & roles:** ✅ done.
+  - Supabase SSR clients (browser/server) + `proxy.ts` session refresh
+    (Next 16 renamed `middleware` → `proxy`).
+  - Roles `seeker` / `employer` / `admin`; central permission matrix in
+    `lib/auth/access.ts`; **server-side** guards in `lib/auth/guards.ts`.
+  - Routes: `/login`, `/signup`, `/auth/callback`, `/dashboard`, `/employer`,
+    `/admin`, `/forbidden` (wrong-role state).
+  - **Dev-auth fallback:** while Supabase env vars are placeholders, a
+    cookie-based mock session lets you pick a role to exercise guards locally.
+  - **Limitations (intentional this slice):** no real Supabase project wired;
+    roles read from a dev cookie / `user_metadata`, not a `profiles` table yet;
+    login/signup are minimal; no email/password or OAuth UI; public header stays
+    static (signed-in chrome lives on protected pages via `AccountBar`).
+- **Slice 3 — Database schema & seed:** next. Move roles into a `profiles`
+  table, add core tables + migrations + RLS, replace mock jobs with DB queries.
