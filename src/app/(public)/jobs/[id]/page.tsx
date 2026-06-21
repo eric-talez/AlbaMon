@@ -136,16 +136,15 @@ export default async function JobDetailPage({
           <WorkAuthorizationDisclaimer />
         </div>
 
-        {/* Application submission is intentionally deferred to Slice 5. */}
         <div className="sticky bottom-20 mt-6 sm:static sm:bottom-auto">
-          <span
-            aria-disabled="true"
-            className="flex h-12 w-full cursor-not-allowed items-center justify-center rounded-full bg-brand/50 px-6 font-medium text-brand-foreground"
+          <Link
+            href={`/jobs/${encodeURIComponent(job.id)}/apply`}
+            className="flex h-12 w-full items-center justify-center rounded-full bg-brand px-6 font-medium text-brand-foreground transition-opacity hover:opacity-90"
           >
-            지원 기능 준비 중
-          </span>
+            지원하기 (Apply)
+          </Link>
           <p className="mt-2 text-center text-xs text-muted">
-            온라인 지원은 Slice 5에서 제공됩니다.
+            로그인 후 간단한 지원 메모를 제출할 수 있습니다.
           </p>
         </div>
       </article>

@@ -139,8 +139,20 @@ describe("no unsafe RLS patterns", () => {
   });
 
   it("only seeker-role profiles may insert applications", () => {
+    const policy = latestPolicy(sql, "applications_insert_seeker");
+    expect(policy).toBeTruthy();
+    expect(policy).toMatch(/seeker_id\s*=\s*auth\.uid\(\)/i);
+    expect(policy).toMatch(/current_profile_role\(\)\s*=\s*'seeker'/i);
+    expect(policy).toMatch(/moderation_status\s*=\s*'approved'/i);
+    expect(policy).toMatch(/status\s*=\s*'submitted'/i);
+  });
+
+  it("bounds cover notes and preserves one application per seeker/job", () => {
     expect(sql).toMatch(
-      /applications_insert_seeker[\s\S]*?current_profile_role\(\)\s*=\s*'seeker'/i,
+      /constraint\s+applications_cover_note_max_length[\s\S]*?char_length\(cover_note\)\s*<=\s*1000/i,
+    );
+    expect(sql).toMatch(
+      /constraint\s+applications_unique_per_seeker\s+unique\s*\(job_id,\s*seeker_id\)/i,
     );
   });
 

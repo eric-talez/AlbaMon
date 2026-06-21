@@ -10,6 +10,7 @@ supabase/
   migrations/
     20260621000000_init_schema.sql    # full initial schema + RLS
     20260622000000_audit_hardening.sql # role revocation + safe public job view
+    20260623000000_application_submission.sql # submitted-only seeker inserts + note limit
   seed.sql                            # LA/OC demo companies + jobs
 ```
 
@@ -56,6 +57,12 @@ All company names are clearly fictional and all wording is compliance-safe (no
 Korean-only, visa-status, or under-the-table-cash phrasing).
 
 ## Notes & limitations
+
+- Before applying the Slice 5 migration to an existing project, inspect for
+  application cover notes longer than 1,000 characters. The migration does not
+  truncate data: it adds the check as `NOT VALID`, counts incompatible rows, and
+  aborts before validation if any exist. The existing one-application-per-job
+  unique constraint is unchanged.
 
 - The seed inserts into `auth.users`; the `on_auth_user_created` trigger
   auto-creates each `profiles` row, which the seed then promotes to `employer`.
