@@ -99,11 +99,22 @@ applicant's `display_name` and `email`. Default execution is revoked before
 - **Configured** → queries `public_job_listings`, filters approved rows again as
   defense in depth, and maps rows to the camelCase `Job` type.
 
+Employer company and job writes use the caller's cookie-authenticated Supabase
+client through `src/lib/db/companies.ts` and `src/lib/db/employer-jobs.ts`.
+Server Actions derive ownership from the verified session, re-check selected
+company ownership, and submit jobs only as `pending` with a null boost. No
+service-role client or mock persistent write is used.
+
+The Slice 7 hardening migration forces employer company inserts to remain
+unverified and employer job inserts to remain unboosted. Pinned-search-path
+triggers prevent normal users changing `is_verified` or `boost`, while allowing
+admin, service-role, and trusted migration/database execution.
+
 ## Known limitations
 
 - Runtime auth reads `profiles.role`; missing/error profile reads fail closed.
-- Application status transitions, employer posting, and admin moderation UI are
-  not yet implemented.
+- Application status transitions, job editing, and admin moderation UI are not
+  implemented. Slice 7 supports first-time pending submission only.
 - Application dashboard reads are unavailable rather than mocked when Supabase
   is not configured.
 - Seed uses fixed UUIDs and inserts into `auth.users`; intended for local/demo

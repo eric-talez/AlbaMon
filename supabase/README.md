@@ -12,6 +12,7 @@ supabase/
     20260622000000_audit_hardening.sql # role revocation + safe public job view
     20260623000000_application_submission.sql # submitted-only seeker inserts + note limit
     20260624000000_application_listing_functions.sql # caller-bound dashboard RPCs
+    20260625000000_employer_write_hardening.sql # verification/boost write guards
   seed.sql                            # LA/OC demo companies + jobs
 ```
 
@@ -53,6 +54,12 @@ runtime database role, use a pinned empty `search_path`, and have default execut
 privileges revoked. No service-role client or broader profile-read policy is
 used. Without Supabase, application dashboards show an unavailable state and do
 not fabricate records.
+
+Employer company and job forms write through the caller-authenticated client.
+The Slice 7 migration requires employer-created companies to remain unverified
+and employer-created jobs to remain pending and unboosted. Triggers block normal
+users from changing verification or boost fields, while allowing admin,
+service-role, and trusted unauthenticated migration/database execution.
 
 ## What the seed contains
 

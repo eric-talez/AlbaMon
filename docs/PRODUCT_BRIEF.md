@@ -134,4 +134,14 @@ client-only) and Supabase RLS.
     applicant display names and emails without broadening profile RLS.
   - Unconfigured environments show an explicit unavailable state and never
     create mock application records.
-  - Next recommended slice: employer onboarding and company profile.
+  - Minimum employer setup continues in Slice 7 below.
+- **Slice 7 — Minimum employer setup and pending job submission:** scoped
+  implementation done.
+  - Employers can create their first company, edit existing owned companies,
+    submit jobs only as `pending`, and review owned-job statuses.
+  - Server Actions derive ownership from the verified session and block explicit
+    discriminatory, visa-preference, and illegal-cash wording.
+  - Verification and boost fields reject employer writes while trusted
+    admin/service-role workflows remain available.
+  - This does not absorb the broader old Slice 8 roadmap item; roadmap
+    rebaselining or downstream renumbering belongs in a separate docs-only PR.

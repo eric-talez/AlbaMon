@@ -148,9 +148,20 @@ display name and email; profile RLS is not broadened and no service-role client
 is used. Supabase-unconfigured environments show an unavailable state instead
 of mock or misleading empty application histories.
 
-> Next recommended slice: employer onboarding/company profile. Resume upload,
-> application status actions, admin application management, messaging, and job
-> posting remain deferred.
+> Application status actions, admin application management, messaging, and
+> resume upload remain deferred. Minimum employer setup continues below.
+
+## Employer company setup and posting (Slice 7)
+
+Employer accounts can create their first company, edit existing owned companies,
+submit a job as `pending`, and review owned-job moderation states. Company
+verification and paid boosts remain trusted-only fields: normal employers cannot
+set either through the UI, Server Actions, or direct RLS-backed writes.
+Supabase-unconfigured environments never simulate persistent company or job data.
+
+> Slice 7 provides the minimum company setup and first pending job submission
+> needed for MVP continuity. Broader posting enhancements, job editing, and
+> admin moderation remain deferred; roadmap rebaselining is separate docs work.
 
 ## Development approach
 
@@ -159,7 +170,7 @@ See the slice table in [`docs/PRODUCT_BRIEF.md`](docs/PRODUCT_BRIEF.md).
 
 ## Compliance
 
-Current controls require pay ranges in the schema and show work-authorization
-disclaimers. Automated discriminatory / visa-preference / illegal-cash wording
-validation is planned for a later compliance slice. The platform provides
+Current controls require pay ranges, show work-authorization disclaimers, and
+block explicit discriminatory / visa-preference / illegal-cash wording during
+employer submission. Broader compliance validation remains planned. The platform provides
 **information only** and does not give legal advice or determine work eligibility.
