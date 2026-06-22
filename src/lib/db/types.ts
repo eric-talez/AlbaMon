@@ -125,6 +125,22 @@ export interface ApplicationRow {
   updated_at: string;
 }
 
+export interface MessageRow {
+  id: string;
+  application_id: string;
+  sender_id: string;
+  body: string;
+  created_at: string;
+}
+
+export interface ApplicationThreadContextRow {
+  application_id: string;
+  job_id: string;
+  job_title: string;
+  company_name: string;
+  application_status: string;
+}
+
 /** Row returned by the caller-bound seeker application listing RPC. */
 export interface SeekerApplicationListingRow {
   application_id: string;

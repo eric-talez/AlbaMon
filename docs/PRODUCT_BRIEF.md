@@ -153,3 +153,11 @@ client-only) and Supabase RLS.
   - Approval sets the public posting timestamp; rejected jobs remain non-public.
   - No new migration, service-role client, rejection reason, or audit subsystem
     is introduced.
+- **Slice 9 — Application messaging and notification stubs:** scoped
+  implementation done.
+  - Seekers and owning employers exchange bounded messages per application;
+    admins retain read access through RLS but have no messaging UI.
+  - Development-only, non-PII notification stubs cover application submission,
+    future status changes, and new messages without provider credentials.
+  - Real email delivery, status transitions, and broad notification preferences
+    remain deferred.

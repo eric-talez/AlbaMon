@@ -86,8 +86,8 @@ committed.
 ## Database (Slice 3)
 
 The Postgres schema lives in [`supabase/`](supabase/) and is the source of truth:
-enums, the six core tables (`profiles`, `companies`, `jobs`, `applications`,
-`reports`, `audit_logs`), constraints, an `updated_at` trigger, authorization
+enums, the seven core tables (`profiles`, `companies`, `jobs`, `applications`,
+`messages`, `reports`, `audit_logs`), constraints, an `updated_at` trigger, authorization
 helper functions, and **Row Level Security** on every table. See
 [`docs/DATABASE.md`](docs/DATABASE.md) for the full schema + RLS summary and
 [`supabase/README.md`](supabase/README.md) for how to apply migrations and seed.
@@ -171,6 +171,19 @@ updates; approval sets the public posting timestamp, while rejection remains
 non-public. Company actions update only the verification flag. These flows use
 the caller's cookie-authenticated Supabase session and existing admin RLS; no
 new migration or service-role client is required.
+
+## Application messaging (Slice 9)
+
+Seekers and owning employers can exchange messages inside an application thread
+from their application dashboards. Thread reads and writes use the caller's
+cookie-authenticated Supabase session; RLS limits access to the applicant,
+owning employer, or an admin, while only seeker/employer participants may send.
+Supabase-unconfigured environments show an unavailable state and never create
+mock messages.
+
+Development-only notification stubs emit non-PII events for application
+submission, future application-status changes, and new messages. No email
+provider, credentials, or production delivery path is included.
 
 ## Development approach
 

@@ -13,6 +13,7 @@ supabase/
     20260623000000_application_submission.sql # submitted-only seeker inserts + note limit
     20260624000000_application_listing_functions.sql # caller-bound dashboard RPCs
     20260625000000_employer_write_hardening.sql # verification/boost write guards
+    20260626000000_application_messages.sql # participant-bound message threads
   seed.sql                            # LA/OC demo companies + jobs
 ```
 
@@ -67,6 +68,13 @@ or reject pending jobs and change only company verification status. Public job
 reads remain constrained by the approved-only view; no service-role client is
 used for these user-facing actions.
 
+Slice 9 adds `messages` and application-thread access helpers. RLS derives the
+caller from `auth.uid()` and permits reads only to the seeker applicant, owning
+employer, or admin. Inserts are further limited to seeker/employer participants
+sending as themselves. The helper functions pin an empty `search_path`, and
+default function/table privileges are revoked before authenticated access is
+granted. No service-role client or mock message writes are used.
+
 ## What the seed contains
 
 - 3 fictional employer accounts (`employer{1,2,3}@example.com`) + profiles
@@ -95,6 +103,8 @@ Korean-only, visa-status, or under-the-table-cash phrasing).
   grant boundaries when that environment is unavailable.
 - Live admin RLS and trigger execution likewise requires Supabase CLI and Docker;
   static policy tests cover the moderation boundaries when unavailable.
+- Live message-policy execution also requires Supabase CLI and Docker; static
+  tests cover participant access, sender pinning, and privilege grants.
 - Runtime authorization reads `profiles.role`, not client-influenced
   `user_metadata.role`. Ownership policies also require the actor's current
   employer/admin role, so demotion revokes private owner access.

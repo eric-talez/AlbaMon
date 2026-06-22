@@ -56,6 +56,7 @@ describe("migration exists and enables RLS", () => {
       "companies",
       "jobs",
       "applications",
+      "messages",
       "reports",
       "audit_logs",
     ];

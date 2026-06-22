@@ -13,6 +13,7 @@ import {
 
 const mockClient = vi.mocked(createSupabaseServerClient);
 const insert = vi.fn();
+const single = vi.fn();
 const rpc = vi.fn();
 
 beforeEach(() => {
@@ -25,6 +26,8 @@ beforeEach(() => {
     "sb_publishable_realish_key_value_1234567890",
   );
   insert.mockReset();
+  single.mockReset();
+  insert.mockReturnValue({ select: vi.fn(() => ({ single })) });
   rpc.mockReset();
   mockClient.mockResolvedValue({
     from: (table: string) => {
@@ -44,11 +47,12 @@ afterEach(() => {
 
 describe("createApplication", () => {
   it("inserts only trusted application fields and omits status", async () => {
-    insert.mockResolvedValue({ error: null });
+    single.mockResolvedValue({ data: { id: "application-1" }, error: null });
 
-    await expect(createApplication("job-1", "user-1", "Hello")).resolves.toBe(
-      "created",
-    );
+    await expect(createApplication("job-1", "user-1", "Hello")).resolves.toEqual({
+      status: "created",
+      applicationId: "application-1",
+    });
     expect(insert).toHaveBeenCalledWith({
       job_id: "job-1",
       seeker_id: "user-1",
@@ -64,28 +68,28 @@ describe("createApplication", () => {
       ["23503", "not_allowed"],
       ["23514", "not_allowed"],
     ] as const) {
-      insert.mockResolvedValueOnce({ error: { code } });
-      await expect(createApplication("job-1", "user-1", null)).resolves.toBe(
-        expected,
-      );
+      single.mockResolvedValueOnce({ data: null, error: { code } });
+      await expect(createApplication("job-1", "user-1", null)).resolves.toEqual({
+        status: expected,
+      });
     }
   });
 
   it("returns error for unexpected database failures", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    insert.mockResolvedValue({ error: { code: "XX000" } });
-    await expect(createApplication("job-1", "user-1", null)).resolves.toBe(
-      "error",
-    );
+    single.mockResolvedValue({ data: null, error: { code: "XX000" } });
+    await expect(createApplication("job-1", "user-1", null)).resolves.toEqual({
+      status: "error",
+    });
   });
 
   it("never writes or mocks success when Supabase is unconfigured", async () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://your-project.supabase.co");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "your-anon-key");
 
-    await expect(createApplication("job-1", "user-1", null)).resolves.toBe(
-      "unavailable",
-    );
+    await expect(createApplication("job-1", "user-1", null)).resolves.toEqual({
+      status: "unavailable",
+    });
     expect(mockClient).not.toHaveBeenCalled();
     expect(insert).not.toHaveBeenCalled();
   });

@@ -8,11 +8,8 @@ import type {
 } from "@/lib/db/types";
 
 export type CreateApplicationResult =
-  | "created"
-  | "duplicate"
-  | "not_allowed"
-  | "unavailable"
-  | "error";
+  | { status: "created"; applicationId: string }
+  | { status: "duplicate" | "not_allowed" | "unavailable" | "error" };
 
 const NOT_ALLOWED_CODES = new Set(["23503", "23514", "42501"]);
 
@@ -57,25 +54,29 @@ export async function createApplication(
   seekerId: string,
   coverNote: string | null,
 ): Promise<CreateApplicationResult> {
-  if (!isSupabaseConfigured()) return "unavailable";
+  if (!isSupabaseConfigured()) return { status: "unavailable" };
 
   try {
     const supabase = await createSupabaseServerClient();
-    const { error } = await supabase.from("applications").insert({
-      job_id: jobId,
-      seeker_id: seekerId,
-      cover_note: coverNote,
-    });
+    const { data, error } = await supabase
+      .from("applications")
+      .insert({
+        job_id: jobId,
+        seeker_id: seekerId,
+        cover_note: coverNote,
+      })
+      .select("id")
+      .single();
 
-    if (!error) return "created";
-    if (error.code === "23505") return "duplicate";
-    if (NOT_ALLOWED_CODES.has(error.code)) return "not_allowed";
+    if (!error) return { status: "created", applicationId: data.id as string };
+    if (error.code === "23505") return { status: "duplicate" };
+    if (NOT_ALLOWED_CODES.has(error.code)) return { status: "not_allowed" };
 
     console.error("[db] createApplication failed:", error);
-    return "error";
+    return { status: "error" };
   } catch (error) {
     console.error("[db] createApplication failed:", error);
-    return "error";
+    return { status: "error" };
   }
 }
 
