@@ -85,7 +85,7 @@ export default async function EmployerApplicationsPage() {
                 </div>
               ) : null}
 
-              <div className="mt-4 border-t border-border pt-4 text-sm">
+              <div className="mt-4 flex flex-wrap gap-4 border-t border-border pt-4 text-sm">
                 {application.jobIsPublic ? (
                   <Link
                     href={`/jobs/${encodeURIComponent(application.jobId)}`}
@@ -96,6 +96,12 @@ export default async function EmployerApplicationsPage() {
                 ) : (
                   <span className="text-muted">현재 공개되지 않은 공고입니다.</span>
                 )}
+                <Link
+                  href={`/employer/applications/${encodeURIComponent(application.id)}/messages`}
+                  className="font-medium text-brand hover:underline"
+                >
+                  메시지
+                </Link>
               </div>
             </li>
           ))}

@@ -4,6 +4,7 @@ import { getApprovedJobById } from "@/lib/db/jobs";
 import { createApplication } from "@/lib/db/applications";
 import { requireUser } from "@/lib/auth/guards";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { notifyApplicationSubmitted } from "@/lib/notifications/dev";
 
 export interface ApplicationFormState {
   status: "idle" | "success" | "duplicate" | "error";
@@ -66,8 +67,15 @@ export async function submitApplication(
     trimmedCoverNote || null,
   );
 
-  switch (result) {
+  switch (result.status) {
     case "created":
+      // Best-effort dev notification: a notify failure must never turn a
+      // successfully created application into an error for the user.
+      try {
+        notifyApplicationSubmitted(result.applicationId);
+      } catch (err) {
+        console.error("[notification] application_submitted failed:", err);
+      }
       return {
         status: "success",
         message: "지원이 완료되었습니다. (Application submitted.)",

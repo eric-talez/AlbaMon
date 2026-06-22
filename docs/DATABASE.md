@@ -32,6 +32,7 @@ Without the CLI, run every file in `migrations/` in filename order, then run
 | `companies` | Employer companies. | `owner_id → profiles`; `is_verified` gates public visibility. |
 | `jobs` | Job postings. | `company_id → companies`; `moderation_status` gates public visibility; `address_display_mode` is `full`/`city_only`. |
 | `applications` | Seeker applications. | `unique(job_id, seeker_id)` blocks duplicates; optional `cover_note` is limited to 1,000 characters. |
+| `messages` | Application-centered seeker/employer conversations. | `application_id → applications`; body is nonblank and limited to 2,000 characters. |
 | `reports` | Abuse/quality reports. | Nullable `reporter_id`/`job_id`/`company_id`. |
 | `audit_logs` | Append-only audit trail. | No `updated_at`; writes via service-role only. |
 
@@ -61,7 +62,7 @@ policy, preventing recursion) with a pinned `search_path`:
 
 ## Row Level Security summary
 
-RLS is enabled on **all six tables** and is the authorization gate.
+RLS is enabled on **all seven tables** and is the authorization gate.
 
 | Table | Read | Write |
 | --- | --- | --- |
@@ -69,6 +70,7 @@ RLS is enabled on **all six tables** and is the authorization gate.
 | `companies` | verified (public); current-role owner; admin | owner insert/update own — **requires employer or admin role**; admin all |
 | `jobs` | **`approved` only (public)**; current-role owner; admin | employer/admin owner insert **forced to `pending`**; owner update cannot set `approved`; admin all |
 | `applications` | own (seeker); current-role employer for owned jobs; admin | insert only by a **`seeker`-role profile**, as self, for `approved` jobs with initial status `submitted`; admin update |
+| `messages` | applicant; current-role owning employer; admin | applicant/owning employer insert only as `auth.uid()`; no update/delete |
 | `reports` | own (reporter); admin | any authenticated insert; admin update |
 | `audit_logs` | admin only | **no policy** — service-role only |
 
@@ -117,11 +119,20 @@ job ID and current `pending` status; approval updates status and `posted_at`,
 rejection updates status only, and company verification updates only
 `is_verified`. Owner profile lookups select only ID, display name, and email.
 
+Application messages use `src/lib/db/messages.ts` and the Slice 9
+`can_access_application_thread(uuid)` helper. The helper derives identity and
+runtime role from the authenticated database session, and permits only the
+applicant, owning employer, or admin to read a thread. Insert RLS additionally
+requires a seeker/employer participant and pins `sender_id` to `auth.uid()`.
+The thread-context RPC exposes only application/job/company display fields.
+
 ## Known limitations
 
 - Runtime auth reads `profiles.role`; missing/error profile reads fail closed.
 - Application status transitions and employer job editing are not implemented.
   Admin job moderation is pending-only and does not collect a rejection reason.
+- Message delivery is in-app only. Development notification stubs do not send
+  production email or persist a notification queue.
 - Application dashboard reads are unavailable rather than mocked when Supabase
   is not configured.
 - Seed uses fixed UUIDs and inserts into `auth.users`; intended for local/demo

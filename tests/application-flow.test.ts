@@ -6,17 +6,20 @@ vi.mock("@/lib/auth/guards", () => ({ requireUser: vi.fn() }));
 vi.mock("@/lib/db/jobs", () => ({ getApprovedJobById: vi.fn() }));
 vi.mock("@/lib/db/applications", () => ({ createApplication: vi.fn() }));
 vi.mock("@/lib/supabase/config", () => ({ isSupabaseConfigured: vi.fn() }));
+vi.mock("@/lib/notifications/dev", () => ({ notifyApplicationSubmitted: vi.fn() }));
 
 import { requireUser } from "@/lib/auth/guards";
 import { getApprovedJobById } from "@/lib/db/jobs";
 import { createApplication } from "@/lib/db/applications";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { notifyApplicationSubmitted } from "@/lib/notifications/dev";
 import { submitApplication } from "@/app/(public)/jobs/[id]/apply/actions";
 
 const mockRequireUser = vi.mocked(requireUser);
 const mockGetJob = vi.mocked(getApprovedJobById);
 const mockCreate = vi.mocked(createApplication);
 const mockConfigured = vi.mocked(isSupabaseConfigured);
+const mockNotification = vi.mocked(notifyApplicationSubmitted);
 const idle = { status: "idle", message: "" } as const;
 
 function form(note: string): FormData {
@@ -36,7 +39,7 @@ beforeEach(() => {
   // Only truthiness matters to the action.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   mockGetJob.mockResolvedValue({ id: "job-1" } as any);
-  mockCreate.mockResolvedValue("created");
+  mockCreate.mockResolvedValue({ status: "created", applicationId: "application-1" });
 });
 
 afterEach(() => vi.clearAllMocks());
@@ -51,6 +54,7 @@ describe("submitApplication", () => {
     const state = await submitApplication("job-1", idle, form("   "));
     expect(mockCreate).toHaveBeenCalledWith("job-1", "seeker-1", null);
     expect(state.status).toBe("success");
+    expect(mockNotification).toHaveBeenCalledWith("application-1");
   });
 
   it("rejects notes over 1,000 characters before reading or writing", async () => {
@@ -90,7 +94,7 @@ describe("submitApplication", () => {
   });
 
   it("returns graceful duplicate confirmation", async () => {
-    mockCreate.mockResolvedValue("duplicate");
+    mockCreate.mockResolvedValue({ status: "duplicate" });
     const state = await submitApplication("job-1", idle, form("Hello"));
     expect(state.status).toBe("duplicate");
   });
