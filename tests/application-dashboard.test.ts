@@ -136,7 +136,7 @@ describe("application dashboard access and states", () => {
       "utf8",
     );
     expect(seekerDashboard).toContain('href="/dashboard/applications"');
-    expect(employerDashboard).toContain('href="/employer/applications"');
+    expect(employerDashboard).toContain('href: "/employer/applications"');
     expect(employerDashboard).toContain('user.role === "employer"');
   });
 });

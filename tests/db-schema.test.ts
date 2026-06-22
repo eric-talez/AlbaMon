@@ -119,6 +119,34 @@ describe("no unsafe RLS patterns", () => {
     );
   });
 
+  it("prevents employer company verification and job boost assignment", () => {
+    const companyInsert = latestPolicy(sql, "companies_insert_owner");
+    const jobInsert = latestPolicy(sql, "jobs_insert_owner");
+    expect(companyInsert).toMatch(/is_verified\s*=\s*false/i);
+    expect(jobInsert).toMatch(/moderation_status\s*=\s*'pending'/i);
+    expect(jobInsert).toMatch(/boost\s+is\s+null/i);
+  });
+
+  it("allows only admin, service-role, or trusted DB execution to change verification/boost", () => {
+    for (const name of [
+      "prevent_company_verification_change",
+      "prevent_job_boost_change",
+    ]) {
+      const fn = sql.match(
+        new RegExp(`function\\s+public\\.${name}\\(\\)[\\s\\S]*?\\$\\$;`, "i"),
+      )?.[0];
+      expect(fn, name).toBeTruthy();
+      expect(fn, name).toMatch(/security\s+definer/i);
+      expect(fn, name).toMatch(/set\s+search_path\s*=\s*''/i);
+      expect(fn, name).toMatch(/auth\.uid\(\)\s+is\s+not\s+null/i);
+      expect(fn, name).toMatch(/auth\.role\(\)[\s\S]*?'service_role'/i);
+      expect(fn, name).toMatch(/not\s+public\.is_admin\(\)/i);
+      expect(fn, name).toMatch(/raise\s+exception/i);
+    }
+    expect(sql).toMatch(/before\s+update\s+of\s+is_verified\s+on\s+public\.companies/i);
+    expect(sql).toMatch(/before\s+update\s+of\s+boost\s+on\s+public\.jobs/i);
+  });
+
   it("has a defensive trigger blocking profile role self-update", () => {
     // Function + the BEFORE UPDATE OF role trigger must both be present.
     expect(sql).toMatch(/function\s+public\.prevent_profile_role_self_update/i);
