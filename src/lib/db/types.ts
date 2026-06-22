@@ -125,6 +125,34 @@ export interface ApplicationRow {
   updated_at: string;
 }
 
+/** Row returned by the caller-bound seeker application listing RPC. */
+export interface SeekerApplicationListingRow {
+  application_id: string;
+  job_id: string;
+  job_title: string;
+  company_name: string;
+  job_city: string;
+  job_state: string;
+  application_status: string;
+  cover_note: string | null;
+  submitted_at: string;
+  job_is_public: boolean;
+}
+
+/** Row returned by the employer-owned application listing RPC. */
+export interface EmployerApplicationListingRow {
+  application_id: string;
+  job_id: string;
+  job_title: string;
+  company_name: string;
+  applicant_display_name: string | null;
+  applicant_email: string | null;
+  application_status: string;
+  cover_note: string | null;
+  submitted_at: string;
+  job_is_public: boolean;
+}
+
 export interface ReportRow {
   id: string;
   reporter_id: string | null;

@@ -138,8 +138,19 @@ the runtime profile role and approved job status, while RLS and the unique
 gates. Employer/admin accounts are blocked. Without Supabase, public mock jobs
 remain browsable but application writes are unavailable and are never mocked.
 
-> Not yet built: resume upload, employer applicant management, job posting, and
-> admin moderation UIs.
+## Application dashboards (Slice 6)
+
+Seekers can review their own submissions at `/dashboard/applications`, while
+employers can review applications for jobs owned by their companies at
+`/employer/applications`. Both reads use caller-bound database functions through
+the authenticated Supabase session. Employer results expose only applicant
+display name and email; profile RLS is not broadened and no service-role client
+is used. Supabase-unconfigured environments show an unavailable state instead
+of mock or misleading empty application histories.
+
+> Next recommended slice: employer onboarding/company profile. Resume upload,
+> application status actions, admin application management, messaging, and job
+> posting remain deferred.
 
 ## Development approach
 

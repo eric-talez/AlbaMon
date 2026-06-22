@@ -79,9 +79,9 @@ client-only) and Supabase RLS.
 | 3 | Database schema | Migrations + seed; only approved jobs are public. |
 | 4 | Job browse/search | Filters/sort/pagination; pending jobs never public. |
 | 5 | Job detail & apply | One application per seeker/job; duplicate blocked. |
-| 6 | Employer onboarding | Only employers create/edit company profile. |
-| 7 | Post job | Compliance validation; new jobs pending, not public. |
-| 8 | Employer dashboard | Employers see only their own applicants. |
+| 6 | Application dashboards | Seekers see their own submissions; employers see applicants only for owned jobs. |
+| 7 | Employer onboarding | Only employers create/edit company profile. |
+| 8 | Post job | Compliance validation; new jobs pending, not public. |
 | 9 | Admin moderation | Approve/reject; flagged keywords reach review queue. |
 | 10 | Messaging & notifications | Per-application threads; dev-mode email stubs. |
 | 11 | Verification & trust | Verified badges; report queue. |
@@ -127,3 +127,11 @@ client-only) and Supabase RLS.
   - Employer/admin roles, unapproved jobs, duplicate writes, and missing profiles
     fail closed through server checks plus database RLS/constraints.
   - Supabase-unconfigured environments do not simulate application writes.
+- **Slice 6 — Application dashboards:** scoped implementation done.
+  - Seekers see only their own application history; employers see only
+    applications for jobs under companies they own.
+  - Caller-bound RPCs re-check runtime database roles and expose employers only
+    applicant display names and emails without broadening profile RLS.
+  - Unconfigured environments show an explicit unavailable state and never
+    create mock application records.
+  - Next recommended slice: employer onboarding and company profile.

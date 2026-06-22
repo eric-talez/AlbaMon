@@ -1,6 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import type { AuthUser } from "@/lib/auth/types";
+import type { Role } from "@/lib/types";
 import { getCurrentUser } from "@/lib/auth/session";
 import { evaluateAccess, type Area } from "@/lib/auth/access";
 
@@ -31,6 +32,17 @@ export async function requireArea(area: Area, next?: string): Promise<AuthUser> 
 
   // result === "ok" implies an authenticated user for any non-public area.
   return user as AuthUser;
+}
+
+/** Require one exact runtime DB role; hierarchy access does not apply. */
+export async function requireRole(
+  role: Role,
+  next?: string,
+): Promise<AuthUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect(loginUrl(next));
+  if (user.role !== role) redirect("/forbidden");
+  return user;
 }
 
 function loginUrl(next?: string): string {

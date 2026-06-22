@@ -199,6 +199,52 @@ describe("no unsafe RLS patterns", () => {
     );
   });
 
+  it("restricts seeker and employer application listing RPCs to their callers", () => {
+    const seekerFunction = sql.match(
+      /function\s+public\.list_seeker_applications\(\)[\s\S]*?\$\$;/i,
+    )?.[0];
+    const employerFunction = sql.match(
+      /function\s+public\.list_employer_applications\(\)[\s\S]*?\$\$;/i,
+    )?.[0];
+
+    expect(seekerFunction).toBeTruthy();
+    expect(seekerFunction).toMatch(/security\s+definer/i);
+    expect(seekerFunction).toMatch(/set\s+search_path\s*=\s*''/i);
+    expect(seekerFunction).toMatch(/current_profile_role\(\)\s*=\s*'seeker'/i);
+    expect(seekerFunction).toMatch(/a\.seeker_id\s*=\s*auth\.uid\(\)/i);
+    expect(seekerFunction).toMatch(/order\s+by\s+a\.created_at\s+desc/i);
+
+    expect(employerFunction).toBeTruthy();
+    expect(employerFunction).toMatch(/security\s+definer/i);
+    expect(employerFunction).toMatch(/set\s+search_path\s*=\s*''/i);
+    expect(employerFunction).toMatch(/current_profile_role\(\)\s*=\s*'employer'/i);
+    expect(employerFunction).toMatch(/c\.owner_id\s*=\s*auth\.uid\(\)/i);
+    expect(employerFunction).toMatch(/order\s+by\s+a\.created_at\s+desc/i);
+    expect(employerFunction).toMatch(/p\.display_name\s+as\s+applicant_display_name/i);
+    expect(employerFunction).toMatch(/p\.email\s+as\s+applicant_email/i);
+    expect(employerFunction).not.toMatch(/p\.(?:phone|city|state)|metadata/i);
+  });
+
+  it("revokes default application RPC execution before granting authenticated access", () => {
+    for (const name of [
+      "list_seeker_applications",
+      "list_employer_applications",
+    ]) {
+      expect(sql).toMatch(
+        new RegExp(
+          `revoke\\s+all\\s+on\\s+function\\s+public\\.${name}\\(\\)\\s+from\\s+public,\\s*anon,\\s*authenticated`,
+          "i",
+        ),
+      );
+      expect(sql).toMatch(
+        new RegExp(
+          `grant\\s+execute\\s+on\\s+function\\s+public\\.${name}\\(\\)\\s+to\\s+authenticated`,
+          "i",
+        ),
+      );
+    }
+  });
+
   it("audit_logs has no insert/update/delete policy (service-role only)", () => {
     const auditPolicies = [...sql.matchAll(/create\s+policy\s+\w+\s+on\s+public\.audit_logs\s+for\s+(\w+)/gi)].map(
       (m) => m[1].toLowerCase(),
