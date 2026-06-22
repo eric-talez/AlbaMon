@@ -110,11 +110,18 @@ unverified and employer job inserts to remain unboosted. Pinned-search-path
 triggers prevent normal users changing `is_verified` or `boost`, while allowing
 admin, service-role, and trusted migration/database execution.
 
+Admin moderation uses the same cookie-authenticated client through
+`src/lib/db/admin-moderation.ts`. Existing admin RLS permits the required reads
+and narrow updates, so Slice 8 adds no migration. Job decisions filter by both
+job ID and current `pending` status; approval updates status and `posted_at`,
+rejection updates status only, and company verification updates only
+`is_verified`. Owner profile lookups select only ID, display name, and email.
+
 ## Known limitations
 
 - Runtime auth reads `profiles.role`; missing/error profile reads fail closed.
-- Application status transitions, job editing, and admin moderation UI are not
-  implemented. Slice 7 supports first-time pending submission only.
+- Application status transitions and employer job editing are not implemented.
+  Admin job moderation is pending-only and does not collect a rejection reason.
 - Application dashboard reads are unavailable rather than mocked when Supabase
   is not configured.
 - Seed uses fixed UUIDs and inserts into `auth.users`; intended for local/demo
