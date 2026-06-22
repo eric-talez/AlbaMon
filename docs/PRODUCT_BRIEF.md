@@ -145,3 +145,11 @@ client-only) and Supabase RLS.
     admin/service-role workflows remain available.
   - This does not absorb the broader old Slice 8 roadmap item; roadmap
     rebaselining or downstream renumbering belongs in a separate docs-only PR.
+- **Slice 8 — Admin job moderation and company verification:** scoped
+  implementation done.
+  - Exact-admin pages show pending-job and unverified-company queues.
+  - Admins may approve or reject only currently pending jobs and may verify or
+    unverify companies through caller-authenticated RLS-backed writes.
+  - Approval sets the public posting timestamp; rejected jobs remain non-public.
+  - No new migration, service-role client, rejection reason, or audit subsystem
+    is introduced.

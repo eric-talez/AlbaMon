@@ -163,6 +163,15 @@ Supabase-unconfigured environments never simulate persistent company or job data
 > needed for MVP continuity. Broader posting enhancements, job editing, and
 > admin moderation remain deferred; roadmap rebaselining is separate docs work.
 
+## Admin moderation (Slice 8)
+
+Admin accounts can review pending jobs at `/admin/jobs` and verify or unverify
+companies at `/admin/companies`. Job decisions are enforced as pending-only
+updates; approval sets the public posting timestamp, while rejection remains
+non-public. Company actions update only the verification flag. These flows use
+the caller's cookie-authenticated Supabase session and existing admin RLS; no
+new migration or service-role client is required.
+
 ## Development approach
 
 Work is delivered in small, reviewable **slices** (one PR each), Slice 0 → 15.

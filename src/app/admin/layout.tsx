@@ -1,4 +1,4 @@
-import { requireArea } from "@/lib/auth/guards";
+import { requireRole } from "@/lib/auth/guards";
 import { AccountBar } from "@/components/auth/AccountBar";
 
 // Auth-gated: depends on the request session, so never statically prerender.
@@ -10,7 +10,7 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await requireArea("admin", "/admin");
+  const user = await requireRole("admin", "/admin");
   return (
     <div className="flex min-h-full flex-col">
       <AccountBar user={user} />

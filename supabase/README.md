@@ -61,6 +61,12 @@ and employer-created jobs to remain pending and unboosted. Triggers block normal
 users from changing verification or boost fields, while allowing admin,
 service-role, and trusted unauthenticated migration/database execution.
 
+Slice 8 admin moderation requires no additional migration. Cookie-authenticated
+admins use the existing admin RLS policies and trusted trigger paths to approve
+or reject pending jobs and change only company verification status. Public job
+reads remain constrained by the approved-only view; no service-role client is
+used for these user-facing actions.
+
 ## What the seed contains
 
 - 3 fictional employer accounts (`employer{1,2,3}@example.com`) + profiles
@@ -87,6 +93,8 @@ Korean-only, visa-status, or under-the-table-cash phrasing).
 - Live execution of the application listing functions still requires Supabase
   CLI and Docker; static migration tests cover their role, ownership, field, and
   grant boundaries when that environment is unavailable.
+- Live admin RLS and trigger execution likewise requires Supabase CLI and Docker;
+  static policy tests cover the moderation boundaries when unavailable.
 - Runtime authorization reads `profiles.role`, not client-influenced
   `user_metadata.role`. Ownership policies also require the actor's current
   employer/admin role, so demotion revokes private owner access.
