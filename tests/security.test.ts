@@ -51,13 +51,18 @@ describe("no secrets committed", () => {
 });
 
 describe("no forbidden brand name in app code", () => {
-  it("src/** never exposes 'AlbaMon' or '알바몬'", () => {
+  const forbidden = [
+    ["alba", "mon"].join(""),
+    ["알바", "몬"].join(""),
+  ];
+
+  it("src/** never exposes forbidden/confusable brand names", () => {
     const offenders: string[] = [];
     for (const file of files) {
       if (!file.startsWith("src/")) continue;
       if (!isTextFile(file)) continue;
       const content = readFileSync(file, "utf8").toLowerCase();
-      if (content.includes("albamon") || content.includes("알바몬")) {
+      if (forbidden.some((bad) => content.includes(bad))) {
         offenders.push(file);
       }
     }

@@ -13,7 +13,7 @@ export default async function AdminHomePage() {
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
       <p className="text-xs font-medium text-brand">K-Work US 관리자</p>
       <h1 className="mt-1 text-2xl font-bold">관리자 콘솔</h1>
-      <p className="mt-2 text-muted">대기 중인 공고와 회사 인증을 검토합니다.</p>
+      <p className="mt-2 text-muted">대기 중인 공고, 회사 인증, 신고 큐를 검토합니다.</p>
 
       {result.status !== "ok" ? (
         <section className="mt-6 rounded-xl border border-border bg-surface p-5" role="alert">
@@ -25,7 +25,7 @@ export default async function AdminHomePage() {
           </p>
         </section>
       ) : (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <div className="mt-6 grid gap-4 sm:grid-cols-3">
           <Link
             href="/admin/jobs"
             className="rounded-xl border border-border bg-surface p-5 transition-colors hover:bg-brand-soft"
@@ -41,6 +41,14 @@ export default async function AdminHomePage() {
             <p className="text-sm text-muted">미인증 회사</p>
             <p className="mt-2 text-3xl font-bold">{result.counts.unverifiedCompanies}</p>
             <p className="mt-3 text-sm font-medium text-brand">회사 인증 관리</p>
+          </Link>
+          <Link
+            href="/admin/reports"
+            className="rounded-xl border border-border bg-surface p-5 transition-colors hover:bg-brand-soft"
+          >
+            <p className="text-sm text-muted">Open reports</p>
+            <p className="mt-2 text-3xl font-bold">{result.counts.openReports}</p>
+            <p className="mt-3 text-sm font-medium text-brand">신고 큐 검토</p>
           </Link>
         </div>
       )}

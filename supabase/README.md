@@ -15,6 +15,7 @@ supabase/
     20260625000000_employer_write_hardening.sql # verification/boost write guards
     20260626000000_application_messages.sql # participant-bound message threads
     20260627000000_application_status_workflow.sql # owned employer status updates
+    20260628000000_report_queue_hardening.sql # report reason/status constraints + RLS
   seed.sql                            # LA/OC demo companies + jobs
 ```
 
@@ -86,6 +87,14 @@ Unconfigured environments must show unavailable UI and never mock persistent
 status writes. Real email delivery and broader notification preferences remain
 deferred.
 
+Slice 11 uses the existing `reports` table for signed-in job reports and admin
+review. The hardening migration constrains report reasons/statuses, caps details
+at 1,000 characters, prevents duplicate same-user/same-job/same-reason reports,
+and replaces report insert RLS so user-facing reports must target approved jobs.
+Admins keep existing admin RLS access and can update report status to `reviewed`
+or `dismissed`; the migration does not add account sanctions, email alerts, or
+bulk investigation workflows.
+
 ## What the seed contains
 
 - 3 fictional employer accounts (`employer{1,2,3}@example.com`) + profiles
@@ -119,6 +128,9 @@ Korean-only, visa-status, or under-the-table-cash phrasing).
 - Live application-status RLS execution also requires Supabase CLI and Docker;
   static tests cover the status constraint, ownership policy, seeker blocking,
   and field-change trigger.
+- Live report-policy execution also requires Supabase CLI and Docker; static
+  tests cover reason/status constraints, approved-job insert RLS, duplicate
+  prevention, and admin-only report status updates.
 - Runtime authorization reads `profiles.role`, not client-influenced
   `user_metadata.role`. Ownership policies also require the actor's current
   employer/admin role, so demotion revokes private owner access.

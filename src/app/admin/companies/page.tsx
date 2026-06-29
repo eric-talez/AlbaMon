@@ -47,7 +47,9 @@ export default async function AdminCompaniesPage() {
                   <p className="mt-1 text-sm text-muted">{company.city}, {company.state}</p>
                 </div>
                 <span className="rounded-full bg-brand-soft px-3 py-1 text-xs font-semibold text-brand">
-                  {company.isVerified ? "인증됨" : "미인증"}
+                  {company.isVerified
+                    ? "Company information reviewed / 회사 정보 확인됨"
+                    : "Company not yet verified / 아직 인증되지 않은 회사"}
                 </span>
               </div>
               <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-muted">

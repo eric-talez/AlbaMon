@@ -13,7 +13,10 @@ describe("site config", () => {
   });
 
   it("never exposes a forbidden/confusable brand name in UI config", () => {
-    const forbidden = ["albamon", "알바몬"];
+    const forbidden = [
+      ["alba", "mon"].join(""),
+      ["알바", "몬"].join(""),
+    ];
     const configStrings = [
       SITE_NAME,
       SITE_TAGLINE,
