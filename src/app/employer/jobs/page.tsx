@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth/guards";
 import { getEmployerJobs } from "@/lib/db/employer-jobs";
 import { MODERATION_STATUS_LABELS } from "@/lib/types";
+import { Badge, BoostBadge } from "@/components/Badge";
 
 export const metadata: Metadata = { title: "내 공고" };
 
@@ -55,7 +56,13 @@ export default async function EmployerJobsPage() {
                   {MODERATION_STATUS_LABELS[job.moderationStatus]}
                 </span>
               </div>
-              <div className="mt-4 border-t border-border pt-4 text-sm">
+              <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4 text-sm">
+                {job.boost ? (
+                  <BoostBadge boost={job.boost} />
+                ) : (
+                  <Badge tone="neutral">No boost</Badge>
+                )}
+                <Link href={`/employer/jobs/${encodeURIComponent(job.id)}/boost`} className="font-medium text-brand hover:underline">Boost this job</Link>
                 {job.moderationStatus === "approved" ? (
                   <Link href={`/jobs/${encodeURIComponent(job.id)}`} className="font-medium text-brand hover:underline">공개 공고 보기</Link>
                 ) : (

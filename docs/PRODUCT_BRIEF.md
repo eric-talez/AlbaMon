@@ -184,5 +184,19 @@ client-only) and Supabase RLS.
   - Report writes and admin queue reads use caller-authenticated Supabase
     sessions and RLS; no service-role client or mock persistent report writes
     are used.
-  - Stripe, boosts, blocking/sanctions, email alerts, and full trust-and-safety
-    case management remain deferred.
+  - Blocking/sanctions, email alerts, and full trust-and-safety case management
+    remain deferred.
+- **Slice 12 — Payments and Boosts:** scoped implementation done.
+  - Employers can open `/employer/jobs/[id]/boost` from their owned job list and
+    choose `featured` or `urgent` visibility boosts.
+  - Checkout session creation is server-side only, re-checks ownership, requires
+    configured Stripe price IDs, and records job/company/user/boost metadata
+    without directly changing `jobs.boost`.
+  - Stripe webhook handling lives at `/api/stripe/webhook`, verifies the Stripe
+    signature before parsing trusted metadata, and activates boosts only after a
+    paid `checkout.session.completed` event.
+  - Public cards/details show boost badges for boosted approved jobs only;
+    pending, draft, rejected, paused, or expired jobs remain non-public.
+  - Supabase- or Stripe-unconfigured environments show unavailable states. No
+    refunds, subscriptions, coupons, invoices, payouts, billing portal, taxes,
+    or payment analytics are implemented.

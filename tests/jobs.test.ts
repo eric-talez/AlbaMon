@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { JobCard } from "@/components/JobCard";
-import { formatPayRange } from "@/lib/types";
+import { BOOST_LABELS, formatPayRange } from "@/lib/types";
 import { MOCK_JOBS, getMockJobs, getMockJobById } from "@/lib/mock/jobs";
 
 describe("formatPayRange", () => {
@@ -75,5 +75,19 @@ describe("application job detail", () => {
     expect(renderToStaticMarkup(createElement(JobCard, { job: unverified }))).not.toContain(
       "Verified employer",
     );
+  });
+
+  it("shows boost badges only for boosted approved public job cards", () => {
+    const boosted = { ...getMockJobs()[0], boost: "featured" as const };
+    const unboosted = { ...getMockJobs()[0], boost: null };
+
+    expect(renderToStaticMarkup(createElement(JobCard, { job: boosted }))).toContain(
+      BOOST_LABELS.featured,
+    );
+    expect(renderToStaticMarkup(createElement(JobCard, { job: unboosted }))).not.toContain(
+      BOOST_LABELS.featured,
+    );
+    expect(getMockJobById("kw-101")).toBeUndefined();
+    expect(getMockJobById("kw-102")).toBeUndefined();
   });
 });

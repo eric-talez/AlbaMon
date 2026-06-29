@@ -95,6 +95,14 @@ Admins keep existing admin RLS access and can update report status to `reviewed`
 or `dismissed`; the migration does not add account sanctions, email alerts, or
 bulk investigation workflows.
 
+Slice 12 adds payments and boosts without a new migration. The existing
+`jobs.boost` field remains protected from normal employer writes. Checkout
+creation uses the caller-authenticated session for ownership checks only, while
+the verified Stripe webhook uses the service-role key after signature validation
+to set the intended job's boost by both job ID and company ID. There is no
+payments table, refund schema, subscription schema, billing portal, or analytics
+schema in this slice.
+
 ## What the seed contains
 
 - 3 fictional employer accounts (`employer{1,2,3}@example.com`) + profiles
@@ -131,6 +139,9 @@ Korean-only, visa-status, or under-the-table-cash phrasing).
 - Live report-policy execution also requires Supabase CLI and Docker; static
   tests cover reason/status constraints, approved-job insert RLS, duplicate
   prevention, and admin-only report status updates.
+- Live webhook execution also requires configured Stripe secrets and a Supabase
+  service-role key; unit tests cover signature verification, metadata validation,
+  and idempotent boost activation behavior.
 - Runtime authorization reads `profiles.role`, not client-influenced
   `user_metadata.role`. Ownership policies also require the actor's current
   employer/admin role, so demotion revokes private owner access.
