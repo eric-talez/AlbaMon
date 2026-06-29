@@ -56,6 +56,22 @@ export type ModerationStatus = (typeof MODERATION_STATUSES)[number];
 export const BOOST_TYPES = ["featured", "urgent"] as const;
 export type BoostType = (typeof BOOST_TYPES)[number];
 
+/**
+ * Application lifecycle statuses. `submitted` is the seeker-created initial
+ * state (enforced by RLS); the remaining states are set by the owning employer
+ * through the status workflow. Values must match the
+ * applications_status_allowed CHECK constraint in the Slice 10 migration.
+ */
+export const APPLICATION_STATUSES = [
+  "submitted",
+  "reviewing",
+  "interview",
+  "offered",
+  "rejected",
+  "withdrawn",
+] as const;
+export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
+
 export type AddressDisplayMode = "full" | "city_only";
 
 export interface Job {
@@ -132,6 +148,15 @@ export const MODERATION_STATUS_LABELS: Record<ModerationStatus, string> = {
 export const BOOST_LABELS: Record<BoostType, string> = {
   featured: "추천",
   urgent: "급구",
+};
+
+export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
+  submitted: "제출됨 (Submitted)",
+  reviewing: "검토 중 (Reviewing)",
+  interview: "면접 (Interview)",
+  offered: "오퍼 (Offered)",
+  rejected: "불합격 (Rejected)",
+  withdrawn: "철회됨 (Withdrawn)",
 };
 
 /** Format a pay range, e.g. "시급 $18–22" or "연봉 $55,000–65,000". */

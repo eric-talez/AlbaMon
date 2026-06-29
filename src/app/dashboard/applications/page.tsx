@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/guards";
 import { getSeekerApplications } from "@/lib/db/applications";
+import { APPLICATION_STATUS_LABELS } from "@/lib/types";
 
 export const metadata: Metadata = { title: "내 지원 내역" };
 
@@ -12,7 +13,10 @@ function formatSubmittedAt(value: string): string {
 }
 
 function statusLabel(status: string): string {
-  return status === "submitted" ? "제출됨 (Submitted)" : status;
+  return (
+    APPLICATION_STATUS_LABELS[status as keyof typeof APPLICATION_STATUS_LABELS] ??
+    status
+  );
 }
 
 export default async function SeekerApplicationsPage() {

@@ -126,6 +126,63 @@ describe("application dashboard access and states", () => {
     expect(html).toContain(text);
   });
 
+  it("gives the employer a status control with every supported status option", async () => {
+    mockEmployerApplications.mockResolvedValue({
+      status: "ok",
+      applications: [
+        {
+          id: "a-4",
+          jobId: "job-4",
+          jobTitle: "Barista",
+          companyName: "K-Work Cafe",
+          applicantDisplayName: "지원자",
+          applicantEmail: "seeker@example.com",
+          status: "submitted",
+          coverNote: null,
+          submittedAt: "2026-06-21T12:00:00.000Z",
+          jobIsPublic: true,
+        },
+      ],
+    });
+
+    const html = renderToStaticMarkup(await EmployerApplicationsPage());
+    expect(html).toContain("지원 상태 변경");
+    expect(html).toContain('name="status"');
+    for (const value of [
+      "submitted",
+      "reviewing",
+      "interview",
+      "offered",
+      "rejected",
+      "withdrawn",
+    ]) {
+      expect(html).toContain(`value="${value}"`);
+    }
+  });
+
+  it("shows the seeker a friendly label for an employer-updated status", async () => {
+    mockSeekerApplications.mockResolvedValue({
+      status: "ok",
+      applications: [
+        {
+          id: "a-5",
+          jobId: "job-5",
+          jobTitle: "Server",
+          companyName: "K-Work Cafe",
+          city: "Los Angeles",
+          state: "CA",
+          status: "interview",
+          coverNote: null,
+          submittedAt: "2026-06-21T12:00:00.000Z",
+          jobIsPublic: true,
+        },
+      ],
+    });
+
+    const html = renderToStaticMarkup(await SeekerApplicationsPage());
+    expect(html).toContain("면접");
+  });
+
   it("links both dashboard entry points to their application routes", () => {
     const seekerDashboard = readFileSync(
       join(process.cwd(), "src", "app", "dashboard", "page.tsx"),

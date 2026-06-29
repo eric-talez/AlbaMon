@@ -14,6 +14,7 @@ supabase/
     20260624000000_application_listing_functions.sql # caller-bound dashboard RPCs
     20260625000000_employer_write_hardening.sql # verification/boost write guards
     20260626000000_application_messages.sql # participant-bound message threads
+    20260627000000_application_status_workflow.sql # owned employer status updates
   seed.sql                            # LA/OC demo companies + jobs
 ```
 
@@ -75,6 +76,16 @@ sending as themselves. The helper functions pin an empty `search_path`, and
 default function/table privileges are revoked before authenticated access is
 granted. No service-role client or mock message writes are used.
 
+Slice 10 adds the application status workflow. `applications.status` is
+constrained to `submitted`, `reviewing`, `interview`, `offered`, `rejected`, and
+`withdrawn`. Owning employers can update status for applications on jobs under
+their companies, while seekers still have no update policy and admins retain the
+existing admin behavior. A trigger prevents normal authenticated users from
+changing applicant, job, cover-note, or timestamp fields through the status path.
+Unconfigured environments must show unavailable UI and never mock persistent
+status writes. Real email delivery and broader notification preferences remain
+deferred.
+
 ## What the seed contains
 
 - 3 fictional employer accounts (`employer{1,2,3}@example.com`) + profiles
@@ -105,6 +116,9 @@ Korean-only, visa-status, or under-the-table-cash phrasing).
   static policy tests cover the moderation boundaries when unavailable.
 - Live message-policy execution also requires Supabase CLI and Docker; static
   tests cover participant access, sender pinning, and privilege grants.
+- Live application-status RLS execution also requires Supabase CLI and Docker;
+  static tests cover the status constraint, ownership policy, seeker blocking,
+  and field-change trigger.
 - Runtime authorization reads `profiles.role`, not client-influenced
   `user_metadata.role`. Ownership policies also require the actor's current
   employer/admin role, so demotion revokes private owner access.
