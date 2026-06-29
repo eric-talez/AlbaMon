@@ -42,9 +42,8 @@ export function notifyApplicationSubmitted(
   });
 }
 
-// Reserved for a future application-status-change workflow (e.g. an employer
-// moving an application to reviewing/accepted/rejected). Not yet wired to any
-// caller; kept here so the notification surface is defined in one place.
+// Development-only status-change notification stub; real email delivery remains
+// deferred.
 export function notifyApplicationStatusChanged(
   applicationId: string,
   previousStatus: string,

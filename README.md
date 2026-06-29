@@ -148,8 +148,8 @@ display name and email; profile RLS is not broadened and no service-role client
 is used. Supabase-unconfigured environments show an unavailable state instead
 of mock or misleading empty application histories.
 
-> Application status actions, admin application management, messaging, and
-> resume upload remain deferred. Minimum employer setup continues below.
+> Admin application management and resume upload remain deferred. Application
+> status actions are covered in Slice 10 below.
 
 ## Employer company setup and posting (Slice 7)
 
@@ -182,8 +182,24 @@ Supabase-unconfigured environments show an unavailable state and never create
 mock messages.
 
 Development-only notification stubs emit non-PII events for application
-submission, future application-status changes, and new messages. No email
-provider, credentials, or production delivery path is included.
+submission, application-status changes, and new messages. No email provider,
+credentials, or production delivery path is included.
+
+## Application status workflow (Slice 10)
+
+Employers can update application statuses from `/employer/applications` for
+applications on jobs owned by their company. Seekers see the current status on
+`/dashboard/applications`. The workflow uses the fixed status set `submitted`,
+`reviewing`, `interview`, `offered`, `rejected`, and `withdrawn`; seeker-created
+applications still start as `submitted`.
+
+Status writes use the caller-authenticated Supabase session, never a
+service-role client or mock persistence. The server action validates the status
+and requires the exact employer runtime role, while RLS remains the final
+ownership gate. Supabase-unconfigured environments show an unavailable state
+instead of pretending to save status changes.
+
+Real email notifications and broader notification preferences remain deferred.
 
 ## Development approach
 

@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/guards";
 import { getEmployerApplications } from "@/lib/db/applications";
+import { ApplicationStatusControl } from "@/components/applications/ApplicationStatusControl";
+import { APPLICATION_STATUS_LABELS } from "@/lib/types";
+import { updateEmployerApplicationStatus } from "./actions";
 
 export const metadata: Metadata = { title: "지원자 목록" };
 
@@ -12,7 +15,10 @@ function formatSubmittedAt(value: string): string {
 }
 
 function statusLabel(status: string): string {
-  return status === "submitted" ? "제출됨 (Submitted)" : status;
+  return (
+    APPLICATION_STATUS_LABELS[status as keyof typeof APPLICATION_STATUS_LABELS] ??
+    status
+  );
 }
 
 export default async function EmployerApplicationsPage() {
@@ -84,6 +90,12 @@ export default async function EmployerApplicationsPage() {
                   </p>
                 </div>
               ) : null}
+
+              <ApplicationStatusControl
+                applicationId={application.id}
+                currentStatus={application.status}
+                updateAction={updateEmployerApplicationStatus}
+              />
 
               <div className="mt-4 flex flex-wrap gap-4 border-t border-border pt-4 text-sm">
                 {application.jobIsPublic ? (

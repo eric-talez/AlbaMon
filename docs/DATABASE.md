@@ -31,7 +31,7 @@ Without the CLI, run every file in `migrations/` in filename order, then run
 | `profiles` | One row per `auth.users` user; DB-level source of truth for role. | Auto-created by the `on_auth_user_created` trigger (defaults to `seeker`). |
 | `companies` | Employer companies. | `owner_id → profiles`; `is_verified` gates public visibility. |
 | `jobs` | Job postings. | `company_id → companies`; `moderation_status` gates public visibility; `address_display_mode` is `full`/`city_only`. |
-| `applications` | Seeker applications. | `unique(job_id, seeker_id)` blocks duplicates; optional `cover_note` is limited to 1,000 characters. |
+| `applications` | Seeker applications. | `unique(job_id, seeker_id)` blocks duplicates; optional `cover_note` is limited to 1,000 characters; `status` is constrained to the Slice 10 workflow values. |
 | `messages` | Application-centered seeker/employer conversations. | `application_id → applications`; body is nonblank and limited to 2,000 characters. |
 | `reports` | Abuse/quality reports. | Nullable `reporter_id`/`job_id`/`company_id`. |
 | `audit_logs` | Append-only audit trail. | No `updated_at`; writes via service-role only. |
@@ -69,7 +69,7 @@ RLS is enabled on **all seven tables** and is the authorization gate.
 | `profiles` | self; admin all | self-update only, and **role cannot change** (RLS pins it + a `before update of role` trigger hard-blocks non-admins); admin all |
 | `companies` | verified (public); current-role owner; admin | owner insert/update own — **requires employer or admin role**; admin all |
 | `jobs` | **`approved` only (public)**; current-role owner; admin | employer/admin owner insert **forced to `pending`**; owner update cannot set `approved`; admin all |
-| `applications` | own (seeker); current-role employer for owned jobs; admin | insert only by a **`seeker`-role profile**, as self, for `approved` jobs with initial status `submitted`; admin update |
+| `applications` | own (seeker); current-role employer for owned jobs; admin | insert only by a **`seeker`-role profile**, as self, for `approved` jobs with initial status `submitted`; current-role owning employers may update status only; admin update |
 | `messages` | applicant; current-role owning employer; admin | applicant/owning employer insert only as `auth.uid()`; no update/delete |
 | `reports` | own (reporter); admin | any authenticated insert; admin update |
 | `audit_logs` | admin only | **no policy** — service-role only |
@@ -81,6 +81,16 @@ through the caller's authenticated Supabase session. It does not accept a status
 or use a service-role client. Duplicate, RLS, and foreign-key failures are mapped
 to safe application outcomes; unconfigured environments never perform mock
 writes.
+
+Slice 10 adds the application status workflow. Supported statuses are
+`submitted`, `reviewing`, `interview`, `offered`, `rejected`, and `withdrawn`.
+The `applications_status_allowed` check constraint enforces that set. Owning
+employers can update only the `status` column for applications on jobs under
+their companies through the caller-authenticated client; seekers have no update
+policy, and admins continue to use the existing admin policy. The
+`prevent_application_employer_field_change()` trigger blocks normal authenticated
+users from changing job ownership, applicant identity, cover notes, or timestamps.
+No service-role client or mock status write is used for user-facing changes.
 
 The same module reads application dashboards through the parameterless
 `list_seeker_applications()` and `list_employer_applications()` RPCs. Both are
@@ -129,10 +139,10 @@ The thread-context RPC exposes only application/job/company display fields.
 ## Known limitations
 
 - Runtime auth reads `profiles.role`; missing/error profile reads fail closed.
-- Application status transitions and employer job editing are not implemented.
-  Admin job moderation is pending-only and does not collect a rejection reason.
+- Employer job editing is not implemented. Admin job moderation is pending-only
+  and does not collect a rejection reason.
 - Message delivery is in-app only. Development notification stubs do not send
-  production email or persist a notification queue.
+  production email or persist notification preferences.
 - Application dashboard reads are unavailable rather than mocked when Supabase
   is not configured.
 - Seed uses fixed UUIDs and inserts into `auth.users`; intended for local/demo

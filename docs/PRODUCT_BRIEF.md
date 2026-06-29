@@ -8,7 +8,7 @@
 K-Work US is a **mobile-first, Korean-English bilingual local hiring marketplace**
 for the U.S. Korean community. Initial market: **LA / Orange County**.
 
-It is a lightweight "hiring OS": _post job → apply → message → interview → hired_,
+It is a lightweight "hiring OS": _post job → apply → message → interview → offer_,
 managed in one place — not just a community bulletin board.
 
 **Brand note:** The product name is **K-Work US**. We do **not** use "AlbaMon" or
@@ -83,7 +83,7 @@ client-only) and Supabase RLS.
 | 7 | Employer onboarding | Only employers create/edit company profile. |
 | 8 | Post job | Compliance validation; new jobs pending, not public. |
 | 9 | Admin moderation | Approve/reject; flagged keywords reach review queue. |
-| 10 | Messaging & notifications | Per-application threads; dev-mode email stubs. |
+| 10 | Application status workflow | Employers update owned application status; seekers see status. |
 | 11 | Verification & trust | Verified badges; report queue. |
 | 12 | Payments & boosts | Stripe checkout activates boost via webhook. |
 | 13 | Analytics | Admin KPI dashboard. |
@@ -158,6 +158,18 @@ client-only) and Supabase RLS.
   - Seekers and owning employers exchange bounded messages per application;
     admins retain read access through RLS but have no messaging UI.
   - Development-only, non-PII notification stubs cover application submission,
-    future status changes, and new messages without provider credentials.
-  - Real email delivery, status transitions, and broad notification preferences
+    status changes, and new messages without provider credentials.
+  - Real email delivery and broad notification preferences remain deferred.
+- **Slice 10 — Application Status Workflow:** scoped implementation done.
+  - Employers can update application statuses for jobs owned by their company
+    from `/employer/applications`; seekers see the current status on
+    `/dashboard/applications`.
+  - Supported statuses are `submitted`, `reviewing`, `interview`, `offered`,
+    `rejected`, and `withdrawn`; seeker-created applications still start as
+    `submitted`.
+  - Status writes use the caller-authenticated Supabase session and a
+    server-side employer guard, with RLS enforcing owned-job authorization.
+  - Supabase-unconfigured environments show an unavailable state and never
+    simulate persistent status writes.
+  - Real email notifications, notification preferences, contracts, and payroll
     remain deferred.
