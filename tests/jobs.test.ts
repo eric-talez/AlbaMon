@@ -61,19 +61,21 @@ describe("application job detail", () => {
     expect(source).toContain(
       "href={`/jobs/${encodeURIComponent(job.id)}/report`}",
     );
-    expect(source).toContain("Verification is not a safety, legal, or hiring guarantee.");
+    expect(source).toContain("provided by the employer");
+    expect(source).toContain("not guarantee job quality");
+    expect(source).toContain("Boosts do not imply job quality");
     expect(source).not.toContain('aria-disabled="true"');
   });
 
-  it("shows a modest verified badge only for verified public job cards", () => {
+  it("shows a modest company-reviewed badge only for verified public job cards", () => {
     const verified = { ...getMockJobs()[0], employerVerified: true };
     const unverified = { ...getMockJobs()[0], employerVerified: false };
 
     expect(renderToStaticMarkup(createElement(JobCard, { job: verified }))).toContain(
-      "Verified employer",
+      "Company info reviewed",
     );
     expect(renderToStaticMarkup(createElement(JobCard, { job: unverified }))).not.toContain(
-      "Verified employer",
+      "Company info reviewed",
     );
   });
 
@@ -89,5 +91,26 @@ describe("application job detail", () => {
     );
     expect(getMockJobById("kw-101")).toBeUndefined();
     expect(getMockJobById("kw-102")).toBeUndefined();
+  });
+
+  it("keeps report, boost, and verification copy informational", () => {
+    const reportPage = readFileSync(
+      join(process.cwd(), "src", "app", "(public)", "jobs", "[id]", "report", "page.tsx"),
+      "utf8",
+    );
+    const boostPage = readFileSync(
+      join(process.cwd(), "src", "app", "employer", "jobs", "[id]", "boost", "page.tsx"),
+      "utf8",
+    );
+    const badgeSource = readFileSync(
+      join(process.cwd(), "src", "components", "Badge.tsx"),
+      "utf8",
+    );
+    expect(reportPage).toContain("A report is not a legal determination");
+    expect(boostPage).toContain("do not guarantee applicants, hires, job");
+    expect(boostPage).toContain("legal compliance, or endorsement");
+    expect(badgeSource).toContain("Company info reviewed");
+    expect(badgeSource).not.toContain("Trusted");
+    expect(badgeSource).not.toContain("Guaranteed");
   });
 });

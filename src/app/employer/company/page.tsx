@@ -66,6 +66,11 @@ export default async function EmployerCompanyPage({
       {selected ? (
         <div className="mt-6 rounded-lg border border-border px-4 py-3 text-sm">
           인증 상태: <strong>{selected.isVerified ? "인증됨" : "미인증"}</strong>
+          <p className="mt-2 text-xs leading-5 text-muted">
+            Company verification means company information was reviewed. It is
+            not a guarantee of job quality, safety, legal compliance, applicants,
+            or hires.
+          </p>
         </div>
       ) : null}
       <CompanyForm company={selected ?? null} />

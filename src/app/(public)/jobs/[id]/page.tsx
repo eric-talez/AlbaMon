@@ -96,12 +96,20 @@ export default async function JobDetailPage({
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <CompanyVerificationBadge verified={job.employerVerified} />
           <span className="text-xs text-muted">
-            Verification is not a safety, legal, or hiring guarantee.
+            Company review is not a guarantee of job quality, safety, legal
+            compliance, applicants, or hires.
           </span>
         </div>
 
         {/* Key facts */}
         <dl className="mt-5 grid grid-cols-1 gap-3 rounded-xl border border-border bg-surface p-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <dt className="text-xs text-muted">Employer-provided information</dt>
+            <dd className="text-sm">
+              Job information, including pay, schedule, and role details, is
+              provided by the employer.
+            </dd>
+          </div>
           <div>
             <dt className="text-xs text-muted">급여</dt>
             <dd className="text-base font-semibold text-brand">
@@ -147,6 +155,12 @@ export default async function JobDetailPage({
         <div className="mt-8">
           <WorkAuthorizationDisclaimer />
         </div>
+        <p className="mt-3 rounded-lg border border-border bg-surface p-3 text-xs leading-5 text-muted">
+          K-Work US provides listing and communication tools only. K-Work US does
+          not guarantee job quality, hiring outcome, legal compliance, or work
+          authorization eligibility. Boosts do not imply job quality, safety,
+          legal compliance, or endorsement.
+        </p>
 
         <div className="sticky bottom-20 mt-6 sm:static sm:bottom-auto">
           <Link

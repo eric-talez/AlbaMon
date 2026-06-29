@@ -55,7 +55,8 @@ brand-confusion risk).
 | Student work confusion | Disclaimer: platform does not judge work authorization; consult DSO. |
 | Privacy | Restrict resume/phone access; honor deletion requests (RLS + privacy settings). |
 
-Standard disclaimers live in `lib/compliance` and on the job-detail / application flow.
+Standard disclaimers live in `src/components/WorkAuthorizationDisclaimer.tsx`
+and on job detail, application, and employer posting flows.
 
 ## Recommended architecture
 
@@ -87,7 +88,7 @@ client-only) and Supabase RLS.
 | 11 | Verification trust and report queue | Verified badges; signed-in job reports; admin report queue. |
 | 12 | Payments & boosts | Stripe checkout activates boost via webhook. |
 | 13 | Analytics | Admin KPI dashboard. |
-| 14 | Compliance polish | Policy pages, disclaimers, audit logs. |
+| 14 | Compliance polish | Disclaimers, posting acknowledgement, risky-language validation, admin flags. |
 | 15 | Launch hardening | QA, a11y, SEO, deploy checklist. |
 
 ## Current status
@@ -211,3 +212,17 @@ client-only) and Supabase RLS.
     verification, and featured/urgent boost counts are included.
   - External analytics providers, chart libraries, CSV export, cohort
     retention, payment revenue tracking, and billing history remain deferred.
+- **Slice 14 — Compliance Polish:** scoped implementation done.
+  - Shared informational disclaimers now cover work authorization, wage/tax
+    classification, employer-provided job details, reports, boosts, and company
+    verification without presenting legal advice or legal determinations.
+  - Employer job posting requires a compliance acknowledgement before server-side
+    submission; the acknowledgement is validated but not stored.
+  - Risky-language validation blocks clear discrimination, nationality-only,
+    visa/citizenship-only, off-the-books cash pay, unpaid training, tips-only,
+    and 1099-only phrases while allowing job-related Korean language skills.
+  - Admin job moderation computes compliance review flags with category and
+    reason text. Flags are review aids only and do not auto-approve or
+    auto-reject jobs.
+  - No schema, RLS, service-role, legal review, E-Verify, tax/payroll, sanctions,
+    email delivery, or automated enforcement workflow is added.

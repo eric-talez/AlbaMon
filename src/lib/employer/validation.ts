@@ -45,22 +45,190 @@ export type ValidationResult<T> =
   | { ok: true; value: T }
   | { ok: false; message: string };
 
-const BLOCKED_PHRASES = [
-  "korean only",
-  "koreans only",
-  "한국인만",
-  "한국 사람만",
-  "opt only",
-  "opt preferred",
-  "h1b preferred",
-  "h 1b preferred",
-  "visa preferred",
-  "비자 우대",
-  "under the table",
-  "cash only no tax",
-  "cash no tax",
-  "세금 없이",
-  "세금없이",
+export type ComplianceFlagCategory =
+  | "discrimination"
+  | "work_authorization"
+  | "cash_pay"
+  | "unpaid_labor"
+  | "misleading_pay";
+
+export interface ComplianceFlag {
+  phrase: string;
+  category: ComplianceFlagCategory;
+  reason: string;
+}
+
+const COMPLIANCE_PHRASE_RULES: readonly ComplianceFlag[] = [
+  {
+    phrase: "young only",
+    category: "discrimination",
+    reason: "Age-restrictive language may be discriminatory.",
+  },
+  {
+    phrase: "female only",
+    category: "discrimination",
+    reason: "Gender-restrictive language may be discriminatory.",
+  },
+  {
+    phrase: "male only",
+    category: "discrimination",
+    reason: "Gender-restrictive language may be discriminatory.",
+  },
+  {
+    phrase: "korean only",
+    category: "discrimination",
+    reason: "Korean nationality-only wording is not allowed; job-related language requirements are allowed.",
+  },
+  {
+    phrase: "koreans only",
+    category: "discrimination",
+    reason: "Korean nationality-only wording is not allowed; job-related language requirements are allowed.",
+  },
+  {
+    phrase: "한국인만",
+    category: "discrimination",
+    reason: "Korean nationality-only wording is not allowed; job-related language requirements are allowed.",
+  },
+  {
+    phrase: "한국 사람만",
+    category: "discrimination",
+    reason: "Korean nationality-only wording is not allowed; job-related language requirements are allowed.",
+  },
+  {
+    phrase: "시민권자만",
+    category: "work_authorization",
+    reason: "Citizenship-only language may be an unlawful work-authorization restriction.",
+  },
+  {
+    phrase: "citizen only",
+    category: "work_authorization",
+    reason: "Citizenship-only language may be an unlawful work-authorization restriction.",
+  },
+  {
+    phrase: "green card only",
+    category: "work_authorization",
+    reason: "Green-card-only language may be an unlawful work-authorization restriction.",
+  },
+  {
+    phrase: "영주권자만",
+    category: "work_authorization",
+    reason: "Green-card-only language may be an unlawful work-authorization restriction.",
+  },
+  {
+    phrase: "no visa",
+    category: "work_authorization",
+    reason: "Visa-status screening should not be used as posting language.",
+  },
+  {
+    phrase: "비자 없는 분",
+    category: "work_authorization",
+    reason: "Visa-status screening should not be used as posting language.",
+  },
+  {
+    phrase: "opt only",
+    category: "work_authorization",
+    reason: "Visa-status preference should not be used as posting language.",
+  },
+  {
+    phrase: "opt preferred",
+    category: "work_authorization",
+    reason: "Visa-status preference should not be used as posting language.",
+  },
+  {
+    phrase: "h1b preferred",
+    category: "work_authorization",
+    reason: "Visa-status preference should not be used as posting language.",
+  },
+  {
+    phrase: "h 1b preferred",
+    category: "work_authorization",
+    reason: "Visa-status preference should not be used as posting language.",
+  },
+  {
+    phrase: "visa preferred",
+    category: "work_authorization",
+    reason: "Visa-status preference should not be used as posting language.",
+  },
+  {
+    phrase: "비자 우대",
+    category: "work_authorization",
+    reason: "Visa-status preference should not be used as posting language.",
+  },
+  {
+    phrase: "cash only",
+    category: "cash_pay",
+    reason: "Cash-only pay wording may indicate off-the-books pay.",
+  },
+  {
+    phrase: "under the table",
+    category: "cash_pay",
+    reason: "Off-the-books pay wording is not allowed.",
+  },
+  {
+    phrase: "off the books",
+    category: "cash_pay",
+    reason: "Off-the-books pay wording is not allowed.",
+  },
+  {
+    phrase: "cash only no tax",
+    category: "cash_pay",
+    reason: "Tax-avoidance pay wording is not allowed.",
+  },
+  {
+    phrase: "cash no tax",
+    category: "cash_pay",
+    reason: "Tax-avoidance pay wording is not allowed.",
+  },
+  {
+    phrase: "no tax",
+    category: "cash_pay",
+    reason: "Tax-avoidance pay wording is not allowed.",
+  },
+  {
+    phrase: "현금만",
+    category: "cash_pay",
+    reason: "Cash-only pay wording may indicate off-the-books pay.",
+  },
+  {
+    phrase: "세금 없이",
+    category: "cash_pay",
+    reason: "Tax-avoidance pay wording is not allowed.",
+  },
+  {
+    phrase: "세금없이",
+    category: "cash_pay",
+    reason: "Tax-avoidance pay wording is not allowed.",
+  },
+  {
+    phrase: "택스 없이",
+    category: "cash_pay",
+    reason: "Tax-avoidance pay wording is not allowed.",
+  },
+  {
+    phrase: "unpaid training",
+    category: "unpaid_labor",
+    reason: "Unpaid training language may indicate unpaid labor.",
+  },
+  {
+    phrase: "무급 교육",
+    category: "unpaid_labor",
+    reason: "Unpaid training language may indicate unpaid labor.",
+  },
+  {
+    phrase: "tips only",
+    category: "misleading_pay",
+    reason: "Tips-only compensation may be misleading or unlawful.",
+  },
+  {
+    phrase: "팁만 지급",
+    category: "misleading_pay",
+    reason: "Tips-only compensation may be misleading or unlawful.",
+  },
+  {
+    phrase: "1099 only required",
+    category: "misleading_pay",
+    reason: "Required 1099-only wording may indicate misclassification risk.",
+  },
 ] as const;
 
 function stringValue(formData: FormData, name: string): string | null {
@@ -151,8 +319,14 @@ function normalizeComplianceText(value: string): string {
 }
 
 export function containsBlockedPostingPhrase(value: string): boolean {
+  return detectComplianceFlags(value).length > 0;
+}
+
+export function detectComplianceFlags(value: string): ComplianceFlag[] {
   const normalized = normalizeComplianceText(value);
-  return BLOCKED_PHRASES.some((phrase) => normalized.includes(phrase));
+  return COMPLIANCE_PHRASE_RULES.filter((rule) =>
+    normalized.includes(normalizeComplianceText(rule.phrase)),
+  );
 }
 
 export function parseEmployerCompanyForm(formData: FormData): ValidationResult<EmployerCompanyInput> {
@@ -194,6 +368,14 @@ export function parseEmployerCompanyForm(formData: FormData): ValidationResult<E
 }
 
 export function parseEmployerJobForm(formData: FormData): ValidationResult<EmployerJobInput> {
+  if (formData.get("complianceAcknowledgement") !== "on") {
+    return {
+      ok: false,
+      message:
+        "정확한 공고 정보와 임금, 노동, 세금, 근로 자격 관련 법규 준수 책임을 확인해 주세요.",
+    };
+  }
+
   const title = requiredText(formData, "title", "공고 제목", 120);
   if (!title.ok) return title;
   const category = enumValue(formData, "category", JOB_CATEGORIES, "직종");
@@ -252,11 +434,12 @@ export function parseEmployerJobForm(formData: FormData): ValidationResult<Emplo
     ...requirements.value,
     ...benefits.value,
   ].join("\n");
-  if (containsBlockedPostingPhrase(complianceText)) {
+  const complianceFlags = detectComplianceFlags(complianceText);
+  if (complianceFlags.length > 0) {
     return {
       ok: false,
       message:
-        "차별적 국적 제한, 비자 선호, 또는 세금 회피성 현금 지급 표현을 삭제해 주세요.",
+        "차별, 비자/시민권 선호, 세금 회피성 현금 지급, 무급 노동, 또는 오해 소지가 있는 급여 표현을 삭제해 주세요.",
     };
   }
 

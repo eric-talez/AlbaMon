@@ -24,6 +24,10 @@ export default async function EmployerJobsPage() {
         <div>
           <p className="text-xs font-medium text-brand">K-Work US 고용주</p>
           <h1 className="mt-1 text-2xl font-bold">내 공고</h1>
+          <p className="mt-2 max-w-2xl text-sm text-muted">
+            Boosts only affect listing visibility and do not imply job quality,
+            safety, legal compliance, endorsement, applicants, or hires.
+          </p>
         </div>
         <Link href="/employer/jobs/new" className="rounded-full bg-brand px-4 py-2 text-sm font-medium text-brand-foreground">새 공고 등록</Link>
       </div>

@@ -32,6 +32,14 @@ function DetailList({ title, items }: { title: string; items: string[] }) {
   );
 }
 
+const COMPLIANCE_CATEGORY_LABELS = {
+  discrimination: "Discrimination / 차별 표현",
+  work_authorization: "Work authorization / 근로 자격",
+  cash_pay: "Cash or tax wording / 현금·세금 표현",
+  unpaid_labor: "Unpaid labor / 무급 노동",
+  misleading_pay: "Pay claim / 급여 표현",
+} as const;
+
 function JobCard({ job }: { job: AdminJob }) {
   const location = job.addressDisplayMode === "full" && job.addressDisplay
     ? `${job.addressDisplay}, ${job.city}, ${job.state}`
@@ -66,6 +74,29 @@ function JobCard({ job }: { job: AdminJob }) {
         <DetailList title="자격 요건" items={job.requirements} />
         <DetailList title="복리후생" items={job.benefits} />
       </div>
+
+      {job.complianceFlags.length > 0 ? (
+        <section className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/50 dark:bg-amber-950/20">
+          <h3 className="font-semibold text-warning">
+            Compliance review flag / 컴플라이언스 검토 플래그
+          </h3>
+          <p className="mt-1 text-xs leading-5 text-muted">
+            This listing may contain language that requires closer review. A flag
+            is not a legal determination.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {job.complianceFlags.map((flag) => (
+              <li key={`${flag.category}-${flag.phrase}`}>
+                <span className="font-medium">
+                  {COMPLIANCE_CATEGORY_LABELS[flag.category]}:
+                </span>{" "}
+                <span className="font-mono text-xs">{flag.phrase}</span>
+                <span className="block text-xs text-muted">{flag.reason}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {job.moderationStatus === "pending" ? (
         <JobModerationForm jobId={job.id} />

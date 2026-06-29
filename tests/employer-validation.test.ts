@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   containsBlockedPostingPhrase,
+  detectComplianceFlags,
   parseEmployerCompanyForm,
   parseEmployerJobForm,
 } from "@/lib/employer/validation";
@@ -37,6 +38,7 @@ function validJobForm(): FormData {
   form.set("responsibilities", "음료 제조\n고객 응대\n");
   form.set("requirements", "친절한 서비스");
   form.set("benefits", "식사 제공");
+  form.set("complianceAcknowledgement", "on");
   return form;
 }
 
@@ -94,6 +96,12 @@ describe("job form validation", () => {
     expect(parseEmployerJobForm(form)).toMatchObject({ ok: false });
   });
 
+  it("requires the compliance acknowledgement before submission", () => {
+    const form = validJobForm();
+    form.delete("complianceAcknowledgement");
+    expect(parseEmployerJobForm(form)).toMatchObject({ ok: false });
+  });
+
   it("rejects invalid enums, pay ordering, precision, and oversized lists", () => {
     const invalidEnum = validJobForm();
     invalidEnum.set("category", "forged");
@@ -114,18 +122,41 @@ describe("job form validation", () => {
   });
 
   it.each([
+    "young only",
+    "female only",
+    "male only",
     "Korean-only applicants",
     "한국인만 지원 가능",
+    "citizen only",
+    "green card only",
+    "no visa",
+    "시민권자만",
+    "영주권자만",
     "OPT preferred",
     "H-1B preferred",
     "pay under the table",
+    "off the books",
+    "cash only",
     "cash only no tax",
     "세금 없이 현금 지급",
+    "unpaid training",
+    "무급 교육",
+    "tips only",
+    "1099-only required",
   ])("blocks documented unsafe wording: %s", (phrase) => {
     expect(containsBlockedPostingPhrase(phrase)).toBe(true);
     const form = validJobForm();
     form.set("description", phrase);
     expect(parseEmployerJobForm(form)).toMatchObject({ ok: false });
+  });
+
+  it("reports category and reason metadata for admin review flags", () => {
+    expect(detectComplianceFlags("cash only and no visa")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ category: "cash_pay", phrase: "cash only" }),
+        expect.objectContaining({ category: "work_authorization", phrase: "no visa" }),
+      ]),
+    );
   });
 
   it("allows job-related Korean language requirements", () => {

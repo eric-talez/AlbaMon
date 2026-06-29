@@ -108,7 +108,8 @@ export default async function EmployerJobBoostPage({
       <h1 className="mt-1 text-2xl font-bold">Boost this job / 공고 부스트</h1>
       <p className="mt-2 text-sm text-muted">
         Choose a visibility boost for this listing. Boosts may improve placement
-        or visual emphasis, but they do not guarantee applicants or hires.
+        or visual emphasis, but they do not guarantee applicants, hires, job
+        quality, safety, legal compliance, or endorsement.
       </p>
 
       <Notice status={checkout} />
@@ -175,7 +176,7 @@ export default async function EmployerJobBoostPage({
           </fieldset>
           <p className="text-xs text-muted">
             Boosts improve listing visibility but do not guarantee applicants,
-            hires, job quality, legal approval, or safety.
+            hires, job quality, safety, legal compliance, or endorsement.
           </p>
           <button
             type="submit"
