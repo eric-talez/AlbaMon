@@ -242,6 +242,22 @@ placeholder Supabase or Stripe variables show unavailable states instead of
 pretending to purchase. Refunds, subscriptions, invoices, coupons, payouts,
 taxes, billing portals, and analytics remain deferred.
 
+## Admin analytics and KPI dashboard (Slice 13)
+
+Admins can open `/admin/analytics` from the admin console to review aggregate
+marketplace health metrics: job moderation status totals, recent job activity,
+application status totals, company verification totals, report status totals,
+message volume, and featured/urgent boost counts.
+
+Analytics reads use the caller-authenticated Supabase session and existing admin
+RLS. The page displays aggregate counts only; it does not select message bodies,
+application notes, applicant private details, report details, or thread content.
+Supabase-unconfigured environments show an unavailable state instead of fake
+persistent analytics.
+
+This slice does not add PostHog, Plausible, chart libraries, CSV export, cohort
+retention, payment revenue tracking, or billing history analytics.
+
 ## Development approach
 
 Work is delivered in small, reviewable **slices** (one PR each), Slice 0 → 15.

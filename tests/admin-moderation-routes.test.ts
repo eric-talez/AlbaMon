@@ -14,6 +14,9 @@ vi.mock("@/lib/db/admin-moderation", () => ({
 vi.mock("@/lib/db/reports", () => ({
   getAdminReports: vi.fn(),
 }));
+vi.mock("@/lib/db/admin-analytics", () => ({
+  getAdminAnalytics: vi.fn(),
+}));
 
 import { requireRole } from "@/lib/auth/guards";
 import {
@@ -22,7 +25,9 @@ import {
   getAdminModerationCounts,
 } from "@/lib/db/admin-moderation";
 import { getAdminReports } from "@/lib/db/reports";
+import { getAdminAnalytics } from "@/lib/db/admin-analytics";
 import AdminHomePage from "@/app/admin/page";
+import AdminAnalyticsPage from "@/app/admin/analytics/page";
 import AdminJobsPage from "@/app/admin/jobs/page";
 import AdminCompaniesPage from "@/app/admin/companies/page";
 import AdminReportsPage from "@/app/admin/reports/page";
@@ -32,6 +37,7 @@ const mockCounts = vi.mocked(getAdminModerationCounts);
 const mockJobs = vi.mocked(getAdminJobs);
 const mockCompanies = vi.mocked(getAdminCompanies);
 const mockReports = vi.mocked(getAdminReports);
+const mockAnalytics = vi.mocked(getAdminAnalytics);
 
 beforeEach(() => {
   mockRequireRole.mockResolvedValue({
@@ -47,6 +53,7 @@ beforeEach(() => {
   mockJobs.mockResolvedValue({ status: "ok", jobs: [] });
   mockCompanies.mockResolvedValue({ status: "ok", companies: [] });
   mockReports.mockResolvedValue({ status: "ok", reports: [] });
+  mockAnalytics.mockResolvedValue({ status: "ok", analytics: analyticsFixture() });
 });
 
 afterEach(() => vi.clearAllMocks());
@@ -58,6 +65,8 @@ describe("admin moderation routes", () => {
     expect(home).toContain('href="/admin/jobs"');
     expect(home).toContain('href="/admin/companies"');
     expect(home).toContain('href="/admin/reports"');
+    expect(home).toContain('href="/admin/analytics"');
+    expect(home).toContain("Analytics / KPI dashboard");
     expect(home).toContain(">2<");
     expect(home).toContain(">1<");
     expect(home).toContain(">3<");
@@ -68,6 +77,16 @@ describe("admin moderation routes", () => {
     expect(mockRequireRole).toHaveBeenCalledWith("admin", "/admin/companies");
     await AdminReportsPage();
     expect(mockRequireRole).toHaveBeenCalledWith("admin", "/admin/reports");
+    await AdminAnalyticsPage();
+    expect(mockRequireRole).toHaveBeenCalledWith("admin", "/admin/analytics");
+  });
+
+  it("blocks non-admin callers before loading analytics", async () => {
+    mockRequireRole.mockRejectedValueOnce(new Error("REDIRECT:/forbidden"));
+
+    await expect(AdminAnalyticsPage()).rejects.toThrow("REDIRECT:/forbidden");
+    expect(mockRequireRole).toHaveBeenCalledWith("admin", "/admin/analytics");
+    expect(mockAnalytics).not.toHaveBeenCalled();
   });
 
   it("shows full job content and moderation controls only for pending jobs", async () => {
@@ -156,7 +175,7 @@ describe("admin moderation routes", () => {
 
     mockCounts.mockResolvedValue({ status: "error" });
     const errorDashboard = renderToStaticMarkup(await AdminHomePage());
-    expect(errorDashboard).toContain("검토 현황을 불러오지 못했습니다.");
+    expect(errorDashboard).toContain("관리자 현황을 불러오지 못했습니다.");
 
     const emptyReports = renderToStaticMarkup(await AdminReportsPage());
     expect(emptyReports).toContain("접수된 신고가 없습니다.");
@@ -164,6 +183,9 @@ describe("admin moderation routes", () => {
     mockReports.mockResolvedValue({ status: "unavailable" });
     const unavailableReports = renderToStaticMarkup(await AdminReportsPage());
     expect(unavailableReports).toContain("Supabase가 연결된 환경");
+    mockAnalytics.mockResolvedValue({ status: "unavailable" });
+    const unavailableAnalytics = renderToStaticMarkup(await AdminAnalyticsPage());
+    expect(unavailableAnalytics).toContain("Supabase");
   });
 });
 
@@ -224,5 +246,78 @@ function adminJob(id: string, status: "pending" | "approved", title: string) {
     benefits: ["Meal"],
     moderationStatus: status,
     createdAt: "2026-06-21T00:00:00Z",
+  };
+}
+
+function analyticsFixture() {
+  return {
+    jobs: {
+      total: 10,
+      byStatus: {
+        draft: 0,
+        pending: 2,
+        approved: 6,
+        rejected: 1,
+        paused: 1,
+        expired: 0,
+      },
+      draft: 0,
+      pending: 2,
+      approved: 6,
+      rejected: 1,
+      paused: 1,
+      expired: 0,
+      boosted: 3,
+      featured: 2,
+      urgent: 1,
+      createdLast7Days: 4,
+      createdLast30Days: 8,
+    },
+    applications: {
+      total: 20,
+      byStatus: {
+        submitted: 6,
+        reviewing: 5,
+        interview: 3,
+        offered: 2,
+        rejected: 3,
+        withdrawn: 1,
+      },
+      submitted: 6,
+      reviewing: 5,
+      interview: 3,
+      offered: 2,
+      rejected: 3,
+      withdrawn: 1,
+      createdLast7Days: 7,
+      createdLast30Days: 15,
+    },
+    companies: {
+      total: 8,
+      verified: 5,
+      unverified: 3,
+      createdLast30Days: 2,
+    },
+    reports: {
+      total: 5,
+      byStatus: { open: 3, reviewed: 1, dismissed: 1 },
+      open: 3,
+      reviewed: 1,
+      dismissed: 1,
+      createdLast7Days: 2,
+      createdLast30Days: 4,
+    },
+    messages: {
+      total: 12,
+      createdLast7Days: 3,
+      createdLast30Days: 9,
+    },
+    boosts: {
+      boostedJobs: 3,
+      byType: { featured: 2, urgent: 1 },
+      featuredJobs: 2,
+      urgentJobs: 1,
+      revenueTrackingDeferred: true as const,
+    },
   };
 }

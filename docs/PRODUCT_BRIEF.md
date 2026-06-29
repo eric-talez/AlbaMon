@@ -200,3 +200,14 @@ client-only) and Supabase RLS.
   - Supabase- or Stripe-unconfigured environments show unavailable states. No
     refunds, subscriptions, coupons, invoices, payouts, billing portal, taxes,
     or payment analytics are implemented.
+- **Slice 13 — Admin Analytics and KPI Dashboard:** scoped implementation done.
+  - Admins can open `/admin/analytics` from `/admin` to review aggregate
+    marketplace KPIs for jobs, applications, companies, reports, messages, and
+    boost usage.
+  - Reads use the caller-authenticated Supabase session with existing admin RLS
+    and expose counts only, not message bodies, applicant details, application
+    notes, report details, or thread content.
+  - Job status, application status, report status, recent activity, company
+    verification, and featured/urgent boost counts are included.
+  - External analytics providers, chart libraries, CSV export, cohort
+    retention, payment revenue tracking, and billing history remain deferred.
