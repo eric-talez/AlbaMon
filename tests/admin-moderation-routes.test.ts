@@ -105,6 +105,24 @@ describe("admin moderation routes", () => {
     expect(html.match(/name="decision"/g)).toHaveLength(2);
   });
 
+  it("shows compliance review flags for pending job moderation", async () => {
+    mockJobs.mockResolvedValue({
+      status: "ok",
+      jobs: [{
+        ...adminJob("11111111-1111-4111-8111-111111111111", "pending", "Pending job"),
+        complianceFlags: [{
+          phrase: "cash only",
+          category: "cash_pay",
+          reason: "Cash-only pay wording may indicate off-the-books pay.",
+        }],
+      }],
+    });
+    const html = renderToStaticMarkup(await AdminJobsPage());
+    expect(html).toContain("Compliance review flag");
+    expect(html).toContain("cash only");
+    expect(html).toContain("not a legal determination");
+  });
+
   it("shows company owner fallbacks and verification controls", async () => {
     mockCompanies.mockResolvedValue({
       status: "ok",
@@ -245,6 +263,7 @@ function adminJob(id: string, status: "pending" | "approved", title: string) {
     requirements: ["Customer service"],
     benefits: ["Meal"],
     moderationStatus: status,
+    complianceFlags: [],
     createdAt: "2026-06-21T00:00:00Z",
   };
 }

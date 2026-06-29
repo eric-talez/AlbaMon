@@ -33,8 +33,13 @@ export default async function ReportJobPage({
         <h1 className="mt-1 text-2xl font-bold">Report this job / 신고하기</h1>
         <p className="mt-3 text-sm leading-6 text-muted">
           Help us review listings that may be misleading, discriminatory, or
-          suspicious. K-Work US provides information only and does not determine
-          work authorization.
+          suspicious. Reports help K-Work US review listings for quality and
+          safety concerns. A report is not a legal determination.
+        </p>
+        <p className="mt-2 text-xs leading-5 text-muted">
+          K-Work US provides listing and communication tools only and does not
+          determine work authorization, immigration eligibility, wage compliance,
+          or tax classification.
         </p>
         <div className="mt-4 rounded-lg bg-background p-4 text-sm">
           <p className="font-semibold">{job.title}</p>

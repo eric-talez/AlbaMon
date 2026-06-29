@@ -60,6 +60,7 @@ function jobForm(companyId = "company-1"): FormData {
   form.set("scheduleTimeRange", "09:00–17:00");
   form.set("languageRequirement", "korean_helpful");
   form.set("description", "고객 응대 업무");
+  form.set("complianceAcknowledgement", "on");
   form.set("moderation_status", "approved");
   form.set("boost", "featured");
   form.set("owner_id", "forged-owner");
@@ -141,6 +142,14 @@ describe("submitEmployerJob", () => {
     const state = await submitEmployerJob(idle, jobForm("other-company"));
     expect(state.status).toBe("error");
     expect(state.message).not.toMatch(/42501|postgres|rls/i);
+  });
+
+  it("requires compliance acknowledgement before creating a job", async () => {
+    const form = jobForm();
+    form.delete("complianceAcknowledgement");
+    const state = await submitEmployerJob(idle, form);
+    expect(state.status).toBe("error");
+    expect(mockCreateJob).not.toHaveBeenCalled();
   });
 
   it("does not write when Supabase is unconfigured", async () => {

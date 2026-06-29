@@ -68,6 +68,38 @@ describe("admin moderation reads", () => {
     });
   });
 
+  it("adds computed compliance flags to admin job results", async () => {
+    const companySelect = vi.fn().mockResolvedValue({
+      data: [{ id: "company-1", name: "K-Work Cafe" }],
+      error: null,
+    });
+    const order = vi.fn().mockResolvedValue({
+      data: [
+        jobRow({
+          id: "flagged",
+          description: "cash only no tax",
+          requirements: ["no visa"],
+        }),
+      ],
+      error: null,
+    });
+    const from = vi.fn()
+      .mockReturnValueOnce({ select: companySelect })
+      .mockReturnValueOnce({ select: vi.fn(() => ({ order })) });
+    mockClient.mockResolvedValue({ from } as never);
+
+    await expect(getAdminJobs()).resolves.toMatchObject({
+      status: "ok",
+      jobs: [{
+        id: "flagged",
+        complianceFlags: expect.arrayContaining([
+          expect.objectContaining({ category: "cash_pay" }),
+          expect.objectContaining({ category: "work_authorization" }),
+        ]),
+      }],
+    });
+  });
+
   it("selects only safe owner profile fields and maps nullable fallbacks", async () => {
     const companyOrder = vi.fn().mockResolvedValue({
       data: [{

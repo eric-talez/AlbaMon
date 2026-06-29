@@ -8,6 +8,10 @@ import type {
   ModerationStatus,
   ProfileRow,
 } from "@/lib/db/types";
+import {
+  detectComplianceFlags,
+  type ComplianceFlag,
+} from "@/lib/employer/validation";
 
 export interface AdminModerationCounts {
   pendingJobs: number;
@@ -37,6 +41,7 @@ export interface AdminJob {
   requirements: string[];
   benefits: string[];
   moderationStatus: ModerationStatus;
+  complianceFlags: ComplianceFlag[];
   createdAt: string;
 }
 
@@ -163,6 +168,13 @@ export async function getAdminJobs(): Promise<AdminJobsResult> {
         requirements: job.requirements ?? [],
         benefits: job.benefits ?? [],
         moderationStatus: job.moderation_status,
+        complianceFlags: detectComplianceFlags([
+          job.title,
+          job.description,
+          ...(job.responsibilities ?? []),
+          ...(job.requirements ?? []),
+          ...(job.benefits ?? []),
+        ].join("\n")),
         createdAt: job.created_at,
       }))
       .sort((a, b) => {

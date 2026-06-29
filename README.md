@@ -258,6 +258,27 @@ persistent analytics.
 This slice does not add PostHog, Plausible, chart libraries, CSV export, cohort
 retention, payment revenue tracking, or billing history analytics.
 
+## Compliance polish (Slice 14)
+
+K-Work US now uses shared informational compliance copy across job detail,
+application, employer posting, report, boost, and verification surfaces.
+Employers must acknowledge responsibility for accurate job information and
+applicable wage, labor, tax, and work-authorization laws before submitting a new
+job; the server action rejects submissions that omit the acknowledgement.
+
+Posting validation flags and blocks clearly risky language around
+discrimination, nationality-only wording, visa/citizenship preferences,
+off-the-books cash pay, unpaid training, tips-only compensation, and 1099-only
+claims while still allowing job-related Korean language requirements. Admin job
+moderation computes the same compliance flags for review context and explains
+that a flag is not a legal determination; admins still approve or reject
+manually.
+
+Verification and boosts remain informational. Company review does not guarantee
+job quality, safety, legal compliance, applicants, or hires, and boosts do not
+imply endorsement or higher job quality. This slice is not legal advice and is
+not a legal compliance engine.
+
 ## Development approach
 
 Work is delivered in small, reviewable **slices** (one PR each), Slice 0 → 15.
@@ -265,7 +286,8 @@ See the slice table in [`docs/PRODUCT_BRIEF.md`](docs/PRODUCT_BRIEF.md).
 
 ## Compliance
 
-Current controls require pay ranges, show work-authorization disclaimers, and
-block explicit discriminatory / visa-preference / illegal-cash wording during
-employer submission. Broader compliance validation remains planned. The platform provides
-**information only** and does not give legal advice or determine work eligibility.
+Current controls require pay ranges, show work-authorization disclaimers, require
+employer posting acknowledgement, block clearly risky posting language, and show
+admin review flags for moderation context. The platform provides **information
+only** and does not give legal advice, determine work eligibility, or guarantee
+legal compliance.

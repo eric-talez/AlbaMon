@@ -13,6 +13,7 @@ import {
   PAY_UNITS,
   PAY_UNIT_LABELS,
 } from "@/lib/types";
+import { WorkAuthorizationDisclaimer } from "@/components/WorkAuthorizationDisclaimer";
 import { submitEmployerJob, type JobFormState } from "./actions";
 
 const INITIAL_STATE: JobFormState = { status: "idle", message: "" };
@@ -104,9 +105,33 @@ export function JobForm({ companies }: { companies: EmployerCompany[] }) {
       <label className="block text-sm font-medium">자격 요건 <span className="font-normal text-muted">(선택, 한 줄에 하나)</span><textarea className={inputClass} name="requirements" rows={4} /></label>
       <label className="block text-sm font-medium">복리후생 <span className="font-normal text-muted">(선택, 한 줄에 하나)</span><textarea className={inputClass} name="benefits" rows={4} /></label>
 
+      <WorkAuthorizationDisclaimer />
+
       <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 dark:border-amber-900/50 dark:bg-amber-950/20">
-        국적 제한, 비자 신분 선호, 세금 회피성 현금 지급 표현은 등록할 수 없습니다. 언어 요건은 실제 직무 필요에 근거해야 합니다.
+        Employers are responsible for accurate job information and compliance
+        with applicable wage, labor, tax, and work-authorization laws. K-Work US
+        provides listing and communication tools only.
+        <br />
+        국적 제한, 비자 신분 선호, 세금 회피성 현금 지급 표현은 등록할 수 없습니다.
+        언어 요건은 실제 직무 필요에 근거해야 합니다.
       </div>
+      <label className="flex gap-3 rounded-lg border border-border bg-background p-3 text-sm leading-6">
+        <input
+          type="checkbox"
+          name="complianceAcknowledgement"
+          required
+          className="mt-1"
+        />
+        <span>
+          I understand that I am responsible for accurate job information and
+          compliance with applicable wage, labor, tax, and work-authorization
+          laws.
+          <span className="mt-1 block text-xs text-muted">
+            공고 내용의 정확성과 임금, 노동, 세금, 근로 자격 관련 법규 준수 책임은
+            고용주에게 있음을 이해합니다.
+          </span>
+        </span>
+      </label>
       <button type="submit" disabled={pending} className="h-12 w-full rounded-full bg-brand px-6 font-medium text-brand-foreground disabled:cursor-wait disabled:opacity-60">
         {pending ? "제출 중…" : "검토 요청으로 제출"}
       </button>
