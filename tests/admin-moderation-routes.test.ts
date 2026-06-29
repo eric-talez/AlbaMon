@@ -11,6 +11,9 @@ vi.mock("@/lib/db/admin-moderation", () => ({
   moderatePendingJob: vi.fn(),
   setCompanyVerification: vi.fn(),
 }));
+vi.mock("@/lib/db/reports", () => ({
+  getAdminReports: vi.fn(),
+}));
 
 import { requireRole } from "@/lib/auth/guards";
 import {
@@ -18,14 +21,17 @@ import {
   getAdminJobs,
   getAdminModerationCounts,
 } from "@/lib/db/admin-moderation";
+import { getAdminReports } from "@/lib/db/reports";
 import AdminHomePage from "@/app/admin/page";
 import AdminJobsPage from "@/app/admin/jobs/page";
 import AdminCompaniesPage from "@/app/admin/companies/page";
+import AdminReportsPage from "@/app/admin/reports/page";
 
 const mockRequireRole = vi.mocked(requireRole);
 const mockCounts = vi.mocked(getAdminModerationCounts);
 const mockJobs = vi.mocked(getAdminJobs);
 const mockCompanies = vi.mocked(getAdminCompanies);
+const mockReports = vi.mocked(getAdminReports);
 
 beforeEach(() => {
   mockRequireRole.mockResolvedValue({
@@ -36,10 +42,11 @@ beforeEach(() => {
   });
   mockCounts.mockResolvedValue({
     status: "ok",
-    counts: { pendingJobs: 2, unverifiedCompanies: 1 },
+    counts: { pendingJobs: 2, unverifiedCompanies: 1, openReports: 3 },
   });
   mockJobs.mockResolvedValue({ status: "ok", jobs: [] });
   mockCompanies.mockResolvedValue({ status: "ok", companies: [] });
+  mockReports.mockResolvedValue({ status: "ok", reports: [] });
 });
 
 afterEach(() => vi.clearAllMocks());
@@ -50,13 +57,17 @@ describe("admin moderation routes", () => {
     expect(mockRequireRole).toHaveBeenCalledWith("admin", "/admin");
     expect(home).toContain('href="/admin/jobs"');
     expect(home).toContain('href="/admin/companies"');
+    expect(home).toContain('href="/admin/reports"');
     expect(home).toContain(">2<");
     expect(home).toContain(">1<");
+    expect(home).toContain(">3<");
 
     await AdminJobsPage();
     expect(mockRequireRole).toHaveBeenCalledWith("admin", "/admin/jobs");
     await AdminCompaniesPage();
     expect(mockRequireRole).toHaveBeenCalledWith("admin", "/admin/companies");
+    await AdminReportsPage();
+    expect(mockRequireRole).toHaveBeenCalledWith("admin", "/admin/reports");
   });
 
   it("shows full job content and moderation controls only for pending jobs", async () => {
@@ -100,6 +111,41 @@ describe("admin moderation routes", () => {
     expect(html).toContain("회사 인증");
   });
 
+  it("shows report queue details and scoped review controls", async () => {
+    mockReports.mockResolvedValue({
+      status: "ok",
+      reports: [{
+        id: "44444444-4444-4444-8444-444444444444",
+        reason: "misleading_or_suspicious",
+        details: "Suspicious pay claim",
+        status: "open",
+        jobId: "job-1",
+        jobTitle: "Server",
+        companyName: "K-Work Cafe",
+        jobModerationStatus: "approved",
+        reporterDisplayName: "Reporter",
+        reporterEmail: "reporter@example.com",
+        submittedAt: "2026-06-21T00:00:00Z",
+      }],
+    });
+
+    const html = renderToStaticMarkup(await AdminReportsPage());
+    expect(html).toContain("Server");
+    expect(html).toContain("K-Work Cafe");
+    expect(html).toContain("Suspicious pay claim");
+    expect(html).toContain("reporter@example.com");
+    expect(html).toContain('name="status"');
+    expect(html).toContain('value="reviewed"');
+    expect(html).toContain('value="dismissed"');
+  });
+
+  it("does not expose broad reporter profile fields in report queue code", () => {
+    const dbSource = read("src/lib/db/reports.ts");
+    expect(dbSource).toContain('.select("id, display_name, email")');
+    expect(dbSource).not.toMatch(/phone|metadata|address/i);
+    expect(dbSource).not.toMatch(/service.?role/i);
+  });
+
   it("distinguishes empty, unavailable, and database-error states", async () => {
     const emptyJobs = renderToStaticMarkup(await AdminJobsPage());
     expect(emptyJobs).toContain("등록된 공고가 없습니다.");
@@ -111,6 +157,13 @@ describe("admin moderation routes", () => {
     mockCounts.mockResolvedValue({ status: "error" });
     const errorDashboard = renderToStaticMarkup(await AdminHomePage());
     expect(errorDashboard).toContain("검토 현황을 불러오지 못했습니다.");
+
+    const emptyReports = renderToStaticMarkup(await AdminReportsPage());
+    expect(emptyReports).toContain("접수된 신고가 없습니다.");
+
+    mockReports.mockResolvedValue({ status: "unavailable" });
+    const unavailableReports = renderToStaticMarkup(await AdminReportsPage());
+    expect(unavailableReports).toContain("Supabase가 연결된 환경");
   });
 });
 

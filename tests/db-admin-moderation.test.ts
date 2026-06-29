@@ -24,12 +24,14 @@ afterEach(() => {
 });
 
 describe("admin moderation reads", () => {
-  it("returns exact pending and unverified counts", async () => {
+  it("returns exact pending, unverified, and open-report counts", async () => {
     const from = vi.fn((table: string) => ({
       select: vi.fn(() => ({
         eq: vi.fn().mockResolvedValue(
           table === "jobs"
             ? { count: 3, error: null }
+            : table === "reports"
+              ? { count: 4, error: null }
             : { count: 2, error: null },
         ),
       })),
@@ -38,7 +40,7 @@ describe("admin moderation reads", () => {
 
     await expect(getAdminModerationCounts()).resolves.toEqual({
       status: "ok",
-      counts: { pendingJobs: 3, unverifiedCompanies: 2 },
+      counts: { pendingJobs: 3, unverifiedCompanies: 2, openReports: 4 },
     });
   });
 

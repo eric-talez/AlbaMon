@@ -12,6 +12,7 @@ import type {
 export interface AdminModerationCounts {
   pendingJobs: number;
   unverifiedCompanies: number;
+  openReports: number;
 }
 
 export interface AdminJob {
@@ -87,7 +88,7 @@ export async function getAdminModerationCounts(): Promise<AdminCountsResult> {
   if (!isSupabaseConfigured()) return { status: "unavailable" };
   try {
     const supabase = await createSupabaseServerClient();
-    const [jobs, companies] = await Promise.all([
+    const [jobs, companies, reports] = await Promise.all([
       supabase
         .from("jobs")
         .select("id", { count: "exact", head: true })
@@ -96,14 +97,20 @@ export async function getAdminModerationCounts(): Promise<AdminCountsResult> {
         .from("companies")
         .select("id", { count: "exact", head: true })
         .eq("is_verified", false),
+      supabase
+        .from("reports")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "open"),
     ]);
     if (jobs.error) throw jobs.error;
     if (companies.error) throw companies.error;
+    if (reports.error) throw reports.error;
     return {
       status: "ok",
       counts: {
         pendingJobs: jobs.count ?? 0,
         unverifiedCompanies: companies.count ?? 0,
+        openReports: reports.count ?? 0,
       },
     };
   } catch {

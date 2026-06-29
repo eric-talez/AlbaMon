@@ -8,7 +8,12 @@ import {
   LANGUAGE_REQUIREMENT_LABELS,
 } from "@/lib/types";
 import { getApprovedJobById, getApprovedJobs } from "@/lib/db/jobs";
-import { Badge, BoostBadge, VerifiedBadge } from "@/components/Badge";
+import {
+  Badge,
+  BoostBadge,
+  CompanyVerificationBadge,
+  VerifiedBadge,
+} from "@/components/Badge";
 import { WorkAuthorizationDisclaimer } from "@/components/WorkAuthorizationDisclaimer";
 
 type Params = { id: string };
@@ -88,6 +93,13 @@ export default async function JobDetailPage({
           {job.employerVerified && <VerifiedBadge />}
         </div>
 
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <CompanyVerificationBadge verified={job.employerVerified} />
+          <span className="text-xs text-muted">
+            Verification is not a safety, legal, or hiring guarantee.
+          </span>
+        </div>
+
         {/* Key facts */}
         <dl className="mt-5 grid grid-cols-1 gap-3 rounded-xl border border-border bg-surface p-4 sm:grid-cols-2">
           <div>
@@ -146,6 +158,12 @@ export default async function JobDetailPage({
           <p className="mt-2 text-center text-xs text-muted">
             로그인 후 간단한 지원 메모를 제출할 수 있습니다.
           </p>
+          <Link
+            href={`/jobs/${encodeURIComponent(job.id)}/report`}
+            className="mt-4 flex h-10 w-full items-center justify-center rounded-full border border-border px-5 text-sm font-medium text-muted transition-colors hover:border-brand hover:text-brand"
+          >
+            Report this job / 신고하기
+          </Link>
         </div>
       </article>
     </main>

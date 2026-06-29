@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { JobCard } from "@/components/JobCard";
 import { formatPayRange } from "@/lib/types";
 import { MOCK_JOBS, getMockJobs, getMockJobById } from "@/lib/mock/jobs";
 
@@ -55,6 +58,22 @@ describe("application job detail", () => {
     expect(source).toContain(
       "href={`/jobs/${encodeURIComponent(job.id)}/apply`}",
     );
+    expect(source).toContain(
+      "href={`/jobs/${encodeURIComponent(job.id)}/report`}",
+    );
+    expect(source).toContain("Verification is not a safety, legal, or hiring guarantee.");
     expect(source).not.toContain('aria-disabled="true"');
+  });
+
+  it("shows a modest verified badge only for verified public job cards", () => {
+    const verified = { ...getMockJobs()[0], employerVerified: true };
+    const unverified = { ...getMockJobs()[0], employerVerified: false };
+
+    expect(renderToStaticMarkup(createElement(JobCard, { job: verified }))).toContain(
+      "Verified employer",
+    );
+    expect(renderToStaticMarkup(createElement(JobCard, { job: unverified }))).not.toContain(
+      "Verified employer",
+    );
   });
 });

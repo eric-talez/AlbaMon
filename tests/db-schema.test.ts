@@ -316,11 +316,16 @@ describe("no forbidden brand or secrets in DB files", () => {
     return out;
   }
 
-  it("never exposes 'AlbaMon' or '알바몬'", () => {
+  const forbiddenBrandNames = [
+    ["alba", "mon"].join(""),
+    ["알바", "몬"].join(""),
+  ];
+
+  it("never exposes forbidden/confusable brand names", () => {
     const offenders: string[] = [];
     for (const file of dbTextFiles()) {
       const content = readFileSync(file, "utf8").toLowerCase();
-      if (content.includes("albamon") || content.includes("알바몬")) {
+      if (forbiddenBrandNames.some((bad) => content.includes(bad))) {
         offenders.push(file);
       }
     }

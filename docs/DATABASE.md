@@ -33,7 +33,7 @@ Without the CLI, run every file in `migrations/` in filename order, then run
 | `jobs` | Job postings. | `company_id → companies`; `moderation_status` gates public visibility; `address_display_mode` is `full`/`city_only`. |
 | `applications` | Seeker applications. | `unique(job_id, seeker_id)` blocks duplicates; optional `cover_note` is limited to 1,000 characters; `status` is constrained to the Slice 10 workflow values. |
 | `messages` | Application-centered seeker/employer conversations. | `application_id → applications`; body is nonblank and limited to 2,000 characters. |
-| `reports` | Abuse/quality reports. | Nullable `reporter_id`/`job_id`/`company_id`. |
+| `reports` | Abuse/quality reports. | Job reports filed by signed-in users; reason/status/details are constrained by Slice 11. |
 | `audit_logs` | Append-only audit trail. | No `updated_at`; writes via service-role only. |
 
 `public_job_listings` is a read-only, approved-only view used by public job
@@ -71,7 +71,7 @@ RLS is enabled on **all seven tables** and is the authorization gate.
 | `jobs` | **`approved` only (public)**; current-role owner; admin | employer/admin owner insert **forced to `pending`**; owner update cannot set `approved`; admin all |
 | `applications` | own (seeker); current-role employer for owned jobs; admin | insert only by a **`seeker`-role profile**, as self, for `approved` jobs with initial status `submitted`; current-role owning employers may update status only; admin update |
 | `messages` | applicant; current-role owning employer; admin | applicant/owning employer insert only as `auth.uid()`; no update/delete |
-| `reports` | own (reporter); admin | any authenticated insert; admin update |
+| `reports` | own (reporter); admin | authenticated reporter insert for approved jobs only; admin status update |
 | `audit_logs` | admin only | **no policy** — service-role only |
 
 ## App access layer
@@ -136,6 +136,22 @@ applicant, owning employer, or admin to read a thread. Insert RLS additionally
 requires a seeker/employer participant and pins `sender_id` to `auth.uid()`.
 The thread-context RPC exposes only application/job/company display fields.
 
+Report submission and the admin report queue use
+[`src/lib/db/reports.ts`](../src/lib/db/reports.ts). Users can file reports only
+through their caller-authenticated Supabase session. The app verifies the job via
+the approved-only `public_job_listings` view before inserting, and Slice 11 RLS
+keeps approved jobs as the final insert gate. Reports are constrained to the
+reason set `discriminatory_language`, `visa_status_preference`,
+`illegal_cash_pay`, `misleading_or_suspicious`, `spam`, and `other`; status is
+constrained to `open`, `reviewed`, or `dismissed`; details are capped at 1,000
+characters; and a unique index prevents the same signed-in user from repeatedly
+reporting the same job with the same reason.
+
+Admin report queue reads use existing admin RLS and narrow follow-up reads for
+job title/status, company name, and reporter display name/email only. Admin
+actions update only open report status to `reviewed` or `dismissed`; they do not
+reject jobs, suspend accounts, send email, or expand audit logs.
+
 ## Known limitations
 
 - Runtime auth reads `profiles.role`; missing/error profile reads fail closed.
@@ -143,6 +159,8 @@ The thread-context RPC exposes only application/job/company display fields.
   and does not collect a rejection reason.
 - Message delivery is in-app only. Development notification stubs do not send
   production email or persist notification preferences.
+- Report review is a queue-status workflow only; blocking, sanctions, email
+  alerts, and full trust-and-safety case management are deferred.
 - Application dashboard reads are unavailable rather than mocked when Supabase
   is not configured.
 - Seed uses fixed UUIDs and inserts into `auth.users`; intended for local/demo

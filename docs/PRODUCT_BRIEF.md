@@ -11,9 +11,9 @@ for the U.S. Korean community. Initial market: **LA / Orange County**.
 It is a lightweight "hiring OS": _post job → apply → message → interview → offer_,
 managed in one place — not just a community bulletin board.
 
-**Brand note:** The product name is **K-Work US**. We do **not** use "AlbaMon" or
-any confusingly similar brand name anywhere in code or UI (trademark / brand-confusion
-risk).
+**Brand note:** The product name is **K-Work US**. We do **not** use legacy or
+confusingly similar marketplace brand names anywhere in code or UI (trademark /
+brand-confusion risk).
 
 ## Positioning (critical)
 
@@ -84,7 +84,7 @@ client-only) and Supabase RLS.
 | 8 | Post job | Compliance validation; new jobs pending, not public. |
 | 9 | Admin moderation | Approve/reject; flagged keywords reach review queue. |
 | 10 | Application status workflow | Employers update owned application status; seekers see status. |
-| 11 | Verification & trust | Verified badges; report queue. |
+| 11 | Verification trust and report queue | Verified badges; signed-in job reports; admin report queue. |
 | 12 | Payments & boosts | Stripe checkout activates boost via webhook. |
 | 13 | Analytics | Admin KPI dashboard. |
 | 14 | Compliance polish | Policy pages, disclaimers, audit logs. |
@@ -173,3 +173,16 @@ client-only) and Supabase RLS.
     simulate persistent status writes.
   - Real email notifications, notification preferences, contracts, and payroll
     remain deferred.
+- **Slice 11 — Verification Trust and Report Queue:** scoped implementation done.
+  - Public job cards/details show careful company verification signals without
+    implying safety, legal, immigration, hiring, or job-quality guarantees.
+  - Signed-in users can report approved job listings for discriminatory wording,
+    visa-status preference, illegal cash pay, misleading/suspicious content,
+    spam, or other concerns.
+  - Admins can review `/admin/reports`, mark open reports as reviewed or
+    dismissed, and see an open-report count on `/admin`.
+  - Report writes and admin queue reads use caller-authenticated Supabase
+    sessions and RLS; no service-role client or mock persistent report writes
+    are used.
+  - Stripe, boosts, blocking/sanctions, email alerts, and full trust-and-safety
+    case management remain deferred.

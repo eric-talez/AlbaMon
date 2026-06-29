@@ -16,6 +16,8 @@ import type {
   LanguageRequirement,
   ModerationStatus,
   PayUnit,
+  ReportReason,
+  ReportStatus,
   Role,
 } from "@/lib/types";
 
@@ -26,6 +28,8 @@ export type {
   LanguageRequirement,
   ModerationStatus,
   PayUnit,
+  ReportReason,
+  ReportStatus,
   Role,
 };
 
@@ -174,9 +178,9 @@ export interface ReportRow {
   reporter_id: string | null;
   job_id: string | null;
   company_id: string | null;
-  reason: string;
+  reason: ReportReason;
   details: string | null;
-  status: string;
+  status: ReportStatus;
   created_at: string;
   updated_at: string;
 }

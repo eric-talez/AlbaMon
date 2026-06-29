@@ -38,5 +38,13 @@ export function BoostBadge({ boost }: { boost: BoostType }) {
 }
 
 export function VerifiedBadge() {
-  return <Badge tone="success">✓ 인증 사업장</Badge>;
+  return <Badge tone="success">Verified employer / 인증된 고용주</Badge>;
+}
+
+export function CompanyVerificationBadge({ verified }: { verified: boolean }) {
+  return verified ? (
+    <Badge tone="success">Company information reviewed / 회사 정보 확인됨</Badge>
+  ) : (
+    <Badge tone="neutral">Company not yet verified / 아직 인증되지 않은 회사</Badge>
+  );
 }

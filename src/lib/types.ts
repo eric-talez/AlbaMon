@@ -72,6 +72,19 @@ export const APPLICATION_STATUSES = [
 ] as const;
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
+export const REPORT_REASONS = [
+  "discriminatory_language",
+  "visa_status_preference",
+  "illegal_cash_pay",
+  "misleading_or_suspicious",
+  "spam",
+  "other",
+] as const;
+export type ReportReason = (typeof REPORT_REASONS)[number];
+
+export const REPORT_STATUSES = ["open", "reviewed", "dismissed"] as const;
+export type ReportStatus = (typeof REPORT_STATUSES)[number];
+
 export type AddressDisplayMode = "full" | "city_only";
 
 export interface Job {
@@ -157,6 +170,21 @@ export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
   offered: "오퍼 (Offered)",
   rejected: "불합격 (Rejected)",
   withdrawn: "철회됨 (Withdrawn)",
+};
+
+export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
+  discriminatory_language: "차별적 표현 (Discriminatory language)",
+  visa_status_preference: "비자 신분 선호 (Visa-status preference)",
+  illegal_cash_pay: "불법 현금 지급 (Illegal cash pay)",
+  misleading_or_suspicious: "오해 소지 또는 의심스러운 내용 (Misleading or suspicious)",
+  spam: "스팸 (Spam)",
+  other: "기타 (Other)",
+};
+
+export const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
+  open: "검토 대기 (Open)",
+  reviewed: "검토 완료 (Reviewed)",
+  dismissed: "기각 (Dismissed)",
 };
 
 /** Format a pay range, e.g. "시급 $18–22" or "연봉 $55,000–65,000". */

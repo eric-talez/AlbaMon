@@ -201,6 +201,27 @@ instead of pretending to save status changes.
 
 Real email notifications and broader notification preferences remain deferred.
 
+## Verification trust and report queue (Slice 11)
+
+Public job cards and job detail pages now show modest company verification
+signals. Verified language means company information has been reviewed; it is
+not a safety, legal, immigration, hiring, or job-quality guarantee from K-Work
+US.
+
+Approved job detail pages link to `/jobs/[id]/report`, where signed-in users can
+report listings for discriminatory wording, visa-status preference, illegal cash
+pay, misleading/suspicious content, spam, or other concerns. Report writes use
+the caller-authenticated Supabase session and are unavailable when Supabase is
+not configured; no persistent report writes are mocked.
+
+Admins can review reports at `/admin/reports`, mark open reports as `reviewed`
+or `dismissed`, and see an open-report count from `/admin`. Report queue reads
+show the reported job, company, reason, note, reporter display name/email, and
+status without exposing applicant, application, message, or broad profile data.
+
+Stripe, boosts, blocking/sanctions, email alerts, and full trust-and-safety case
+management remain deferred.
+
 ## Development approach
 
 Work is delivered in small, reviewable **slices** (one PR each), Slice 0 → 15.
