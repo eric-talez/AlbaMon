@@ -13,7 +13,7 @@ community. Mobile-first. Initial market: **LA / Orange County**.
 - **Tailwind CSS v4**
 - **Supabase Auth + Postgres + Row Level Security**
 - **Vitest** for unit tests
-- Planned: Stripe Checkout, Resend/SendGrid
+- Stripe Checkout for paid job boosts; planned: Resend/SendGrid
 
 ## Local setup
 
@@ -219,8 +219,28 @@ or `dismissed`, and see an open-report count from `/admin`. Report queue reads
 show the reported job, company, reason, note, reporter display name/email, and
 status without exposing applicant, application, message, or broad profile data.
 
-Stripe, boosts, blocking/sanctions, email alerts, and full trust-and-safety case
-management remain deferred.
+Blocking/sanctions, email alerts, and full trust-and-safety case management
+remain deferred.
+
+## Payments and boosts (Slice 12)
+
+Employers can open `/employer/jobs/[id]/boost` from the owned job dashboard and
+choose `featured` or `urgent` for a job they own. Checkout creation is
+server-side only, re-checks the authenticated employer/admin ownership path, and
+stores job ID, company ID, boost type, and initiating user ID in Stripe Checkout
+metadata. Creating a Checkout session never updates `jobs.boost`.
+
+Stripe sends payment confirmations to `/api/stripe/webhook`. The webhook verifies
+`STRIPE_WEBHOOK_SECRET` against the raw request body before trusting metadata,
+then uses the service-role Supabase client only to update the intended job boost
+after a paid `checkout.session.completed` event. Duplicate webhook deliveries are
+safe because setting the same boost value is idempotent.
+
+Public job cards and details show boost badges for boosted approved jobs only;
+moderation still controls public visibility. Local/dev environments with
+placeholder Supabase or Stripe variables show unavailable states instead of
+pretending to purchase. Refunds, subscriptions, invoices, coupons, payouts,
+taxes, billing portals, and analytics remain deferred.
 
 ## Development approach
 

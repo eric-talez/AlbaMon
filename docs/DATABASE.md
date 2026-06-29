@@ -122,6 +122,14 @@ unverified and employer job inserts to remain unboosted. Pinned-search-path
 triggers prevent normal users changing `is_verified` or `boost`, while allowing
 admin, service-role, and trusted migration/database execution.
 
+Slice 12 uses the existing nullable `jobs.boost` field for paid visibility
+boosts. User-facing checkout creation uses the caller-authenticated Supabase
+session only to verify job/company ownership and never changes `jobs.boost`.
+The Stripe webhook verifies `STRIPE_WEBHOOK_SECRET` before using the service-role
+client to set the intended job's boost by both `job_id` and `company_id`.
+No payments table, subscription schema, refund tooling, or billing portal schema
+is introduced in this slice.
+
 Admin moderation uses the same cookie-authenticated client through
 `src/lib/db/admin-moderation.ts`. Existing admin RLS permits the required reads
 and narrow updates, so Slice 8 adds no migration. Job decisions filter by both
@@ -161,6 +169,8 @@ reject jobs, suspend accounts, send email, or expand audit logs.
   production email or persist notification preferences.
 - Report review is a queue-status workflow only; blocking, sanctions, email
   alerts, and full trust-and-safety case management are deferred.
+- Boost payment records, refunds, subscriptions, invoices, billing portal,
+  coupons, payouts, taxes, and payment analytics are deferred.
 - Application dashboard reads are unavailable rather than mocked when Supabase
   is not configured.
 - Seed uses fixed UUIDs and inserts into `auth.users`; intended for local/demo
