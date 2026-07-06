@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SITE_NAME } from "@/lib/site";
-import { DevAuthForm } from "@/components/auth/DevAuthForm";
+import { AuthCard } from "@/components/auth/AuthCard";
 
 export const metadata: Metadata = { title: "로그인" };
 
@@ -18,7 +18,7 @@ export default async function LoginPage({
         <Link href="/" className="mb-6 block text-center text-sm text-muted">
           {SITE_NAME}
         </Link>
-        <DevAuthForm mode="login" next={next} error={error} />
+        <AuthCard mode="login" next={next} error={error} />
       </div>
     </main>
   );
