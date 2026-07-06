@@ -52,6 +52,24 @@ their values. See [`OPERATIONAL_HEALTH.md`](OPERATIONAL_HEALTH.md).)
 | `RESEND_API_KEY`, `SENDGRID_API_KEY` | server-only | Only needed once a real email provider is enabled (deferred). |
 | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | client | Analytics provider is not initialized in this build; leave empty. DB-backed admin analytics works without them. |
 
+### Auth provider flags (Slice 19)
+
+Public **booleans, not secrets** — they only decide whether a sign-in method
+renders as clickable. The real OAuth/SMS credentials live exclusively in the
+Supabase dashboard (see [`AUTH_PROVIDERS.md`](AUTH_PROVIDERS.md)). All default
+off; leave them unset until the matching provider is configured in Supabase.
+`NEXT_PUBLIC_*` values are inlined into the client bundle at build time, so a
+change requires a redeploy. A method with its flag off (or Supabase
+unconfigured) shows a "setup required" state — nothing breaks.
+
+| Variable | Exposure | Status |
+|---|---|---|
+| `NEXT_PUBLIC_AUTH_KAKAO_ENABLED` | client | `true` enables the KakaoTalk button once the Kakao provider is configured in Supabase. |
+| `NEXT_PUBLIC_AUTH_GOOGLE_ENABLED` | client | `true` enables the Google button once the Google provider is configured in Supabase. |
+| `NEXT_PUBLIC_AUTH_NAVER_ENABLED` | client | `true` enables the Naver button — additionally requires a valid `NEXT_PUBLIC_AUTH_NAVER_PROVIDER_ID`. |
+| `NEXT_PUBLIC_AUTH_NAVER_PROVIDER_ID` | client | Slug of the Supabase **custom OIDC provider** registered for Naver (app passes `custom:<slug>`). Lowercase `[a-z0-9_-]`, max 63 chars; invalid values are ignored (Naver stays setup-required). |
+| `NEXT_PUBLIC_AUTH_PHONE_ENABLED` | client | `true` enables the phone OTP form once Supabase Phone Auth + an SMS provider are configured in the Supabase dashboard. |
+
 ## CI and local development
 
 CI ([`../.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs with

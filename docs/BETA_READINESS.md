@@ -347,3 +347,31 @@ the sign-off of record; this one is the execution summary feeding it.
 Any unchecked **Hard** row = **no-go**. Conditional rows must either pass or
 be explicitly accepted (name + date) with their scope limitation enforced —
 e.g. paid boosts stay off until the live webhook is verified.
+
+## 17. Social & phone auth verification
+
+Run per enabled method, after its Supabase dashboard setup
+([`AUTH_PROVIDERS.md`](AUTH_PROVIDERS.md)) and flag flip. Methods left with
+their default-`false` flags need no verification — they render as
+"setup required" and this section is N/A for them. Not a launch blocker:
+Conditional in the same sense as Stripe (§16) — an unverified method's flag
+simply stays `false`.
+
+1. **UI state sanity**: `/login` and `/signup` show enabled buttons only for
+   flipped flags; every other method shows the calm setup-required state.
+2. **Social smoke (per enabled provider)**: full sign-in round-trip — button →
+   provider consent → back to the app signed in. Confirm the URL passes
+   through `/auth/callback` and lands on `/dashboard` (or the `next` target).
+3. **Phone OTP smoke**: send a code to a real number (E.164, e.g. `+1…`),
+   verify the 6-digit code, confirm the session works. Check the resend
+   button is locked for ~60 seconds after sending. Confirm no phone number or
+   code appears in any application log.
+4. **Profile provisioning**: after the first sign-up via each new method, the
+   `profiles` row exists with role `seeker` (phone-only accounts have a null
+   email — expected). Role changes still happen only via admin (§7).
+5. **Open-redirect spot checks**: `/auth/callback?next=//evil.example` and
+   `/auth/callback?next=/\evil.example` (with a valid session code flow) must
+   land on `/dashboard`, never off-site. `?next=/jobs` must land on `/jobs`.
+6. **Copy check**: nothing in the sign-in UI claims identity, work
+   authorization, age, or background verification — phone verification only
+   means control of that number.

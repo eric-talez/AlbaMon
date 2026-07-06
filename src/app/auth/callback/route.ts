@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { sanitizeNextPath } from "@/lib/auth/redirect";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -10,11 +11,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams, origin } = request.nextUrl;
   const code = searchParams.get("code");
-  const nextParam = searchParams.get("next");
-  const next =
-    nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
-      ? nextParam
-      : "/dashboard";
+  const next = sanitizeNextPath(searchParams.get("next"));
 
   if (isSupabaseConfigured() && code) {
     const supabase = await createSupabaseServerClient();

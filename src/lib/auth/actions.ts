@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { ROLES, type Role } from "@/lib/types";
 import { roleHome } from "@/lib/auth/access";
+import { isSafeNextPath } from "@/lib/auth/redirect";
 import {
   isSupabaseConfigured,
   isDevAuthEnabled,
@@ -19,8 +20,7 @@ function parseRole(value: FormDataEntryValue | null): Role {
 
 function normalizeNext(value: FormDataEntryValue | null): string | null {
   // Only allow same-site relative paths to avoid open-redirect.
-  if (typeof value !== "string") return null;
-  return value.startsWith("/") && !value.startsWith("//") ? value : null;
+  return isSafeNextPath(value) ? value : null;
 }
 
 /**

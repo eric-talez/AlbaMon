@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { ROLES } from "@/lib/types";
 import { ROLE_LABELS } from "@/lib/auth/types";
 import { isDevAuthMode } from "@/lib/auth/session";
@@ -13,50 +12,29 @@ const ROLE_HINTS: Record<(typeof ROLES)[number], string> = {
 interface DevAuthFormProps {
   mode: "login" | "signup";
   next?: string;
-  error?: string;
 }
 
 /**
- * Server-rendered auth form. In dev mode (no Supabase configured) it sets a
- * dev-session cookie with the selected role so the role-guard flow is testable.
- * When Supabase is configured, it shows a notice instead of faking a session.
+ * Dev-mode role picker. Only in dev mode (non-production, no Supabase
+ * configured) it sets a dev-session cookie with the selected role so the
+ * role-guard flow is testable; otherwise it renders nothing — the real
+ * sign-in methods live in `AuthCard`.
  */
-export function DevAuthForm({ mode, next, error }: DevAuthFormProps) {
+export function DevAuthForm({ mode, next }: DevAuthFormProps) {
   const isLogin = mode === "login";
-  const title = isLogin ? "로그인" : "회원가입";
-  const subtitle = isLogin ? "Sign in" : "Create account";
 
-  if (!isDevAuthMode()) {
-    return (
-      <div className="rounded-xl border border-border bg-surface p-6 text-center">
-        <h1 className="text-2xl font-bold">{title}</h1>
-        <p className="mt-2 text-sm text-muted">
-          이메일/소셜 로그인 UI는 다음 단계에서 제공됩니다. (Email/social sign-in
-          coming soon.)
-        </p>
-      </div>
-    );
-  }
+  if (!isDevAuthMode()) return null;
 
   return (
-    <div className="rounded-xl border border-border bg-background p-6">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold">{title}</h1>
-        <p className="mt-1 text-sm text-muted">{subtitle}</p>
-      </div>
+    <section className="mt-6 rounded-lg border border-dashed border-border p-4">
+      <h2 className="text-sm font-semibold">개발 모드 로그인 (Dev mode)</h2>
 
-      <div className="mt-4 rounded-lg bg-brand-soft px-3 py-2 text-xs text-brand">
+      <div className="mt-3 rounded-lg bg-brand-soft px-3 py-2 text-xs text-brand">
         개발 모드: Supabase 미연결 상태로 역할을 선택해 임시 로그인합니다. 실제
         인증은 Supabase 연결 후 동작합니다.
       </div>
 
-      {error ? (
-        <p className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
-          로그인 처리 중 문제가 발생했습니다. 다시 시도해 주세요.
-        </p>
-      ) : null}
-
-      <form action={signInDev} className="mt-5 flex flex-col gap-4">
+      <form action={signInDev} className="mt-4 flex flex-col gap-4">
         {next ? <input type="hidden" name="next" value={next} /> : null}
 
         <label className="flex flex-col gap-1 text-sm" htmlFor="dev-email">
@@ -100,24 +78,6 @@ export function DevAuthForm({ mode, next, error }: DevAuthFormProps) {
           {isLogin ? "로그인" : "회원가입"}
         </button>
       </form>
-
-      <p className="mt-4 text-center text-sm text-muted">
-        {isLogin ? (
-          <>
-            계정이 없으신가요?{" "}
-            <Link href="/signup" className="font-medium text-brand">
-              회원가입
-            </Link>
-          </>
-        ) : (
-          <>
-            이미 계정이 있으신가요?{" "}
-            <Link href="/login" className="font-medium text-brand">
-              로그인
-            </Link>
-          </>
-        )}
-      </p>
-    </div>
+    </section>
   );
 }

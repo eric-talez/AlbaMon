@@ -368,6 +368,34 @@ observability provider, no product changes:
   behavior map, log triage by symptom (Vercel/Supabase/Stripe), and the
   private-beta incident response process.
 
+## Social & phone auth foundation (Slice 19)
+
+Real sign-in methods on `/login` and `/signup`, entirely through **Supabase
+Auth** (no hand-rolled OAuth, no SMS SDKs, no new secrets):
+
+- **KakaoTalk / Google / Naver buttons** driven by an allowlist registry
+  (`src/lib/auth/providers.ts`): only known provider keys can ever reach
+  `supabase.auth.signInWithOAuth`. Kakao and Google use built-in Supabase
+  providers; **Naver goes through Supabase's custom OIDC provider support**
+  (`custom:<slug>`) and ships **setup-required by default** until the
+  dashboard registration is verified.
+- **Phone OTP** (E.164 number → 6-digit SMS code) via
+  `signInWithOtp({ phone })` / `verifyOtp({ phone, token, type: "sms" })`,
+  with a 60-second resend cooldown. Codes are never stored; phone numbers and
+  codes are never logged. Phone verification only confirms control of the
+  number — no identity/work-authorization claims.
+- Everything is gated behind **default-off public flags**
+  (`NEXT_PUBLIC_AUTH_*` — booleans, not secrets); unconfigured methods render
+  a calm "setup required" state. CI needs no provider credentials, and the
+  dev role-picker still works unchanged in unconfigured local mode.
+- The `?next=` return path is sanitized by a shared helper
+  (`src/lib/auth/redirect.ts`) used by the OAuth callback, dev sign-in, and
+  the OTP success redirect — same-site paths only (also hardened against
+  backslash/control-character `//` bypasses).
+- New accounts get their `profiles` row from the existing
+  `on_auth_user_created` trigger (role `seeker`); authorization still reads
+  `profiles.role` only. Setup guide: [`docs/AUTH_PROVIDERS.md`](docs/AUTH_PROVIDERS.md).
+
 ## Development approach
 
 Work is delivered in small, reviewable **slices** (one PR each), Slice 0 → 15.

@@ -31,6 +31,9 @@ Per-variable reference (exposure, validation, placeholders):
 - [ ] `STRIPE_FEATURED_PRICE_ID`, `STRIPE_URGENT_PRICE_ID` (live price ids)
 - [ ] `EMAIL_PROVIDER=dev` confirmed (real email delivery is out of beta scope)
 - [ ] PostHog vars left empty (analytics provider not initialized in this build)
+- [ ] `NEXT_PUBLIC_AUTH_*` flags decided per provider — keep the default
+      `false` for any method whose Supabase dashboard setup is not verified
+      (see [`AUTH_PROVIDERS.md`](AUTH_PROVIDERS.md) and §12)
 - [ ] `npm test` passes — includes `tests/security.test.ts`, which scans tracked
       files for secret-shaped strings and forbidden brand names
 
@@ -209,9 +212,38 @@ Chrome + Safari, on the production URL:
 | Stripe live webhook verified (§5) | ☐ |
 | RLS spot-checks passed (§7) | ☐ |
 | Team accepts open placeholders: attorney review pending, no error tracking, dev-stub email, browser E2E deferred | ☐ |
+| Social/phone auth providers verified per §12 — or their flags stay `false` | ☐ |
 
 **Go** = every row checked. Any unchecked row = **no-go**; fix or explicitly
 accept (with a name and date) before inviting users.
+
+## 12. Social & phone auth providers
+
+Config-time checklist for enabling real sign-in methods; not a beta blocker —
+every method ships behind a default-`false` flag and renders as
+"setup required" until this section is done for it. Full setup steps:
+[`AUTH_PROVIDERS.md`](AUTH_PROVIDERS.md).
+
+- [ ] Supabase Auth → URL Configuration: Site URL set, and the redirect
+      allowlist includes the **wildcard** `https://<your-domain>/auth/callback*`
+      (the OAuth `redirectTo` can carry `?next=…`)
+- [ ] Kakao: Kakao Developers app configured with the Supabase callback URL;
+      provider enabled in Supabase; live sign-in smoke-tested → then
+      `NEXT_PUBLIC_AUTH_KAKAO_ENABLED=true`
+- [ ] Google: GCP OAuth client configured; provider enabled in Supabase; live
+      sign-in smoke-tested → then `NEXT_PUBLIC_AUTH_GOOGLE_ENABLED=true`
+- [ ] Naver (go/no-go): Supabase **custom OIDC provider** registered and
+      verified end-to-end in staging — if Naver's OIDC support cannot satisfy
+      it, keep the flag `false` (button stays setup-required) → otherwise set
+      `NEXT_PUBLIC_AUTH_NAVER_PROVIDER_ID=<slug>` and
+      `NEXT_PUBLIC_AUTH_NAVER_ENABLED=true`
+- [ ] Phone OTP: Supabase Phone provider + SMS vendor connected **in the
+      Supabase dashboard only** (no SMS credentials in Vercel/repo/CI); send +
+      verify tested with a real number; rate limits reviewed → then
+      `NEXT_PUBLIC_AUTH_PHONE_ENABLED=true`
+- [ ] First social/phone sign-up spot-checked: `profiles` row auto-created
+      with role `seeker`; flags flipped only after the matching dashboard
+      setup was verified
 
 ## Deferred (accepted for beta, revisit after)
 
