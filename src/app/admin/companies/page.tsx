@@ -21,7 +21,11 @@ export default async function AdminCompaniesPage() {
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
       <Link href="/admin" className="text-sm font-medium text-brand hover:underline">← 관리자 콘솔</Link>
       <h1 className="mt-4 text-2xl font-bold">회사 인증 관리</h1>
-      <p className="mt-2 text-sm text-muted">회사 정보와 소유자 연락 정보를 확인한 뒤 인증 상태를 변경합니다.</p>
+      <p className="mt-2 text-sm text-muted">
+        회사 정보와 소유자 연락 정보를 확인한 뒤 인증 상태를 변경합니다. Verification
+        means company information was reviewed; it is not a guarantee of job
+        quality, safety, or legal compliance.
+      </p>
 
       {result.status !== "ok" ? (
         <section className="mt-6 rounded-xl border border-border bg-surface p-5" role="alert">

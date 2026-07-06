@@ -52,6 +52,28 @@ describe("employer setup routes", () => {
     expect(html).toContain('/employer/company');
   });
 
+  it("shows compliance acknowledgement and disclaimer on the posting form", async () => {
+    mockCompanies.mockResolvedValue({
+      status: "ok",
+      companies: [{
+        id: "company-1",
+        name: "K-Work Cafe",
+        description: "Cafe",
+        website: null,
+        phone: null,
+        city: "Los Angeles",
+        state: "CA",
+        addressDisplay: "Koreatown",
+        isVerified: false,
+        createdAt: "2026-06-21T00:00:00Z",
+      }],
+    });
+    const html = renderToStaticMarkup(await NewJobPage());
+    expect(html).toContain('name="complianceAcknowledgement"');
+    expect(html).toContain("responsible for accurate job information");
+    expect(html).toContain("does not determine work authorization");
+  });
+
   it("shows public links only for approved owned jobs", async () => {
     mockJobs.mockResolvedValue({
       status: "ok",
