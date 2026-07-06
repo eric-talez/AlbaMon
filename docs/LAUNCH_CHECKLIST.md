@@ -5,6 +5,12 @@ setup instructions live in [`DEPLOYMENT.md`](DEPLOYMENT.md); this file is the
 list of things that must be **true** before inviting users. No real secrets
 belong in this file — every value is a placeholder.
 
+Companion docs: [`BETA_READINESS.md`](BETA_READINESS.md) is the step-by-step
+runbook for verifying each gate below, and
+[`PRODUCTION_ENV_VARS.md`](PRODUCTION_ENV_VARS.md) is the per-variable
+environment reference. `npm run verify:beta` checks this documentation set
+automatically.
+
 Legend: `[ ]` open · `[x]` done · items marked **(placeholder)** are known-open
 work that beta launch explicitly accepts or defers.
 
@@ -13,6 +19,8 @@ work that beta launch explicitly accepts or defers.
 All values set in Vercel (Production scope), none committed to the repo. The
 placeholder-detection in the app treats `.env.example` values as *unconfigured*,
 and production **fails closed** if Supabase credentials are missing.
+Per-variable reference (exposure, validation, placeholders):
+[`PRODUCTION_ENV_VARS.md`](PRODUCTION_ENV_VARS.md).
 
 - [ ] `NEXT_PUBLIC_SITE_URL` = `https://<your-domain>` (canonical/OG/sitemap base)
 - [ ] `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` set (real project, not placeholders)
@@ -153,6 +161,8 @@ Automated (all must pass on the release commit):
 - [ ] `npm run lint`
 - [ ] `npm test` (unit + server-render smoke tests; 38 files)
 - [ ] `npm run build`
+- [ ] `npm run verify:beta` (readiness docs gate: required docs + CI workflow
+      present, checklist topics intact, placeholder-only secret hygiene)
 
 > **Browser E2E is deferred.** There is no Playwright/Cypress setup; automated
 > coverage is Vitest server-render smoke tests (`tests/smoke-public-pages.test.ts`)

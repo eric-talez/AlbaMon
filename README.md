@@ -42,6 +42,7 @@ npm run dev
 | `npm run typecheck` | TypeScript `--noEmit` strict check. |
 | `npm test` | Run unit tests once (Vitest). |
 | `npm run test:watch` | Watch-mode tests. |
+| `npm run verify:beta` | Beta-readiness docs gate (see [`docs/BETA_READINESS.md`](docs/BETA_READINESS.md)). |
 
 ## Continuous integration
 
@@ -335,6 +336,20 @@ with correct redirect targets, non-approved job ids 404, and the sitemap/robots
 expose no private routes. **Browser E2E (Playwright/Cypress) remains deferred**
 — see the launch checklist. This slice adds no product features, schema
 changes, or new dependencies.
+
+## Production beta readiness (Slice 17)
+
+Docs-and-verification-only slice — no product, schema, or CI changes:
+
+- [`docs/BETA_READINESS.md`](docs/BETA_READINESS.md) — 16-section operator
+  runbook for taking a deployment to private beta: verification order, exact
+  queries, per-role smoke tests, and the go/no-go decision table.
+- [`docs/PRODUCTION_ENV_VARS.md`](docs/PRODUCTION_ENV_VARS.md) — per-variable
+  production environment reference (required/optional, client vs server-only
+  exposure, validation and failure modes; placeholders only).
+- `npm run verify:beta` — offline docs gate (`scripts/verify-beta-readiness.mjs`):
+  required docs and CI workflow exist, launch-checklist topics intact,
+  placeholder-only secret hygiene. No network, no credentials.
 
 ## Development approach
 
