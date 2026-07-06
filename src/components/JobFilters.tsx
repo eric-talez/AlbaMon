@@ -11,14 +11,17 @@ import type { JobSearchParams } from "@/lib/db/jobs";
 import { LAUNCH_CITIES } from "@/lib/site";
 
 function Field({
+  id,
   label,
   children,
 }: {
+  /** id of the contained control, for explicit label association. */
+  id: string;
   label: string;
   children: React.ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1 text-sm">
+    <label htmlFor={id} className="flex flex-col gap-1 text-sm">
       <span className="font-medium text-foreground">{label}</span>
       {children}
     </label>
@@ -41,8 +44,9 @@ export function JobFilters({ values = {} }: { values?: JobSearchParams }) {
       className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-surface p-4 sm:grid-cols-2 lg:grid-cols-3"
       aria-label="공고 필터"
     >
-      <Field label="검색어 (Keyword)">
+      <Field id="filter-q" label="검색어 (Keyword)">
         <input
+          id="filter-q"
           type="text"
           name="q"
           defaultValue={values.q ?? ""}
@@ -51,8 +55,13 @@ export function JobFilters({ values = {} }: { values?: JobSearchParams }) {
         />
       </Field>
 
-      <Field label="지역 (City)">
-        <select name="city" className={controlClass} defaultValue={values.city ?? ""}>
+      <Field id="filter-city" label="지역 (City)">
+        <select
+          id="filter-city"
+          name="city"
+          className={controlClass}
+          defaultValue={values.city ?? ""}
+        >
           <option value="">전체 지역</option>
           {LAUNCH_CITIES.map((c) => (
             <option key={c} value={c}>
@@ -62,8 +71,9 @@ export function JobFilters({ values = {} }: { values?: JobSearchParams }) {
         </select>
       </Field>
 
-      <Field label="업종 (Category)">
+      <Field id="filter-category" label="업종 (Category)">
         <select
+          id="filter-category"
           name="category"
           className={controlClass}
           defaultValue={values.category ?? ""}
@@ -77,8 +87,9 @@ export function JobFilters({ values = {} }: { values?: JobSearchParams }) {
         </select>
       </Field>
 
-      <Field label="고용 형태 (Job type)">
+      <Field id="filter-jobType" label="고용 형태 (Job type)">
         <select
+          id="filter-jobType"
           name="jobType"
           className={controlClass}
           defaultValue={values.jobType ?? ""}
@@ -92,8 +103,9 @@ export function JobFilters({ values = {} }: { values?: JobSearchParams }) {
         </select>
       </Field>
 
-      <Field label="언어 요건 (Language)">
+      <Field id="filter-languageRequirement" label="언어 요건 (Language)">
         <select
+          id="filter-languageRequirement"
           name="languageRequirement"
           className={controlClass}
           defaultValue={values.languageRequirement ?? ""}
@@ -107,8 +119,9 @@ export function JobFilters({ values = {} }: { values?: JobSearchParams }) {
         </select>
       </Field>
 
-      <Field label="최소 급여 (Min pay)">
+      <Field id="filter-payMin" label="최소 급여 (Min pay)">
         <input
+          id="filter-payMin"
           type="number"
           name="payMin"
           min={0}
@@ -120,8 +133,9 @@ export function JobFilters({ values = {} }: { values?: JobSearchParams }) {
         />
       </Field>
 
-      <Field label="정렬 (Sort)">
+      <Field id="filter-sort" label="정렬 (Sort)">
         <select
+          id="filter-sort"
           name="sort"
           className={controlClass}
           defaultValue={values.sort ?? "newest"}

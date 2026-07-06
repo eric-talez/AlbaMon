@@ -59,10 +59,11 @@ export function DevAuthForm({ mode, next, error }: DevAuthFormProps) {
       <form action={signInDev} className="mt-5 flex flex-col gap-4">
         {next ? <input type="hidden" name="next" value={next} /> : null}
 
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="flex flex-col gap-1 text-sm" htmlFor="dev-email">
           <span className="font-medium">이메일 (Email)</span>
           <input
             type="email"
+            id="dev-email"
             name="email"
             placeholder="you@example.com"
             autoComplete="email"
@@ -75,10 +76,12 @@ export function DevAuthForm({ mode, next, error }: DevAuthFormProps) {
           {ROLES.map((role, i) => (
             <label
               key={role}
+              htmlFor={`dev-role-${role}`}
               className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm hover:bg-surface"
             >
               <input
                 type="radio"
+                id={`dev-role-${role}`}
                 name="role"
                 value={role}
                 defaultChecked={i === 0}

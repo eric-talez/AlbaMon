@@ -7,7 +7,11 @@ import { ReportJobForm } from "./ReportJobForm";
 
 type Params = { id: string };
 
-export const metadata: Metadata = { title: "Report this job / 신고하기" };
+// Signed-in user flow — never index.
+export const metadata: Metadata = {
+  title: "Report this job / 신고하기",
+  robots: { index: false },
+};
 
 export default async function ReportJobPage({
   params,

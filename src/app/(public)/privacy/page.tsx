@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { ComingSoon } from "@/components/ComingSoon";
 
-export const metadata: Metadata = { title: "개인정보처리방침" };
+export const metadata: Metadata = {
+  title: "개인정보처리방침",
+  description:
+    "K-Work US 개인정보 수집·이용 및 보호 정책 (Privacy Policy). 정식 문구는 법률 검토 후 게시됩니다.",
+};
 
 export default function PrivacyPage() {
   return (

@@ -279,6 +279,34 @@ job quality, safety, legal compliance, applicants, or hires, and boosts do not
 imply endorsement or higher job quality. This slice is not legal advice and is
 not a legal compliance engine.
 
+## Deployment & launch hardening (Slice 15)
+
+Launch documentation and hardening for the private beta:
+
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Vercel + hosted Supabase + Stripe
+  deployment guide (env vars as placeholders, migration order, webhook setup,
+  first-admin promotion, known issues).
+- [`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md) — go/no-go checklist:
+  environment, seed-data verification, admin setup, Stripe test→live, RLS
+  review, QA script (390px/1440px), monitoring, rollback notes.
+
+SEO polish: `metadataBase` + Open Graph identity in the root layout,
+`robots.ts`/`sitemap.ts` (static public pages only; account/auth areas
+disallowed), descriptions on policy pages, canonical URLs for the jobs listing
+and job detail, and `noindex` on the apply/report user flows.
+
+Accessibility polish: explicit label association (`htmlFor`/`id`) on the job
+filters, posting form, and dev auth form; `aria-live` on form error alerts;
+`aria-describedby` on the application cover-note limit; a global
+`:focus-visible` ring for keyboard users.
+
+Smoke tests (`tests/smoke-public-pages.test.ts`, `tests/seo.test.ts`) render
+every public page end-to-end on the deterministic mock path, assert guards fire
+with correct redirect targets, non-approved job ids 404, and the sitemap/robots
+expose no private routes. **Browser E2E (Playwright/Cypress) remains deferred**
+— see the launch checklist. This slice adds no product features, schema
+changes, or new dependencies.
+
 ## Development approach
 
 Work is delivered in small, reviewable **slices** (one PR each), Slice 0 → 15.

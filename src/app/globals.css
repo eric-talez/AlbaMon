@@ -64,3 +64,13 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans-kr);
 }
+
+/*
+ * Keyboard focus visibility: a consistent ring for keyboard users, including
+ * on controls that replace the default outline with a border-color change.
+ * :focus-visible leaves mouse/touch interactions unchanged.
+ */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
