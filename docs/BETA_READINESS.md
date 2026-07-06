@@ -5,9 +5,11 @@ first small private beta (LA/OC). Companion docs:
 [`DEPLOYMENT.md`](DEPLOYMENT.md) is *how to set everything up*,
 [`LAUNCH_CHECKLIST.md`](LAUNCH_CHECKLIST.md) is *what must be true* (and the
 sign-off of record), [`PRODUCTION_ENV_VARS.md`](PRODUCTION_ENV_VARS.md) is the
-per-variable environment reference, and `npm run verify:beta` is the automated
-docs gate. This runbook adds execution order, exact queries, and pass criteria
-— it does not restate those documents.
+per-variable environment reference,
+[`OPERATIONAL_HEALTH.md`](OPERATIONAL_HEALTH.md) is the post-deploy health and
+incident runbook, and `npm run verify:beta` is the automated docs gate. This
+runbook adds execution order, exact queries, and pass criteria — it does not
+restate those documents.
 
 ## 1. Purpose
 
@@ -64,10 +66,15 @@ per-variable reference) using the Vercel procedure in
       Stripe webhook flow only.
 - [ ] Redeployed after the last env change (edits do not apply to the running
       deployment).
+- [ ] `GET /api/health` on the production URL returns 200 with
+      `siteUrl`/`supabase`/`stripe` = `configured` and `email`/`analytics` =
+      `deferred` (statuses reference:
+      [`OPERATIONAL_HEALTH.md §2`](OPERATIONAL_HEALTH.md#2-get-apihealth-reference)).
+      Any `missing`/`partial` = this section is not done.
 
-Pass: production `/` renders with real auth (no fail-closed configuration
-error in Vercel function logs), and page source contains no `sk_`, `whsec_`,
-or service-role values.
+Pass: the health check above is green, production `/` renders with real auth
+(no fail-closed configuration error in Vercel function logs), and page source
+contains no `sk_`, `whsec_`, or service-role values.
 
 ## 4. Supabase setup checklist
 
@@ -306,7 +313,9 @@ Accepted for the private beta — details in the
 - Email delivery is a dev stub (`EMAIL_PROVIDER=dev`) — no real email/SMS is
   sent.
 - No error-tracking or analytics provider — the beta runs on Vercel, Supabase,
-  and Stripe platform logs.
+  and Stripe platform logs, plus the public `GET /api/health` config/liveness
+  endpoint. Log triage and the incident process live in
+  [`OPERATIONAL_HEALTH.md`](OPERATIONAL_HEALTH.md).
 - **Browser E2E automation is deferred** (no Playwright/Cypress unless a later
   slice adds it); automated coverage is Vitest unit + server-render smoke
   tests, and §§9–14 are the manual compensation.

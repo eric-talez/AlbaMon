@@ -83,6 +83,7 @@ src/
     auth/               # roles, permission matrix, server-side guards, sessions
     supabase/           # browser/server clients + proxy session helper
     db/                 # DB row types + approved-job reads (mock fallback)
+    ops/                # operational health report backing GET /api/health
     ...                 # site config, types, mock data (validation/compliance later)
   proxy.ts              # Next 16 "proxy" (renamed middleware): Supabase session refresh
 tests/                 # Vitest unit tests
@@ -350,6 +351,22 @@ Docs-and-verification-only slice — no product, schema, or CI changes:
 - `npm run verify:beta` — offline docs gate (`scripts/verify-beta-readiness.mjs`):
   required docs and CI workflow exist, launch-checklist topics intact,
   placeholder-only secret hygiene. No network, no credentials.
+
+## Observability & operational health (Slice 18)
+
+A zero-dependency operational health layer for the private beta — no paid
+observability provider, no product changes:
+
+- `GET /api/health` — public-safe liveness + configuration-presence endpoint
+  for uptime checks. Always 200 JSON with coarse statuses only
+  (`configured`/`partial`/`missing`/`deferred`) — never env values or secrets;
+  no Supabase/Stripe/network calls; works unauthenticated and in CI's
+  unconfigured mode (`src/app/api/health/route.ts` → `src/lib/ops/health.ts`,
+  contract asserted by `tests/health.test.ts`).
+- [`docs/OPERATIONAL_HEALTH.md`](docs/OPERATIONAL_HEALTH.md) — operator
+  runbook: health-endpoint reference, uptime monitoring, the fail-closed
+  behavior map, log triage by symptom (Vercel/Supabase/Stripe), and the
+  private-beta incident response process.
 
 ## Development approach
 
