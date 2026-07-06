@@ -9,6 +9,9 @@ list; [`DEPLOYMENT.md §4`](DEPLOYMENT.md#4-vercel) is the procedure for setting
 values in Vercel; [`LAUNCH_CHECKLIST.md §1`](LAUNCH_CHECKLIST.md#1-environment-variables)
 is the launch sign-off. This page adds what those do not: required/optional
 status, exposure semantics, and validation/failure behavior with code pointers.
+After deploying, `GET /api/health` reports whether these variables are present
+(as coarse statuses only, never values) —
+[`OPERATIONAL_HEALTH.md`](OPERATIONAL_HEALTH.md) is the reference.
 
 ## How to read this page
 
@@ -35,8 +38,11 @@ status, exposure semantics, and validation/failure behavior with code pointers.
 
 ## Optional / deferred variables
 
-Declared in `.env.example` but **not read by application code in this build**.
-Leave them unset or empty for the beta.
+Declared in `.env.example` but **not used by any product feature in this
+build**. Leave them unset or empty for the beta. (The only code that looks at
+them is the ops health module, `src/lib/ops/health.ts`, which reports their
+*presence* as a coarse status on the public `GET /api/health` endpoint — never
+their values. See [`OPERATIONAL_HEALTH.md`](OPERATIONAL_HEALTH.md).)
 
 | Variable | Exposure | Status |
 |---|---|---|

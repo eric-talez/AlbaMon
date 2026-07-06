@@ -35,6 +35,7 @@ const REQUIRED_FILES = [
   "docs/LAUNCH_CHECKLIST.md",
   "docs/BETA_READINESS.md",
   "docs/PRODUCTION_ENV_VARS.md",
+  "docs/OPERATIONAL_HEALTH.md",
   ".github/workflows/ci.yml",
 ];
 

@@ -6,10 +6,11 @@ list of things that must be **true** before inviting users. No real secrets
 belong in this file — every value is a placeholder.
 
 Companion docs: [`BETA_READINESS.md`](BETA_READINESS.md) is the step-by-step
-runbook for verifying each gate below, and
+runbook for verifying each gate below,
 [`PRODUCTION_ENV_VARS.md`](PRODUCTION_ENV_VARS.md) is the per-variable
-environment reference. `npm run verify:beta` checks this documentation set
-automatically.
+environment reference, and [`OPERATIONAL_HEALTH.md`](OPERATIONAL_HEALTH.md) is
+the post-deploy health-check and incident runbook. `npm run verify:beta`
+checks this documentation set automatically.
 
 Legend: `[ ]` open · `[x]` done · items marked **(placeholder)** are known-open
 work that beta launch explicitly accepts or defers.
@@ -130,13 +131,24 @@ Supabase CLI + Docker (see `supabase/README.md`).
 ## 8. Monitoring & operations
 
 Current state: **no error-tracking or analytics provider is wired** (PostHog env
-vars exist but are not initialized). Beta operates on platform logs.
+vars exist but are not initialized). Beta operates on platform logs plus the
+public `GET /api/health` endpoint. Operating procedures (health-check
+reference, log triage, incident response) live in
+[`OPERATIONAL_HEALTH.md`](OPERATIONAL_HEALTH.md).
 
-- [ ] Vercel function logs reviewed after first deploy (no recurring errors)
+- [ ] `GET /api/health` on production returns 200; required checks
+      `configured`, deferred ones `deferred` — no `missing`/`partial`
+      ([`OPERATIONAL_HEALTH.md §1`](OPERATIONAL_HEALTH.md#1-quick-health-check))
+- [ ] External uptime monitor pointed at `/api/health` (alert on non-200;
+      [`OPERATIONAL_HEALTH.md §3`](OPERATIONAL_HEALTH.md#3-uptime-monitoring))
+- [ ] Vercel function logs reviewed after first deploy (no recurring errors;
+      log-prefix guide in
+      [`OPERATIONAL_HEALTH.md §5`](OPERATIONAL_HEALTH.md#5-log-triage--where-to-look-when-a-flow-fails))
 - [ ] Supabase logs/dashboard reviewed (auth + Postgres errors)
 - [ ] Stripe webhook dashboard shows deliveries succeeding (200s)
 - [ ] Decide post-beta: error tracking (e.g. Sentry) and product analytics —
       **deferred, out of beta scope**
+      ([`OPERATIONAL_HEALTH.md §7`](OPERATIONAL_HEALTH.md#7-deferred-observability-post-beta))
 - [ ] On-call answer for the beta: who checks logs, and how users report
       problems (email/Kakao channel), documented for the team
 
@@ -159,7 +171,7 @@ Automated (all must pass on the release commit):
 - [ ] `git diff --check` (no whitespace/conflict markers)
 - [ ] `npm run typecheck`
 - [ ] `npm run lint`
-- [ ] `npm test` (unit + server-render smoke tests; 38 files)
+- [ ] `npm test` (unit + server-render smoke tests; 39 files)
 - [ ] `npm run build`
 - [ ] `npm run verify:beta` (readiness docs gate: required docs + CI workflow
       present, checklist topics intact, placeholder-only secret hygiene)
