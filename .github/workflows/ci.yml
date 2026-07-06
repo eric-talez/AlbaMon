@@ -1,0 +1,63 @@
+# CI gate: every pull request and every push to main must pass all steps
+# below before merging/releasing. No secrets are required — typecheck, lint,
+# tests, and `next build` all run in the same "Supabase/Stripe unconfigured"
+# mode as a fresh local checkout (mock/dev fallbacks, no live services).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Cancel superseded runs on PR branches, but let pushes to main finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  ci:
+    name: Whitespace, typecheck, lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Next.js build cache, per node_modules/next/dist/docs CI guide.
+      # Keyed so source changes rebuild from the closest prior cache.
+      - name: Restore Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**/*.ts', 'src/**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
+
+      # Diffing HEAD against git's empty tree makes `git diff --check` scan
+      # every tracked text file for whitespace errors (trailing whitespace,
+      # space-before-tab, blank lines at EOF), not just uncommitted changes.
+      - name: Whitespace check
+        run: git diff --check "$(git hash-object -t tree /dev/null)" HEAD
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

@@ -43,6 +43,35 @@ npm run dev
 | `npm test` | Run unit tests once (Vitest). |
 | `npm run test:watch` | Watch-mode tests. |
 
+## Continuous integration
+
+Every pull request and every push to `main` runs the CI gate in
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) (GitHub Actions,
+Node 22). One job runs these steps in order, and any failure fails the run:
+
+| Step | Command |
+| --- | --- |
+| Install exact locked dependencies | `npm ci` |
+| Whitespace check — every tracked file | `git diff --check` against git's empty tree |
+| Type check | `npm run typecheck` |
+| Lint | `npm run lint` |
+| Unit tests | `npm test` |
+| Production build | `npm run build` |
+
+CI needs **no secrets or environment variables**: like a fresh checkout, it
+runs in the unconfigured dev/mock mode (see the mock-fallback notes below),
+so the gate never depends on live Supabase or Stripe. To reproduce the
+whitespace check locally:
+
+```bash
+git diff --check "$(git hash-object -t tree /dev/null)" HEAD
+```
+
+To make the gate **blocking** (a true release gate), enable branch
+protection on `main` and mark the CI job as a required status check
+(GitHub → Settings → Branches). Superseded runs on PR branches are
+auto-cancelled; runs on `main` always complete.
+
 ## Project structure
 
 ```
