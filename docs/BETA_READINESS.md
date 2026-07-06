@@ -43,6 +43,9 @@ Hard gates this runbook enforces:
       ([`../.github/workflows/ci.yml`](../.github/workflows/ci.yml); see the
       README "Continuous integration" section).
 - [ ] `npm run verify:beta` passes on the release commit (offline docs gate).
+- [ ] Local Supabase rehearsal completed per [`LOCAL_SUPABASE.md`](LOCAL_SUPABASE.md):
+      migrations + seed applied, auth mode and guard behavior smoked, and the
+      admin-promotion SQL practiced against a disposable local stack.
 - [ ] Access on hand: Vercel project, Supabase dashboard + SQL editor, Stripe
       dashboard, and the production URL.
 - [ ] Two disposable, team-owned test inboxes (employer + seeker accounts for
@@ -80,6 +83,8 @@ contains no `sk_`, `whsec_`, or service-role values.
 
 Follow [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project); sign off
 in [`LAUNCH_CHECKLIST.md §2`](LAUNCH_CHECKLIST.md#2-supabase-setup--migrations).
+Rehearse the identical flow locally first ([`LOCAL_SUPABASE.md`](LOCAL_SUPABASE.md))
+— same migrations, seed expectations, and admin-promotion SQL, zero blast radius.
 
 - [ ] Project region suits LA/OC users (e.g. `us-west-1`).
 - [ ] Auth URL configuration (Dashboard → Authentication → URL Configuration):

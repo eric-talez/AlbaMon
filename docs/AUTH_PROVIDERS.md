@@ -46,6 +46,12 @@ Notes:
 - In dev-auth mode (non-production + placeholder Supabase values) every
   method is setup-required and the dev role-picker remains available — that
   mode is unchanged by this slice and stays impossible in production.
+- During a basic **local Supabase** DB smoke
+  ([`LOCAL_SUPABASE.md`](LOCAL_SUPABASE.md)), keep all `NEXT_PUBLIC_AUTH_*`
+  flags `false`: every method then renders its "setup required" state by
+  design (no crash, no dead button). Enable a flag locally only after
+  configuring that provider — or use the guide's phone test-OTP appendix,
+  which needs no real credentials.
 
 ## 3. Auth flow
 

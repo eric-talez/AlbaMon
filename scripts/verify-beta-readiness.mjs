@@ -36,6 +36,7 @@ const REQUIRED_FILES = [
   "docs/BETA_READINESS.md",
   "docs/PRODUCTION_ENV_VARS.md",
   "docs/OPERATIONAL_HEALTH.md",
+  "docs/LOCAL_SUPABASE.md",
   ".github/workflows/ci.yml",
 ];
 
