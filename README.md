@@ -31,6 +31,11 @@ npm run dev
 # open http://localhost:3000
 ```
 
+With the `.env.example` placeholders left in place the app runs in **dev
+mode** (mock role-picker auth, mock job data). To run against a **real local
+Auth + Postgres stack** instead, see the
+[Local Supabase](#local-supabase-slice-20) section below.
+
 ## Scripts
 
 | Script | What it does |
@@ -43,6 +48,7 @@ npm run dev
 | `npm test` | Run unit tests once (Vitest). |
 | `npm run test:watch` | Watch-mode tests. |
 | `npm run verify:beta` | Beta-readiness docs gate (see [`docs/BETA_READINESS.md`](docs/BETA_READINESS.md)). |
+| `npm run verify:local-supabase` | Local Supabase readiness gate (see [`docs/LOCAL_SUPABASE.md`](docs/LOCAL_SUPABASE.md)). |
 
 ## Continuous integration
 
@@ -395,6 +401,25 @@ Auth** (no hand-rolled OAuth, no SMS SDKs, no new secrets):
 - New accounts get their `profiles` row from the existing
   `on_auth_user_created` trigger (role `seeker`); authorization still reads
   `profiles.role` only. Setup guide: [`docs/AUTH_PROVIDERS.md`](docs/AUTH_PROVIDERS.md).
+
+## Local Supabase (Slice 20)
+
+The app picks its mode from the Supabase values in `.env.local`:
+
+| Supabase env values | Mode |
+| --- | --- |
+| Placeholders from `.env.example` (the default) | **Dev mode** — cookie-based dev role-picker auth, deterministic mock job data, write flows render unavailable states. |
+| Real **local** stack values (printed by `supabase start`) | **Real mode** — Supabase local Auth + Postgres: real sessions, seeded DB reads, RLS-guarded writes. |
+
+[`docs/LOCAL_SUPABASE.md`](docs/LOCAL_SUPABASE.md) is the full guide:
+prerequisites (Docker + Supabase CLI), `supabase start` + `supabase db reset`,
+wiring the printed URL/keys into `.env.local`, the manual smoke checklist
+(`/api/health`, `/jobs`, auth pages, employer/admin flows), common errors,
+safe resets, and what must never be committed. It is also the recommended
+rehearsal before any hosted setup
+([`docs/BETA_READINESS.md`](docs/BETA_READINESS.md)).
+`npm run verify:local-supabase` is the offline gate that keeps the guide,
+the local stack inputs, and the placeholder hygiene intact.
 
 ## Development approach
 

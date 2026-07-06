@@ -31,6 +31,10 @@ supabase db reset       # applies migrations/ then seed.sql from scratch
 `db reset` is the easiest way to get a clean, fully-seeded database. To apply
 new migrations to an already-running DB without wiping data, use `supabase db push`.
 
+For the full app-level walkthrough — wiring the printed keys into `.env.local`,
+auth modes, the manual smoke checklist — see
+[`docs/LOCAL_SUPABASE.md`](../docs/LOCAL_SUPABASE.md).
+
 ## Apply to a hosted Supabase project
 
 1. Link the project: `supabase link --project-ref <your-ref>`

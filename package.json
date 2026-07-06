@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify:beta": "node scripts/verify-beta-readiness.mjs"
+    "verify:beta": "node scripts/verify-beta-readiness.mjs",
+    "verify:local-supabase": "node scripts/verify-local-supabase-readiness.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

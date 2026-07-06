@@ -39,6 +39,9 @@ Per-variable reference (exposure, validation, placeholders):
 
 ## 2. Supabase setup & migrations
 
+- [ ] Local Supabase rehearsal completed ([`LOCAL_SUPABASE.md`](LOCAL_SUPABASE.md)):
+      migrations + seed + auth mode + admin promotion verified against a
+      disposable local stack **before** touching the hosted project
 - [ ] Hosted project created; region appropriate for LA/OC
 - [ ] All 8 migrations applied **in filename order** via `supabase db push`
       (order table in [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project))
