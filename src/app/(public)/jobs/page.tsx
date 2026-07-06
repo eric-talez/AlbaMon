@@ -11,6 +11,8 @@ import { LAUNCH_MARKET } from "@/lib/site";
 export const metadata: Metadata = {
   title: "공고 둘러보기",
   description: `${LAUNCH_MARKET} 한인 커뮤니티 Korean-English bilingual 로컬 채용 공고.`,
+  // Filter query params all present the same listing — one canonical URL.
+  alternates: { canonical: "/jobs" },
 };
 
 export default async function JobsPage({

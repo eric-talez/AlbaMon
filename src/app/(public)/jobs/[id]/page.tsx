@@ -33,6 +33,7 @@ export async function generateMetadata({
       job.payMax,
       job.payUnit,
     )} · ${job.companyName}`,
+    alternates: { canonical: `/jobs/${encodeURIComponent(job.id)}` },
   };
 }
 

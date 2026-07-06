@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth/guards";
@@ -7,6 +8,12 @@ import { WorkAuthorizationDisclaimer } from "@/components/WorkAuthorizationDiscl
 import { ApplicationForm } from "./ApplicationForm";
 
 type Params = { id: string };
+
+// Signed-in user flow — never index.
+export const metadata: Metadata = {
+  title: "지원하기 (Apply)",
+  robots: { index: false },
+};
 
 export default async function ApplyPage({
   params,

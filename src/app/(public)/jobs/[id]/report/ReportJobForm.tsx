@@ -63,7 +63,7 @@ export function ReportJobForm({ jobId }: { jobId: string }) {
       </div>
 
       {state.message ? (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" aria-live="polite" className="text-sm text-danger">
           {state.message}
         </p>
       ) : null}

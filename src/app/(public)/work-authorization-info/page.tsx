@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { ComingSoon } from "@/components/ComingSoon";
 
-export const metadata: Metadata = { title: "근로자격 안내" };
+export const metadata: Metadata = {
+  title: "근로자격 안내",
+  description:
+    "근로 자격(work authorization) 일반 정보 안내. K-Work US는 개인의 취업 자격을 판단하지 않으며, 법률 자문을 제공하지 않습니다.",
+};
 
 export default function WorkAuthorizationInfoPage() {
   return (

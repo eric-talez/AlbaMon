@@ -37,10 +37,13 @@ export function ApplicationForm({ jobId }: { jobId: string }) {
         name="coverNote"
         rows={6}
         maxLength={1_000}
+        aria-describedby="coverNote-limit"
         placeholder="간단한 소개나 지원 동기를 작성해 주세요."
         className="w-full rounded-xl border border-border bg-background p-3 text-sm outline-none focus:border-brand"
       />
-      <p className="text-xs text-muted">최대 1,000자</p>
+      <p id="coverNote-limit" className="text-xs text-muted">
+        최대 1,000자
+      </p>
 
       {state.message ? (
         <p
