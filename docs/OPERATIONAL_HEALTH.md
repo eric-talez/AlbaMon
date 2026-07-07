@@ -9,7 +9,7 @@ is the sign-off of record (§8 covers monitoring, §9 rollback), and
 [`DEPLOYMENT.md`](DEPLOYMENT.md) is the platform setup guide.
 
 No paid observability provider is wired in this build — by design. This page
-plus `GET /api/health` and the Vercel/Supabase/Stripe platform logs are the
+plus `GET /api/health` and the Vercel/Supabase platform logs are the
 beta observability layer (§7 covers what comes later).
 
 ## 1. Quick health check
@@ -28,7 +28,6 @@ Expected on a launch-ready production deployment:
   "checks": {
     "siteUrl": "configured",
     "supabase": "configured",
-    "stripe": "configured",
     "email": "deferred",
     "analytics": "deferred"
   }
@@ -52,7 +51,7 @@ Endpoint properties (safe for public, unauthenticated uptime checks):
 - Reports **coarse statuses only** — never env values, key fragments,
   hostnames, or error details.
 - **Presence-of-configuration only**: it reads `process.env` through the same
-  predicates the app uses. It never connects to Supabase, Stripe, or any
+  predicates the app uses. It never connects to Supabase or any
   network service, and never writes anything.
 - Always **HTTP 200** while the process can serve requests at all — uptime
   monitors should alert on non-200/timeout, not on body contents.
@@ -77,15 +76,14 @@ What each check covers:
 | Check | Covers | Expected (prod beta) |
 |---|---|---|
 | `siteUrl` | `NEXT_PUBLIC_SITE_URL` present and parseable as a URL. Presence only — a stale localhost value in production still reports `configured`; correctness is [`LAUNCH_CHECKLIST.md §1`](LAUNCH_CHECKLIST.md#1-environment-variables). | `configured` |
-| `supabase` | Anon auth pair (`NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`) **and** the server-only `SUPABASE_SERVICE_ROLE_KEY` used by the Stripe webhook. `partial` = one side absent. | `configured` |
-| `stripe` | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_FEATURED_PRICE_ID`, `STRIPE_URGENT_PRICE_ID`. | `configured` |
+| `supabase` | Anon auth pair (`NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`) **and** the server-only `SUPABASE_SERVICE_ROLE_KEY` (reserved for trusted server-side workflows; no app code path uses it). `partial` = one side absent. | `configured` |
 | `email` | `deferred` while `EMAIL_PROVIDER` is `dev`/unset (the accepted beta state). A real provider (`resend`/`sendgrid`) without its API key reports `partial`. | `deferred` |
 | `analytics` | `NEXT_PUBLIC_POSTHOG_KEY` presence. The provider is **not initialized in this build** — `configured` means the env is staged for a later slice, not that analytics is running. | `deferred` |
 
-What the endpoint deliberately does **not** tell you: whether Supabase or
-Stripe are actually reachable, whether migrations are applied, or whether RLS
+What the endpoint deliberately does **not** tell you: whether Supabase is
+actually reachable, whether migrations are applied, or whether RLS
 holds. Presence of config ≠ liveness of providers — those need the platform
-dashboards (§5) and [`BETA_READINESS.md`](BETA_READINESS.md) §§4–8.
+dashboards (§5) and [`BETA_READINESS.md`](BETA_READINESS.md) §§4–7.
 
 ## 3. Uptime monitoring
 
@@ -110,10 +108,8 @@ from outside. Verified behaviors:
 |---|---|---|
 | Supabase auth pair (production) | `supabase: missing`/`partial` | Auth **throws** instead of silently enabling the forgeable dev role-picker: Vercel logs show `Auth is misconfigured: production requires real Supabase credentials` (`src/lib/supabase/config.ts`). Public pages may still render; sign-in/role flows fail loudly. |
 | Supabase auth pair (local/preview) | same | Dev role-picker mode — intended for development only. |
-| `SUPABASE_SERVICE_ROLE_KEY` only | `supabase: partial` | Auth works, but webhook-driven boost activation fails (`src/lib/supabase/service.ts` throws; `[payments]` errors in logs). |
-| Stripe checkout vars | `stripe: missing`/`partial` | Boost page fails closed — no checkout session is created (`src/lib/payments/config.ts`). |
-| `STRIPE_WEBHOOK_SECRET` | `stripe: partial` | `/api/stripe/webhook` answers **503 `unavailable`**; Stripe retries and its dashboard shows the failures. A wrong (vs missing) secret shows **400 `bad_signature`** instead. |
-| `NEXT_PUBLIC_SITE_URL` | `siteUrl: missing` | Silent fallback to `http://localhost:3000` for canonical/OG/sitemap URLs and Stripe redirect URLs — pages render but links are wrong. This is the one silent failure the health check exists to surface. |
+| `SUPABASE_SERVICE_ROLE_KEY` only | `supabase: partial` | Auth works. No app code path uses the service-role client, so nothing else degrades — the status simply flags the incomplete Supabase credential set. |
+| `NEXT_PUBLIC_SITE_URL` | `siteUrl: missing` | Silent fallback to `http://localhost:3000` for canonical/OG/sitemap URLs — pages render but links are wrong. This is the one silent failure the health check exists to surface. |
 | Email provider | `email: deferred` | Expected: **no email is ever sent in the beta.** Notification events log as `[notification:dev]` outside production and are silently skipped in production (`src/lib/notifications/dev.ts`). |
 | Analytics | `analytics: deferred` | Nothing — no analytics code runs in this build. |
 
@@ -124,7 +120,6 @@ Server logs use stable prefixes, so Vercel's log search finds them directly:
 | Prefix | Emitted by |
 |---|---|
 | `[db]` | Every Supabase query helper in `src/lib/db/*` (failures name the function, e.g. `[db] createApplication failed`). In production these rethrow — they surface as request errors, never as silent mock-data fallbacks. |
-| `[payments]` | Boost checkout + activation (`src/lib/payments/boosts.ts`). Deliberately message-only — no Stripe error objects, no ids. |
 | `[notification]` / `[notification:dev]` | Notification stubs and their call sites (apply, messaging, status changes). |
 
 By symptom:
@@ -134,8 +129,6 @@ By symptom:
 | Site down / all pages erroring | `/api/health`, Vercel → Deployments (did a deploy or env edit just precede it?) | Roll back per §6; Vercel function logs for the crash. |
 | Sign-in / signup failing | `checks.supabase` | Vercel logs for `Auth is misconfigured` (fail-closed config) → Supabase Dashboard → Logs → Auth (provider/email issues, rate limits). |
 | Applications, messaging, or reports failing | Vercel logs for `[db]` | Supabase Dashboard → Logs → Postgres. Permission-denied errors here usually mean an RLS policy blocked a write the UI allowed — treat as a bug, cross-check [`LAUNCH_CHECKLIST.md §7`](LAUNCH_CHECKLIST.md#7-rls--security-review). |
-| Boost checkout not starting | `checks.stripe` | Vercel logs for `[payments]` → Stripe Dashboard → Developers → Logs. |
-| Paid boost never activates | Stripe Dashboard → Webhooks → endpoint → deliveries | 503 = webhook secret missing; 400 = signature mismatch (test/live endpoint or secret mixup — each endpoint has its own `whsec_...`); 200 but no badge = check `[payments] boost activation failed` and `checks.supabase` (service-role key). |
 | "I never got an email" | `checks.email` | Expected during beta (`deferred`) — no email is sent; support replies come via the human channel in [`LAUNCH_CHECKLIST.md §8`](LAUNCH_CHECKLIST.md#8-monitoring--operations). |
 
 ## 6. Incident response (private-beta minimum)
@@ -146,7 +139,7 @@ Severity triage — respond top-down:
   leak, auth letting the wrong role through.
 - **S2 — same day**: a core flow broken for everyone (sign-in, browse/apply,
   posting, moderation).
-- **S3 — next working session**: degraded non-core flows (boosts, admin
+- **S3 — next working session**: degraded non-core flows (admin
   analytics), cosmetic issues.
 
 First 15 minutes:
@@ -162,8 +155,6 @@ First 15 minutes:
      ([`LAUNCH_CHECKLIST.md §9`](LAUNCH_CHECKLIST.md#9-rollback-notes) — the
      app is stateless, rollback is safe at any time).
    - Bad/missing env value → fix in Vercel, redeploy, re-check `/api/health`.
-   - Stripe misbehaving → freeze payments: disable the live webhook endpoint
-     and/or archive the boost prices; the app fails closed (§4) while frozen.
    - Suspected secret leak → **rotate first**, ask questions after:
      [`PRODUCTION_ENV_VARS.md` → "If a value leaks"](PRODUCTION_ENV_VARS.md#if-a-value-leaks).
 5. Tell the beta users through the support channel named in
@@ -179,6 +170,9 @@ sooner. If that one thing is a missing runbook entry, add it to this page.
 
 Deliberately out of scope for this slice — the beta runs zero-dependency:
 
+- **Payments observability**: payments and paid boosts were de-scoped from the
+  MVP in Slice 23; the `jobs.boost` column, enum, and write-protection
+  triggers remain in the schema, intentionally unused. Revisit post-beta.
 - **Error tracking (e.g. Sentry)**: would wrap server actions and route
   handlers; until then, Vercel function logs are the error store.
 - **Product analytics (e.g. PostHog/Plausible)**: `NEXT_PUBLIC_POSTHOG_KEY` /

@@ -1,6 +1,4 @@
 import type { ReactNode } from "react";
-import type { BoostType } from "@/lib/types";
-import { BOOST_LABELS } from "@/lib/types";
 
 type Tone = "brand" | "success" | "warning" | "danger" | "neutral";
 
@@ -25,15 +23,6 @@ export function Badge({
     >
       {children}
     </span>
-  );
-}
-
-export function BoostBadge({ boost }: { boost: BoostType }) {
-  return (
-    <Badge tone={boost === "urgent" ? "danger" : "brand"}>
-      {boost === "urgent" ? "🔥 " : "⭐ "}
-      {BOOST_LABELS[boost]}
-    </Badge>
   );
 }
 

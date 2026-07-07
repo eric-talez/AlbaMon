@@ -8,7 +8,6 @@ import {
   LANGUAGE_REQUIREMENTS,
   JOB_CATEGORIES,
   MODERATION_STATUSES,
-  BOOST_TYPES,
 } from "@/lib/types";
 
 const MIGRATIONS_DIR = join(process.cwd(), "supabase", "migrations");
@@ -75,7 +74,9 @@ describe("SQL enums match TypeScript constants", () => {
     language_requirement: LANGUAGE_REQUIREMENTS,
     job_category: JOB_CATEGORIES,
     moderation_status: MODERATION_STATUSES,
-    boost_type: BOOST_TYPES,
+    // The SQL enum is retained even though the app no longer defines a
+    // BOOST_TYPES constant (paid boosts were de-scoped in Slice 23).
+    boost_type: ["featured", "urgent"],
   };
 
   /** Parse `create type public.<name> as enum ( 'a', 'b' )` blocks. */

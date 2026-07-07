@@ -56,7 +56,6 @@ function dbJobRow(overrides: Record<string, unknown> = {}) {
     requirements: [],
     benefits: [],
     moderation_status: "approved",
-    boost: null,
     posted_at: "2026-06-19T12:00:00Z",
     company_name: "Pacific Trade Logistics",
     company_is_verified: false,

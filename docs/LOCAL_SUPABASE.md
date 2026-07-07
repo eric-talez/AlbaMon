@@ -133,7 +133,7 @@ Rules:
   as "not configured" and stays in dev auth mode.
 - Set **all three**. The app's auth works with URL + anon key alone, but
   `/api/health` then reports Supabase as `"partial"` (the service_role key is
-  used by the Stripe webhook path; see §8).
+  reserved for trusted server-side workflows; only its presence is checked).
 
 ## 7. Running the app
 

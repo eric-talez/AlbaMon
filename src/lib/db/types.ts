@@ -10,7 +10,6 @@
  * is produced by the mapper in `@/lib/db/jobs`.
  */
 import type {
-  BoostType,
   EmployerAccessRequestStatus,
   JobCategory,
   JobType,
@@ -23,7 +22,6 @@ import type {
 } from "@/lib/types";
 
 export type {
-  BoostType,
   EmployerAccessRequestStatus,
   JobCategory,
   JobType,
@@ -86,7 +84,8 @@ export interface JobRow {
   requirements: string[];
   benefits: string[];
   moderation_status: ModerationStatus;
-  boost: BoostType | null;
+  // jobs.boost (enum boost_type) still exists in SQL but is intentionally
+  // unselected since Slice 23 de-scoped paid boosts from the MVP.
   posted_at: string | null;
   expires_at: string | null;
   created_at: string;
@@ -115,7 +114,6 @@ export interface PublicJobListingRow {
   requirements: string[];
   benefits: string[];
   moderation_status: ModerationStatus;
-  boost: BoostType | null;
   posted_at: string | null;
   company_name: string;
   company_is_verified: boolean;

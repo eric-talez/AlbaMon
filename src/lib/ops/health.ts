@@ -2,11 +2,6 @@ import "server-only";
 
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { isSupabaseServiceRoleConfigured } from "@/lib/supabase/service";
-import {
-  getStripePriceId,
-  getStripeSecretKey,
-  getStripeWebhookSecret,
-} from "@/lib/payments/config";
 
 /**
  * Operational health report for the private beta, served by `GET /api/health`.
@@ -17,8 +12,8 @@ import {
  * - Reports coarse statuses only. Never env values, key fragments, hostnames,
  *   or error details.
  * - Presence-of-configuration checks only: reads `process.env` through the
- *   same predicates the app itself uses. No Supabase/Stripe/network calls,
- *   no database access, no writes.
+ *   same predicates the app itself uses. No Supabase/network calls, no
+ *   database access, no writes.
  * - Never throws — the endpoint backs public uptime checks and must answer
  *   even in a fully unconfigured (CI/dev) process.
  */
@@ -36,7 +31,6 @@ export type HealthCheckStatus =
 export interface HealthChecks {
   siteUrl: HealthCheckStatus;
   supabase: HealthCheckStatus;
-  stripe: HealthCheckStatus;
   email: HealthCheckStatus;
   analytics: HealthCheckStatus;
 }
@@ -68,23 +62,11 @@ function checkSiteUrl(): HealthCheckStatus {
   }
 }
 
-/** Anon (auth) credentials plus the server-only service-role key used by the
- * Stripe webhook. Placeholder values from `.env.example` count as missing. */
+/** Anon (auth) credentials plus the server-only service-role key reserved for
+ * trusted server-side workflows. Placeholder values from `.env.example` count
+ * as missing. */
 function checkSupabase(): HealthCheckStatus {
   const present = [isSupabaseConfigured(), isSupabaseServiceRoleConfigured()];
-  if (present.every(Boolean)) return "configured";
-  if (present.some(Boolean)) return "partial";
-  return "missing";
-}
-
-/** Secret key, webhook signing secret, and both boost price ids. */
-function checkStripe(): HealthCheckStatus {
-  const present = [
-    getStripeSecretKey() !== null,
-    getStripeWebhookSecret() !== null,
-    getStripePriceId("featured") !== null,
-    getStripePriceId("urgent") !== null,
-  ];
   if (present.every(Boolean)) return "configured";
   if (present.some(Boolean)) return "partial";
   return "missing";
@@ -119,7 +101,6 @@ export function buildHealthReport(now: Date = new Date()): HealthReport {
     checks: {
       siteUrl: checkSiteUrl(),
       supabase: checkSupabase(),
-      stripe: checkStripe(),
       email: checkEmail(),
       analytics: checkAnalytics(),
     },

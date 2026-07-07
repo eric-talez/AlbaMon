@@ -292,9 +292,6 @@ function analyticsFixture() {
       rejected: 1,
       paused: 1,
       expired: 0,
-      boosted: 3,
-      featured: 2,
-      urgent: 1,
       createdLast7Days: 4,
       createdLast30Days: 8,
     },
@@ -336,13 +333,6 @@ function analyticsFixture() {
       total: 12,
       createdLast7Days: 3,
       createdLast30Days: 9,
-    },
-    boosts: {
-      boostedJobs: 3,
-      byType: { featured: 2, urgent: 1 },
-      featuredJobs: 2,
-      urgentJobs: 1,
-      revenueTrackingDeferred: true as const,
     },
   };
 }

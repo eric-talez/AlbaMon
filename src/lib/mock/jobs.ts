@@ -32,7 +32,6 @@ export const MOCK_JOBS: Job[] = [
     requirements: ["고객 응대를 위한 한국어 필수", "주말 근무 가능자"],
     benefits: ["식사 제공", "팁 별도", "유연한 스케줄"],
     moderationStatus: "approved",
-    boost: "featured",
     postedAt: "2026-06-18",
   },
   {
@@ -59,7 +58,6 @@ export const MOCK_JOBS: Job[] = [
     requirements: ["환자 응대를 위한 한/영 의사소통", "MS Office 기본 사용"],
     benefits: ["의료보험", "유급휴가", "주말 휴무"],
     moderationStatus: "approved",
-    boost: null,
     postedAt: "2026-06-17",
   },
   {
@@ -86,7 +84,6 @@ export const MOCK_JOBS: Job[] = [
     requirements: ["지게차 경험 우대", "한국어 가능자 우대"],
     benefits: ["초과근무 수당", "성과급"],
     moderationStatus: "approved",
-    boost: "urgent",
     postedAt: "2026-06-19",
   },
   {
@@ -113,7 +110,6 @@ export const MOCK_JOBS: Job[] = [
     requirements: ["네일 라이센스 보유", "경력 1년 이상"],
     benefits: ["팁 별도", "높은 시급", "단골 고객"],
     moderationStatus: "approved",
-    boost: null,
     postedAt: "2026-06-15",
   },
   {
@@ -140,7 +136,6 @@ export const MOCK_JOBS: Job[] = [
     requirements: ["관련 전공 또는 강의 경험", "한/영 학부모 응대"],
     benefits: ["유연한 시간", "강의 경력 인정"],
     moderationStatus: "approved",
-    boost: null,
     postedAt: "2026-06-14",
   },
   {
@@ -167,7 +162,6 @@ export const MOCK_JOBS: Job[] = [
     requirements: ["고객 응대를 위한 영어 필수", "오전 근무 가능자"],
     benefits: ["팁 별도", "음료 제공"],
     moderationStatus: "approved",
-    boost: null,
     postedAt: "2026-06-16",
   },
   {
@@ -194,7 +188,6 @@ export const MOCK_JOBS: Job[] = [
     requirements: ["성실한 분", "한국어 가능 우대"],
     benefits: ["직원 할인", "유연한 스케줄"],
     moderationStatus: "approved",
-    boost: null,
     postedAt: "2026-06-13",
   },
   {
@@ -221,7 +214,6 @@ export const MOCK_JOBS: Job[] = [
     requirements: ["엑셀 기본 활용", "한/영 거래처 응대"],
     benefits: ["주말 휴무", "장기 근무 우대"],
     moderationStatus: "approved",
-    boost: null,
     postedAt: "2026-06-12",
   },
   {
@@ -248,7 +240,6 @@ export const MOCK_JOBS: Job[] = [
     requirements: ["미용 라이센스", "한국어 가능 우대"],
     benefits: ["팁 별도", "교육 지원"],
     moderationStatus: "approved",
-    boost: null,
     postedAt: "2026-06-11",
   },
   {
@@ -275,7 +266,6 @@ export const MOCK_JOBS: Job[] = [
     requirements: ["성실한 분", "단기 근무 가능"],
     benefits: ["식사 제공", "주차 지원"],
     moderationStatus: "approved",
-    boost: null,
     postedAt: "2026-06-19",
   },
   {
@@ -302,7 +292,6 @@ export const MOCK_JOBS: Job[] = [
     requirements: ["성실한 분"],
     benefits: ["제품 할인"],
     moderationStatus: "pending",
-    boost: null,
     postedAt: "2026-06-20",
   },
   {
@@ -329,7 +318,6 @@ export const MOCK_JOBS: Job[] = [
     requirements: ["엑셀 기본"],
     benefits: ["주말 휴무"],
     moderationStatus: "draft",
-    boost: null,
     postedAt: "2026-06-20",
   },
 ];

@@ -78,14 +78,13 @@ describe("employer setup routes", () => {
     mockJobs.mockResolvedValue({
       status: "ok",
       jobs: [
-        { id: "approved-1", companyId: "company-1", companyName: "Cafe", title: "Approved", moderationStatus: "approved", boost: "featured", createdAt: "2026-06-21T00:00:00Z" },
-        { id: "pending-1", companyId: "company-1", companyName: "Cafe", title: "Pending", moderationStatus: "pending", boost: null, createdAt: "2026-06-20T00:00:00Z" },
+        { id: "approved-1", companyId: "company-1", companyName: "Cafe", title: "Approved", moderationStatus: "approved", createdAt: "2026-06-21T00:00:00Z" },
+        { id: "pending-1", companyId: "company-1", companyName: "Cafe", title: "Pending", moderationStatus: "pending", createdAt: "2026-06-20T00:00:00Z" },
       ],
     });
     const html = renderToStaticMarkup(await EmployerJobsPage());
     expect(html).toContain('/jobs/approved-1');
     expect(html).not.toContain('href="/jobs/pending-1"');
-    expect(html).toContain('/employer/jobs/approved-1/boost');
     expect(html).toContain("승인 전에는 공개되지 않습니다.");
   });
 

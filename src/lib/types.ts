@@ -53,9 +53,6 @@ export const MODERATION_STATUSES = [
 ] as const;
 export type ModerationStatus = (typeof MODERATION_STATUSES)[number];
 
-export const BOOST_TYPES = ["featured", "urgent"] as const;
-export type BoostType = (typeof BOOST_TYPES)[number];
-
 /**
  * Application lifecycle statuses. `submitted` is the seeker-created initial
  * state (enforced by RLS); the remaining states are set by the owning employer
@@ -118,7 +115,6 @@ export interface Job {
   requirements: string[];
   benefits: string[];
   moderationStatus: ModerationStatus;
-  boost: BoostType | null;
   postedAt: string; // ISO date
 }
 
@@ -164,11 +160,6 @@ export const MODERATION_STATUS_LABELS: Record<ModerationStatus, string> = {
   rejected: "반려됨",
   paused: "일시중지",
   expired: "마감",
-};
-
-export const BOOST_LABELS: Record<BoostType, string> = {
-  featured: "추천",
-  urgent: "급구",
 };
 
 export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {

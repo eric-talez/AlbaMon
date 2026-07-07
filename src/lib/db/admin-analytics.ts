@@ -7,7 +7,6 @@ import {
   MODERATION_STATUSES,
   REPORT_STATUSES,
   type ApplicationStatus,
-  type BoostType,
   type ModerationStatus,
   type ReportStatus,
 } from "@/lib/types";
@@ -22,7 +21,6 @@ interface CountResponse {
 interface CountBuilder extends PromiseLike<CountResponse> {
   eq(column: string, value: string | boolean): CountBuilder;
   gte(column: string, value: string): CountBuilder;
-  not(column: string, operator: "is", value: null): CountBuilder;
 }
 
 type CountFilter = (query: CountBuilder) => CountBuilder;
@@ -37,9 +35,6 @@ export interface AdminAnalytics {
     rejected: number;
     paused: number;
     expired: number;
-    boosted: number;
-    featured: number;
-    urgent: number;
     createdLast7Days: number;
     createdLast30Days: number;
   };
@@ -75,13 +70,6 @@ export interface AdminAnalytics {
     createdLast7Days: number;
     createdLast30Days: number;
   };
-  boosts: {
-    boostedJobs: number;
-    byType: Record<BoostType, number>;
-    featuredJobs: number;
-    urgentJobs: number;
-    revenueTrackingDeferred: true;
-  };
 }
 
 export type AdminAnalyticsResult =
@@ -101,9 +89,6 @@ export async function getAdminAnalytics(
     const [
       jobStatusCounts,
       jobTotal,
-      boostedJobs,
-      featuredJobs,
-      urgentJobs,
       jobsLast7Days,
       jobsLast30Days,
       applicationStatusCounts,
@@ -124,9 +109,6 @@ export async function getAdminAnalytics(
     ] = await Promise.all([
       countByValues(supabase, "jobs", "moderation_status", MODERATION_STATUSES),
       exactCount(supabase, "jobs"),
-      exactCount(supabase, "jobs", (query) => query.not("boost", "is", null)),
-      exactCount(supabase, "jobs", (query) => query.eq("boost", "featured")),
-      exactCount(supabase, "jobs", (query) => query.eq("boost", "urgent")),
       exactCount(supabase, "jobs", (query) => query.gte("created_at", last7Days)),
       exactCount(supabase, "jobs", (query) => query.gte("created_at", last30Days)),
       countByValues(supabase, "applications", "status", APPLICATION_STATUSES),
@@ -170,9 +152,6 @@ export async function getAdminAnalytics(
           rejected: jobStatusCounts.rejected,
           paused: jobStatusCounts.paused,
           expired: jobStatusCounts.expired,
-          boosted: boostedJobs,
-          featured: featuredJobs,
-          urgent: urgentJobs,
           createdLast7Days: jobsLast7Days,
           createdLast30Days: jobsLast30Days,
         },
@@ -207,13 +186,6 @@ export async function getAdminAnalytics(
           total: messageTotal,
           createdLast7Days: messagesLast7Days,
           createdLast30Days: messagesLast30Days,
-        },
-        boosts: {
-          boostedJobs,
-          byType: { featured: featuredJobs, urgent: urgentJobs },
-          featuredJobs,
-          urgentJobs,
-          revenueTrackingDeferred: true,
         },
       },
     };

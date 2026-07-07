@@ -7,7 +7,6 @@ import {
 } from "@/lib/db/admin-analytics";
 import {
   APPLICATION_STATUS_LABELS,
-  BOOST_LABELS,
   MODERATION_STATUS_LABELS,
   REPORT_STATUS_LABELS,
 } from "@/lib/types";
@@ -84,9 +83,6 @@ function AnalyticsDashboard({ analytics }: { analytics: AdminAnalytics }) {
     { label: MODERATION_STATUS_LABELS.paused, value: analytics.jobs.paused },
     { label: MODERATION_STATUS_LABELS.expired, value: analytics.jobs.expired },
     { label: MODERATION_STATUS_LABELS.draft, value: analytics.jobs.draft },
-    { label: "Boosted / 부스트", value: analytics.jobs.boosted },
-    { label: "Featured / 추천", value: analytics.jobs.featured },
-    { label: "Urgent / 긴급", value: analytics.jobs.urgent },
     {
       label: "Created last 7 days",
       value: analytics.jobs.createdLast7Days,
@@ -137,20 +133,6 @@ function AnalyticsDashboard({ analytics }: { analytics: AdminAnalytics }) {
     { label: "Messages last 30 days", value: analytics.messages.createdLast30Days },
   ];
 
-  const boostItems = [
-    { label: "Boosted jobs / 부스트 공고", value: analytics.boosts.boostedJobs },
-    {
-      label: BOOST_LABELS.featured,
-      value: analytics.boosts.featuredJobs,
-      hint: "Featured job boost count only.",
-    },
-    {
-      label: BOOST_LABELS.urgent,
-      value: analytics.boosts.urgentJobs,
-      hint: "Urgent job boost count only.",
-    },
-  ];
-
   return (
     <>
       <section className="mt-6">
@@ -164,14 +146,14 @@ function AnalyticsDashboard({ analytics }: { analytics: AdminAnalytics }) {
         <BreakdownTable title="Companies" items={companyItems} />
         <BreakdownTable title="Reports" items={reportItems} />
         <BreakdownTable title="Messages" items={messageItems} />
-        <BreakdownTable title="Boosts" items={boostItems} />
       </div>
 
       <section className="mt-6 rounded-xl border border-dashed border-border p-5">
         <h2 className="text-sm font-semibold">Deferred metrics / 보류된 지표</h2>
         <p className="mt-2 text-sm text-muted">
-          External analytics providers, CSV export, cohort retention, and payment
-          revenue history are not included in this slice.
+          External analytics providers, CSV export, and cohort retention are not
+          included in this slice. Payments and paid boosts were de-scoped from
+          the MVP in Slice 23.
         </p>
       </section>
     </>
@@ -190,9 +172,8 @@ export default async function AdminAnalyticsPage() {
       <p className="mt-4 text-xs font-medium text-brand">K-Work US admin</p>
       <h1 className="mt-1 text-2xl font-bold">Admin analytics / 관리자 지표</h1>
       <p className="mt-2 max-w-3xl text-sm text-muted">
-        Track marketplace activity, moderation workload, applications, reports,
-        and boost usage. 공고, 지원, 신고, 회사 인증, 부스트 사용 현황을 한눈에
-        확인합니다.
+        Track marketplace activity, moderation workload, applications, and
+        reports. 공고, 지원, 신고, 회사 인증 현황을 한눈에 확인합니다.
       </p>
 
       {result.status !== "ok" ? (

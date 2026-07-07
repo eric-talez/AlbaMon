@@ -17,14 +17,12 @@ interface FakeCountResponse {
 interface FakeBuilder extends PromiseLike<FakeCountResponse> {
   eq(column: string, value: string | boolean): FakeBuilder;
   gte(column: string, value: string): FakeBuilder;
-  not(column: string, operator: string, value: null): FakeBuilder;
 }
 
 interface FilterCall {
-  kind: "eq" | "gte" | "not";
+  kind: "eq" | "gte";
   column: string;
-  operator?: string;
-  value: string | boolean | null;
+  value: string | boolean;
 }
 
 interface CountCall {
@@ -53,7 +51,7 @@ describe("admin analytics reads", () => {
     expect(mockClient).not.toHaveBeenCalled();
   });
 
-  it("returns aggregate KPI counts with status and boost mappings", async () => {
+  it("returns aggregate KPI counts with status mappings", async () => {
     const now = new Date("2026-06-29T00:00:00.000Z");
     const counts = {
       [keyOf("jobs")]: 12,
@@ -63,9 +61,6 @@ describe("admin analytics reads", () => {
       [keyOf("jobs", eq("moderation_status", "rejected"))]: 1,
       [keyOf("jobs", eq("moderation_status", "paused"))]: 2,
       [keyOf("jobs", eq("moderation_status", "expired"))]: 2,
-      [keyOf("jobs", not("boost", "is", null))]: 3,
-      [keyOf("jobs", eq("boost", "featured"))]: 2,
-      [keyOf("jobs", eq("boost", "urgent"))]: 1,
       [keyOf("jobs", gte("created_at", "2026-06-22T00:00:00.000Z"))]: 5,
       [keyOf("jobs", gte("created_at", "2026-05-30T00:00:00.000Z"))]: 8,
       [keyOf("applications")]: 20,
@@ -107,9 +102,6 @@ describe("admin analytics reads", () => {
             paused: 2,
             expired: 2,
           },
-          boosted: 3,
-          featured: 2,
-          urgent: 1,
           createdLast7Days: 5,
           createdLast30Days: 8,
         },
@@ -142,11 +134,6 @@ describe("admin analytics reads", () => {
           total: 11,
           createdLast7Days: 4,
           createdLast30Days: 10,
-        },
-        boosts: {
-          boostedJobs: 3,
-          byType: { featured: 2, urgent: 1 },
-          revenueTrackingDeferred: true,
         },
       },
     });
@@ -203,10 +190,6 @@ function makeCountClient(
         filters.push(gte(column, value));
         return query;
       };
-      query.not = (column, operator, value) => {
-        filters.push(not(column, operator, value));
-        return query;
-      };
       query.then = (onfulfilled, onrejected) => {
         const call = { table, selected, options, filters: [...filters] };
         calls.push(call);
@@ -233,20 +216,11 @@ function gte(column: string, value: string): FilterCall {
   return { kind: "gte", column, value };
 }
 
-function not(column: string, operator: string, value: null): FilterCall {
-  return { kind: "not", column, operator, value };
-}
-
 function keyOf(table: string, ...filters: FilterCall[]): string {
   return [
     table,
     ...filters.map((filter) =>
-      [
-        filter.kind,
-        filter.column,
-        filter.operator ?? "",
-        String(filter.value),
-      ].join(":"),
+      [filter.kind, filter.column, String(filter.value)].join(":"),
     ),
   ].join("|");
 }

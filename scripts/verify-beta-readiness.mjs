@@ -7,7 +7,7 @@
  *   node scripts/verify-beta-readiness.mjs [repo-root]
  *
  * Read-only and self-contained: no network, no credentials, no Supabase or
- * Stripe or Vercel access, no writes. It verifies repo-level launch-readiness
+ * Vercel access, no writes. It verifies repo-level launch-readiness
  * assumptions only:
  *
  *   - the launch documentation set and the CI workflow exist
@@ -45,10 +45,6 @@ const REQUIRED_ENV_VAR_NAMES = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
-  "STRIPE_SECRET_KEY",
-  "STRIPE_WEBHOOK_SECRET",
-  "STRIPE_FEATURED_PRICE_ID",
-  "STRIPE_URGENT_PRICE_ID",
 ];
 
 // Launch topics the checklist must keep covering. Each topic passes when ANY
@@ -70,10 +66,6 @@ const CHECKLIST_TOPICS = [
   {
     topic: "admin setup",
     anyOf: [/^##\s*\d+\.\s*admin setup/im, /role\s*=\s*'admin'/],
-  },
-  {
-    topic: "Stripe webhook",
-    anyOf: [/STRIPE_WEBHOOK_SECRET/, /\/api\/stripe\/webhook/, /webhook signature/i],
   },
   {
     topic: "RLS / access checks",
@@ -162,11 +154,6 @@ function checkEnvVarReference() {
   }
   if (!/placeholder/i.test(reference)) {
     failures.push("env var reference does not state the placeholder policy");
-  }
-  for (const marker of ["sk_live_...", "whsec_..."]) {
-    if (!reference.includes(marker)) {
-      failures.push(`env var reference lost the placeholder form: ${marker}`);
-    }
   }
   return failures;
 }

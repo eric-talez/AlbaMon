@@ -10,7 +10,6 @@ import {
 import { getApprovedJobById, getApprovedJobs } from "@/lib/db/jobs";
 import {
   Badge,
-  BoostBadge,
   CompanyVerificationBadge,
   VerifiedBadge,
 } from "@/components/Badge";
@@ -82,7 +81,6 @@ export default async function JobDetailPage({
 
       <article className="mt-3">
         <div className="flex flex-wrap items-center gap-1.5">
-          {job.boost && <BoostBadge boost={job.boost} />}
           <Badge tone="neutral">{JOB_TYPE_LABELS[job.jobType]}</Badge>
           <Badge tone="neutral">{JOB_CATEGORY_LABELS[job.category]}</Badge>
         </div>
@@ -159,8 +157,7 @@ export default async function JobDetailPage({
         <p className="mt-3 rounded-lg border border-border bg-surface p-3 text-xs leading-5 text-muted">
           K-Work US provides listing and communication tools only. K-Work US does
           not guarantee job quality, hiring outcome, legal compliance, or work
-          authorization eligibility. Boosts do not imply job quality, safety,
-          legal compliance, or endorsement.
+          authorization eligibility.
         </p>
 
         <div className="sticky bottom-20 mt-6 sm:static sm:bottom-auto">

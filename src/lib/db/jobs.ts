@@ -33,7 +33,7 @@ const PUBLIC_JOB_SELECT =
   "id, title, category, job_type, city, state, address_display, " +
   "address_display_mode, pay_min, pay_max, pay_unit, tips_available, " +
   "schedule_days, schedule_time_range, language_requirement, description, " +
-  "responsibilities, requirements, benefits, moderation_status, boost, " +
+  "responsibilities, requirements, benefits, moderation_status, " +
   "posted_at, company_name, company_is_verified";
 
 /**
@@ -82,7 +82,6 @@ function mapRow(row: PublicJobListingRow): Job {
     requirements: row.requirements ?? [],
     benefits: row.benefits ?? [],
     moderationStatus: row.moderation_status,
-    boost: row.boost,
     // Job.postedAt is an ISO date (YYYY-MM-DD); posted_at is a timestamptz.
     postedAt: row.posted_at ? row.posted_at.slice(0, 10) : "",
   };
