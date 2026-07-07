@@ -16,7 +16,7 @@ vi.mock("@/lib/db/employer-access-requests", () => ({
   reviewEmployerAccessRequest: vi.fn(),
 }));
 vi.mock("@/lib/db/admin-moderation", () => ({
-  getAdminModerationCounts: vi.fn(),
+  getAdminQueueCounts: vi.fn(),
 }));
 vi.mock("@/components/auth/AccountBar", () => ({
   AccountBar: () => null,
@@ -31,7 +31,7 @@ import {
   type AdminEmployerAccessRequest,
   type EmployerAccessRequestSummary,
 } from "@/lib/db/employer-access-requests";
-import { getAdminModerationCounts } from "@/lib/db/admin-moderation";
+import { getAdminQueueCounts } from "@/lib/db/admin-moderation";
 import EmployerRequestAccessPage from "@/app/(employer-access)/employer/request-access/page";
 import AdminEmployerRequestsPage from "@/app/admin/employer-requests/page";
 import AdminHomePage from "@/app/admin/page";
@@ -44,7 +44,7 @@ const mockGetCurrentUser = vi.mocked(getCurrentUser);
 const mockLatest = vi.mocked(getLatestEmployerAccessRequest);
 const mockAdminRequests = vi.mocked(getAdminEmployerAccessRequests);
 const mockPendingCount = vi.mocked(getPendingEmployerAccessRequestCount);
-const mockCounts = vi.mocked(getAdminModerationCounts);
+const mockCounts = vi.mocked(getAdminQueueCounts);
 
 function user(role: "seeker" | "employer" | "admin") {
   return {
@@ -99,8 +99,9 @@ beforeEach(() => {
   mockAdminRequests.mockResolvedValue({ status: "ok", requests: [] });
   mockPendingCount.mockResolvedValue({ status: "ok", count: 4 });
   mockCounts.mockResolvedValue({
-    status: "ok",
-    counts: { pendingJobs: 2, unverifiedCompanies: 1, openReports: 3 },
+    pendingJobs: { status: "ok", count: 2 },
+    unverifiedCompanies: { status: "ok", count: 1 },
+    openReports: { status: "ok", count: 3 },
   });
 });
 

@@ -324,6 +324,13 @@ With a real session (Appendix A):
 - [ ] Create a company and post a job → job is **pending**, not on `/jobs`
 - [ ] Promote a user to admin via SQL (`role = 'admin'`, §12) → approve the
       job in `/admin` → it appears on `/jobs`
+- [ ] `/admin` shows live counts on its queue cards (the seed leaves 1
+      pending job) and the recent-activity section shows its calm empty
+      state — nothing writes `audit_logs` yet
+
+> Before §6 is done (placeholder values), a dev-auth admin sees the "Admin
+> setup required" panel on `/admin` with these exact §§3–7 commands — the
+> expected unconfigured state, not an error.
 
 ## Appendix A — optional: real sign-in via local phone test OTP
 

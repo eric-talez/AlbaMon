@@ -76,6 +76,9 @@ a DB trigger + RLS).
 - [ ] Promoted via SQL editor: `update public.profiles set role = 'admin' where id = '<auth-user-uuid>';`
 - [ ] Verified: that account can open `/admin`, and a fresh non-admin account
       gets `/forbidden`
+- [ ] Verified: `/admin` shows live queue counts (jobs, companies, employer
+      access requests, reports). Live counts need real Supabase — a dev-auth
+      admin previews the UI only and sees the "Admin setup required" panel
 - [ ] Documented who holds admin (beta: keep it to 1–2 people)
 
 **Employer access (Slice 21):** employers need no SQL. New users start as
@@ -162,6 +165,9 @@ reference, log triage, incident response) live in
       log-prefix guide in
       [`OPERATIONAL_HEALTH.md §5`](OPERATIONAL_HEALTH.md#5-log-triage--where-to-look-when-a-flow-fails))
 - [ ] Supabase logs/dashboard reviewed (auth + Postgres errors)
+- [ ] `/admin` operational-health card shows the same checks and links
+      `/api/health` — treat `/api/health` as the first setup check whenever
+      admin queues look wrong
 - [ ] Stripe webhook dashboard shows deliveries succeeding (200s)
 - [ ] Decide post-beta: error tracking (e.g. Sentry) and product analytics —
       **deferred, out of beta scope**

@@ -13,10 +13,14 @@ import {
   type ComplianceFlag,
 } from "@/lib/employer/validation";
 
-export interface AdminModerationCounts {
-  pendingJobs: number;
-  unverifiedCompanies: number;
-  openReports: number;
+export type AdminQueueCountResult =
+  | { status: "ok"; count: number }
+  | { status: "unavailable" | "error" };
+
+export interface AdminQueueCounts {
+  pendingJobs: AdminQueueCountResult;
+  unverifiedCompanies: AdminQueueCountResult;
+  openReports: AdminQueueCountResult;
 }
 
 export interface AdminJob {
@@ -60,10 +64,6 @@ export interface AdminCompany {
   createdAt: string;
 }
 
-export type AdminCountsResult =
-  | { status: "ok"; counts: AdminModerationCounts }
-  | { status: "unavailable" | "error" };
-
 export type AdminJobsResult =
   | { status: "ok"; jobs: AdminJob[] }
   | { status: "unavailable" | "error" };
@@ -89,8 +89,31 @@ const ADMIN_COMPANY_SELECT =
   "id, owner_id, name, description, website, phone, city, state, " +
   "address_display, is_verified, created_at, updated_at";
 
-export async function getAdminModerationCounts(): Promise<AdminCountsResult> {
-  if (!isSupabaseConfigured()) return { status: "unavailable" };
+function toQueueCount(result: {
+  count: number | null;
+  error: unknown;
+}): AdminQueueCountResult {
+  if (result.error) {
+    console.error("[db] getAdminQueueCounts query failed");
+    return { status: "error" };
+  }
+  return { status: "ok", count: result.count ?? 0 };
+}
+
+/**
+ * Per-queue moderation counts for the admin dashboard. Each queue resolves
+ * independently so a single failing count degrades one card instead of
+ * hiding the whole console: unavailable = Supabase not configured, error =
+ * that queue's query failed.
+ */
+export async function getAdminQueueCounts(): Promise<AdminQueueCounts> {
+  if (!isSupabaseConfigured()) {
+    return {
+      pendingJobs: { status: "unavailable" },
+      unverifiedCompanies: { status: "unavailable" },
+      openReports: { status: "unavailable" },
+    };
+  }
   try {
     const supabase = await createSupabaseServerClient();
     const [jobs, companies, reports] = await Promise.all([
@@ -107,20 +130,18 @@ export async function getAdminModerationCounts(): Promise<AdminCountsResult> {
         .select("id", { count: "exact", head: true })
         .eq("status", "open"),
     ]);
-    if (jobs.error) throw jobs.error;
-    if (companies.error) throw companies.error;
-    if (reports.error) throw reports.error;
     return {
-      status: "ok",
-      counts: {
-        pendingJobs: jobs.count ?? 0,
-        unverifiedCompanies: companies.count ?? 0,
-        openReports: reports.count ?? 0,
-      },
+      pendingJobs: toQueueCount(jobs),
+      unverifiedCompanies: toQueueCount(companies),
+      openReports: toQueueCount(reports),
     };
   } catch {
-    console.error("[db] getAdminModerationCounts failed");
-    return { status: "error" };
+    console.error("[db] getAdminQueueCounts failed");
+    return {
+      pendingJobs: { status: "error" },
+      unverifiedCompanies: { status: "error" },
+      openReports: { status: "error" },
+    };
   }
 }
 

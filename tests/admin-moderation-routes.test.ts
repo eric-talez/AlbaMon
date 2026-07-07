@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("@/lib/auth/guards", () => ({ requireRole: vi.fn() }));
 vi.mock("@/lib/db/admin-moderation", () => ({
-  getAdminModerationCounts: vi.fn(),
+  getAdminQueueCounts: vi.fn(),
   getAdminJobs: vi.fn(),
   getAdminCompanies: vi.fn(),
   moderatePendingJob: vi.fn(),
@@ -22,7 +22,7 @@ import { requireRole } from "@/lib/auth/guards";
 import {
   getAdminCompanies,
   getAdminJobs,
-  getAdminModerationCounts,
+  getAdminQueueCounts,
 } from "@/lib/db/admin-moderation";
 import { getAdminReports } from "@/lib/db/reports";
 import { getAdminAnalytics } from "@/lib/db/admin-analytics";
@@ -33,7 +33,7 @@ import AdminCompaniesPage from "@/app/admin/companies/page";
 import AdminReportsPage from "@/app/admin/reports/page";
 
 const mockRequireRole = vi.mocked(requireRole);
-const mockCounts = vi.mocked(getAdminModerationCounts);
+const mockCounts = vi.mocked(getAdminQueueCounts);
 const mockJobs = vi.mocked(getAdminJobs);
 const mockCompanies = vi.mocked(getAdminCompanies);
 const mockReports = vi.mocked(getAdminReports);
@@ -47,8 +47,9 @@ beforeEach(() => {
     isDev: false,
   });
   mockCounts.mockResolvedValue({
-    status: "ok",
-    counts: { pendingJobs: 2, unverifiedCompanies: 1, openReports: 3 },
+    pendingJobs: { status: "ok", count: 2 },
+    unverifiedCompanies: { status: "ok", count: 1 },
+    openReports: { status: "ok", count: 3 },
   });
   mockJobs.mockResolvedValue({ status: "ok", jobs: [] });
   mockCompanies.mockResolvedValue({ status: "ok", companies: [] });
@@ -191,9 +192,14 @@ describe("admin moderation routes", () => {
     const unavailableCompanies = renderToStaticMarkup(await AdminCompaniesPage());
     expect(unavailableCompanies).toContain("Supabase가 연결된 환경");
 
-    mockCounts.mockResolvedValue({ status: "error" });
+    mockCounts.mockResolvedValue({
+      pendingJobs: { status: "error" },
+      unverifiedCompanies: { status: "error" },
+      openReports: { status: "error" },
+    });
     const errorDashboard = renderToStaticMarkup(await AdminHomePage());
     expect(errorDashboard).toContain("관리자 현황을 불러오지 못했습니다.");
+    expect(errorDashboard).toContain('href="/admin/jobs"');
 
     const emptyReports = renderToStaticMarkup(await AdminReportsPage());
     expect(emptyReports).toContain("접수된 신고가 없습니다.");

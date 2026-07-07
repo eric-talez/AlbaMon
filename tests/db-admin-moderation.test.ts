@@ -6,7 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   getAdminCompanies,
   getAdminJobs,
-  getAdminModerationCounts,
+  getAdminQueueCounts,
   moderatePendingJob,
   setCompanyVerification,
 } from "@/lib/db/admin-moderation";
@@ -38,9 +38,29 @@ describe("admin moderation reads", () => {
     }));
     mockClient.mockResolvedValue({ from } as never);
 
-    await expect(getAdminModerationCounts()).resolves.toEqual({
-      status: "ok",
-      counts: { pendingJobs: 3, unverifiedCompanies: 2, openReports: 4 },
+    await expect(getAdminQueueCounts()).resolves.toEqual({
+      pendingJobs: { status: "ok", count: 3 },
+      unverifiedCompanies: { status: "ok", count: 2 },
+      openReports: { status: "ok", count: 4 },
+    });
+  });
+
+  it("degrades only the failing queue when one count query errors", async () => {
+    const from = vi.fn((table: string) => ({
+      select: vi.fn(() => ({
+        eq: vi.fn().mockResolvedValue(
+          table === "reports"
+            ? { count: null, error: { message: "boom" } }
+            : { count: 1, error: null },
+        ),
+      })),
+    }));
+    mockClient.mockResolvedValue({ from } as never);
+
+    await expect(getAdminQueueCounts()).resolves.toEqual({
+      pendingJobs: { status: "ok", count: 1 },
+      unverifiedCompanies: { status: "ok", count: 1 },
+      openReports: { status: "error" },
     });
   });
 
@@ -139,12 +159,22 @@ describe("admin moderation reads", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://your-project.supabase.co");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "your-anon-key");
     await expect(getAdminJobs()).resolves.toEqual({ status: "unavailable" });
+    await expect(getAdminQueueCounts()).resolves.toEqual({
+      pendingJobs: { status: "unavailable" },
+      unverifiedCompanies: { status: "unavailable" },
+      openReports: { status: "unavailable" },
+    });
     expect(mockClient).not.toHaveBeenCalled();
 
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://abcdefghijklmnop.supabase.co");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "sb_publishable_realish_key_value_1234567890");
     mockClient.mockRejectedValue(new Error("private database detail"));
     await expect(getAdminCompanies()).resolves.toEqual({ status: "error" });
+    await expect(getAdminQueueCounts()).resolves.toEqual({
+      pendingJobs: { status: "error" },
+      unverifiedCompanies: { status: "error" },
+      openReports: { status: "error" },
+    });
   });
 });
 

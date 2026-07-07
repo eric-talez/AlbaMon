@@ -247,3 +247,21 @@ client-only) and Supabase RLS.
   - Approval does not create a company; company registration, job submission,
     approved-only public visibility, payments, and auth providers are
     unchanged. The user-facing flow never uses the service-role client.
+- **Slice 22 — Admin operations console:** scoped implementation done.
+  - `/admin` is a real operations dashboard: per-queue count cards (pending
+    jobs, unverified companies, open reports, employer access requests) that
+    resolve independently with ok / zero / unavailable / error states, so one
+    failing queue degrades one card instead of hiding the console.
+  - Always-visible admin navigation (jobs, companies, employer requests,
+    reports, analytics, health check) plus an operational-health card that
+    reuses the public `/api/health` presence report — statuses only, never
+    env values.
+  - With placeholder Supabase values, the dashboard shows an "Admin setup
+    required" panel with the local-setup commands and env-variable **names**
+    from [`LOCAL_SUPABASE.md`](LOCAL_SUPABASE.md); dev-auth admin previews
+    the UI only, live counts need a configured Supabase.
+  - Read-only recent-activity section on `audit_logs` (admin-read RLS,
+    narrow select, latest 5); nothing writes the table yet, so its calm
+    empty state is expected. No audit-write behavior was added.
+  - No schema/RLS changes, no service-role reads, and payments, auth
+    providers, and public job visibility are unchanged.
