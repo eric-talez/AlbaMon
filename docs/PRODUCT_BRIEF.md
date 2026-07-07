@@ -269,3 +269,26 @@ client-only) and Supabase RLS.
     insert policy, and `prevent_job_boost_change` trigger remain, intentionally
     unused. Public job visibility, auth, RLS, admin moderation, reports, and
     employer access behavior are unchanged.
+- **Fix — explicit table grants (PR #25):** done.
+  - Current Supabase projects apply no implicit table privileges to the API
+    roles, so every real sign-in (social or phone OTP) minted a session and
+    then failed closed at the `profiles.role` lookup (`permission denied for
+    table profiles`, 42501), bouncing back to `/login`.
+    `20260707000000_explicit_table_grants.sql` adds deterministic,
+    least-privilege grants for `anon`/`authenticated`/`service_role`; RLS is
+    unchanged as the row-level gate. Pinned by `tests/db-schema.test.ts`
+    ([`DATABASE.md`](DATABASE.md#table-grants-supabase-api-roles)).
+- **Slice 24 — Post-grants readiness docs:** done (docs-only).
+  - Runbooks updated for the hosted schema deploy: `supabase login` →
+    `supabase link` → `supabase db push`, 10 migrations, never `db reset` or
+    `seed.sql` against hosted/production, and a post-migration smoke
+    (health → first `seeker` signup → admin via SQL → `/admin` live counts →
+    auth flags last) in [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project).
+  - Where auth stands: the Slice 19 foundation (buttons, flags, callback,
+    registry) is code-complete and fully rehearsable on the local stack, but
+    real Google/Kakao/Phone E2E needs a Supabase project with **both** the
+    schema deployed (profiles trigger + explicit grants) **and** that
+    provider's credentials — the hosted project needs its migrations pushed
+    before provider E2E can complete. Naver stays setup-required pending
+    custom-OIDC verification; local phone test OTP and hosted SMS remain
+    separate flows; payments/boosts stay de-scoped (Slice 23).

@@ -17,6 +17,7 @@ supabase/
     20260627000000_application_status_workflow.sql # owned employer status updates
     20260628000000_report_queue_hardening.sql # report reason/status constraints + RLS
     20260706000000_employer_access_requests.sql # seeker→employer request queue + admin review RPC
+    20260707000000_explicit_table_grants.sql # explicit least-privilege API-role grants (RLS stays the row gate)
   seed.sql                            # LA/OC demo companies + jobs
 ```
 
@@ -38,12 +39,17 @@ auth modes, the manual smoke checklist — see
 
 ## Apply to a hosted Supabase project
 
-1. Link the project: `supabase link --project-ref <your-ref>`
-2. Push migrations: `supabase db push`
-3. (Optional) load demo data by pasting `seed.sql` into the **SQL editor**.
+1. Sign in: `supabase login`
+2. Link the project: `supabase link --project-ref <your-ref>`
+3. Push migrations: `supabase db push`
+4. (Optional, demo/staging projects only) load demo data by pasting
+   `seed.sql` into the **SQL editor** — **never on production**
+   ([`docs/LAUNCH_CHECKLIST.md §3`](../docs/LAUNCH_CHECKLIST.md#3-seed--demo-data)).
 
-Or, without the CLI: open the Supabase **SQL editor**, run every file in
-`migrations/` in filename order, then run `seed.sql`.
+**Never run `supabase db reset` against a linked hosted project** — it wipes
+the database; `db push` is the only schema command for hosted. Or, without
+the CLI: open the Supabase **SQL editor**, run every file in `migrations/` in
+filename order, then (demo/staging only) `seed.sql`.
 
 After setting the project URL + anon key in `.env.local` (see `.env.example`),
 the app automatically switches from mock data to live DB reads — see
@@ -100,13 +106,12 @@ Admins keep existing admin RLS access and can update report status to `reviewed`
 or `dismissed`; the migration does not add account sanctions, email alerts, or
 bulk investigation workflows.
 
-Slice 12 adds payments and boosts without a new migration. The existing
-`jobs.boost` field remains protected from normal employer writes. Checkout
-creation uses the caller-authenticated session for ownership checks only, while
-the verified Stripe webhook uses the service-role key after signature validation
-to set the intended job's boost by both job ID and company ID. There is no
-payments table, refund schema, subscription schema, billing portal, or analytics
-schema in this slice.
+Slice 12 added Stripe-based payments and boosts without a new migration;
+**Slice 23 removed all of it from the MVP** — no Stripe code, env vars,
+webhook, or boost UI remains. The `jobs.boost` column and its write
+protections stay in the schema, intentionally unused: normal employer writes
+still cannot touch the field. There is no payments table, refund schema,
+subscription schema, billing portal, or analytics schema.
 
 Slice 21 adds `employer_access_requests`, the self-service path from `seeker`
 to `employer`. Real auth users always start as `seeker`; a signed-in seeker
@@ -120,6 +125,18 @@ role, users cannot self-promote, and the user-facing flow never uses the
 service-role key. Approval does not create a company; company registration and
 job submission still follow the existing employer flow, and admin review is
 not a business/legal/work-authorization verification.
+
+The `20260707000000` migration adds **explicit table grants** for the
+Supabase API roles. Current Supabase projects apply no implicit table
+privileges, so without it every real sign-in minted a session and then failed
+closed at the `profiles.role` lookup (`permission denied for table profiles`,
+42501). The grants are least-privilege and deterministic (revoke-then-grant):
+`anon` may only SELECT `jobs`/`companies`, `authenticated` gets the narrow
+DML surface its policies expect (no DELETEs; no `profiles` INSERT —
+provisioning stays with the `on_auth_user_created` trigger), and
+`service_role` regains full DML. RLS remains the row-level authorization gate
+on every table; `tests/db-schema.test.ts` pins the grant surface. Details:
+[`docs/DATABASE.md`](../docs/DATABASE.md#table-grants-supabase-api-roles).
 
 ## What the seed contains
 
@@ -157,9 +174,10 @@ Korean-only, visa-status, or under-the-table-cash phrasing).
 - Live report-policy execution also requires Supabase CLI and Docker; static
   tests cover reason/status constraints, approved-job insert RLS, duplicate
   prevention, and admin-only report status updates.
-- Live webhook execution also requires configured Stripe secrets and a Supabase
-  service-role key; unit tests cover signature verification, metadata validation,
-  and idempotent boost activation behavior.
+- Live execution of the explicit API-role grants likewise requires Supabase
+  CLI and Docker; `tests/db-schema.test.ts` statically pins the per-role
+  grant surface (SELECT/INSERT/UPDATE/DELETE per table) when that
+  environment is unavailable.
 - Runtime authorization reads `profiles.role`, not client-influenced
   `user_metadata.role`. Ownership policies also require the actor's current
   employer/admin role, so demotion revokes private owner access.
