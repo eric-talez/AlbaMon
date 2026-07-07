@@ -3,7 +3,6 @@ import "server-only";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { JobRow, ModerationStatus } from "@/lib/db/types";
-import type { BoostType } from "@/lib/types";
 import type { EmployerJobInput } from "@/lib/employer/validation";
 
 export interface EmployerJobSummary {
@@ -12,7 +11,6 @@ export interface EmployerJobSummary {
   companyName: string;
   title: string;
   moderationStatus: ModerationStatus;
-  boost: BoostType | null;
   createdAt: string;
 }
 
@@ -44,7 +42,7 @@ export async function getEmployerJobs(ownerId: string): Promise<EmployerJobListR
 
     const { data: jobs, error: jobError } = await supabase
       .from("jobs")
-      .select("id, company_id, title, moderation_status, boost, created_at")
+      .select("id, company_id, title, moderation_status, created_at")
       .in("company_id", companyRows.map((company) => company.id))
       .order("created_at", { ascending: false });
     if (jobError) throw jobError;
@@ -57,7 +55,6 @@ export async function getEmployerJobs(ownerId: string): Promise<EmployerJobListR
         companyName: names.get(job.company_id) ?? "회사 정보 없음",
         title: job.title,
         moderationStatus: job.moderation_status,
-        boost: job.boost,
         createdAt: job.created_at,
       })),
     };
@@ -107,6 +104,8 @@ export async function createEmployerJob(
         requirements: input.requirements,
         benefits: input.benefits,
         moderation_status: "pending",
+        // Explicit null: the jobs insert RLS policy requires boost IS NULL for
+        // non-admins (paid boosts were de-scoped in Slice 23; column retained).
         boost: null,
       })
       .select("id")

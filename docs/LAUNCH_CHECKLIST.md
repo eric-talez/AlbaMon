@@ -26,9 +26,6 @@ Per-variable reference (exposure, validation, placeholders):
 - [ ] `NEXT_PUBLIC_SITE_URL` = `https://<your-domain>` (canonical/OG/sitemap base)
 - [ ] `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` set (real project, not placeholders)
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` set as **server-only** (never `NEXT_PUBLIC_*`)
-- [ ] `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (live mode on Production only)
-- [ ] `STRIPE_WEBHOOK_SECRET` for the **live** endpoint
-- [ ] `STRIPE_FEATURED_PRICE_ID`, `STRIPE_URGENT_PRICE_ID` (live price ids)
 - [ ] `EMAIL_PROVIDER=dev` confirmed (real email delivery is out of beta scope)
 - [ ] PostHog vars left empty (analytics provider not initialized in this build)
 - [ ] `NEXT_PUBLIC_AUTH_*` flags decided per provider — keep the default
@@ -92,17 +89,12 @@ work-authorization verification.
 - [ ] Verified: a seeker's request appears in `/admin/employer-requests`, and
       approving it opens `/employer` for that account
 
-## 5. Stripe (test → live)
+## 5. Payments (de-scoped in Slice 23)
 
-- [ ] Test-mode end-to-end pass: boost checkout → Stripe test payment →
-      webhook `checkout.session.completed` → boost visible on the job
-- [ ] Webhook signature verification confirmed (bad-signature request gets 4xx;
-      covered by `tests/stripe-webhook.test.ts`)
-- [ ] Live products/prices created; live price ids in env
-- [ ] Live webhook endpoint registered → `https://<your-domain>/api/stripe/webhook`
-      with its own `whsec_...` in Production env
-- [ ] Live keys **only** on Production; Preview keeps test keys
-- [ ] One real low-value live transaction verified after launch, then refunded
+Payments and paid boosts were de-scoped from the MVP in Slice 23; the
+`jobs.boost` column, enum, and write-protection triggers remain in the schema,
+intentionally unused. Revisit post-beta. No Stripe account, keys, webhook, or
+test transaction is required to launch — this section is intentionally empty.
 
 ## 6. Legal & compliance copy **(placeholder — attorney review pending)**
 
@@ -117,7 +109,7 @@ legal review.
 - [ ] Until then: beta invite communication states the service is a beta and
       policies are being finalized
 - [ ] Verified the app itself makes no legal determinations or guarantees
-      (disclaimers on job detail, apply, posting, boost, verification surfaces;
+      (disclaimers on job detail, apply, posting, verification surfaces;
       covered by `tests/jobs.test.ts` and `tests/smoke-public-pages.test.ts`)
 
 ## 7. RLS / security review
@@ -132,15 +124,15 @@ Supabase CLI + Docker (see `supabase/README.md`).
 | Approved-only public view, role revocation | `20260622…_audit_hardening.sql` | `tests/db-schema.test.ts`, `tests/auth-role-source.test.ts` |
 | Seeker-only application inserts | `20260623…_application_submission.sql` | `tests/application-flow.test.ts`, `tests/db-applications.test.ts` |
 | Caller-bound dashboard RPCs | `20260624…_application_listing_functions.sql` | `tests/db-applications.test.ts` |
-| Verification/boost write guards | `20260625…_employer_write_hardening.sql` | `tests/db-companies.test.ts`, `tests/db-employer-jobs.test.ts` |
+| Verification/boost write guards (boost column retained but unused since Slice 23) | `20260625…_employer_write_hardening.sql` | `tests/db-companies.test.ts`, `tests/db-employer-jobs.test.ts` |
 | Participant-bound messages | `20260626…_application_messages.sql` | `tests/messaging-routes-security.test.ts`, `tests/db-messages.test.ts` |
 | Status workflow constraints | `20260627…_application_status_workflow.sql` | `tests/application-status-migration.test.ts` |
 | Report queue constraints | `20260628…_report_queue_hardening.sql` | `tests/report-workflow-migration.test.ts`, `tests/db-reports.test.ts` |
 
 - [ ] Role guards remain server-side (`src/lib/auth/guards.ts`; every
       `/admin`, `/employer`, `/dashboard` page calls them — no client-only gating)
-- [ ] Service-role client used **only** in the verified Stripe webhook path
-      (`src/lib/supabase/service.ts` → `src/lib/payments/boosts.ts`)
+- [ ] No app code path uses the service-role client (`src/lib/supabase/service.ts`
+      is retained infrastructure; the health check only reports the key's presence)
 - [ ] Public job surfaces read approved listings only (`public_job_listings`
       view; `tests/smoke-public-pages.test.ts` asserts non-approved ids 404)
 - [ ] Sitemap/robots expose no private routes and no per-job URLs
@@ -168,7 +160,6 @@ reference, log triage, incident response) live in
 - [ ] `/admin` operational-health card shows the same checks and links
       `/api/health` — treat `/api/health` as the first setup check whenever
       admin queues look wrong
-- [ ] Stripe webhook dashboard shows deliveries succeeding (200s)
 - [ ] Decide post-beta: error tracking (e.g. Sentry) and product analytics —
       **deferred, out of beta scope**
       ([`OPERATIONAL_HEALTH.md §7`](OPERATIONAL_HEALTH.md#7-deferred-observability-post-beta))
@@ -183,9 +174,6 @@ reference, log triage, incident response) live in
   Take a backup/PITR snapshot **before** applying new migrations to prod.
   Restoring a backup rolls back *data* too — prefer fixing forward for
   code-level issues.
-- **Stripe**: to freeze payments quickly, disable the live webhook endpoint
-  and/or archive the boost prices; the boost page fails closed when checkout is
-  unconfigured.
 
 ## 10. QA & verification
 
@@ -215,7 +203,6 @@ Chrome + Safari, on the production URL:
       risky phrasing blocked) → job **not** publicly visible while pending
 - [ ] Admin: approve the job → appears on `/jobs`; reject path shows correctly
 - [ ] Report a job → visible in admin report queue → review/dismiss
-- [ ] Boost checkout (test mode on preview): pay → webhook → badge on listing
 - [ ] Messaging: seeker ↔ employer thread on an application; status updates
       (reviewing/interview/offered) reflect on the seeker dashboard
 - [ ] `/robots.txt` and `/sitemap.xml` respond; sitemap lists only public pages
@@ -229,7 +216,6 @@ Chrome + Safari, on the production URL:
 | Manual smoke script passed at 390px & 1440px | ☐ |
 | No seed/demo data in production (§3 counts are 0) | ☐ |
 | Founding admin verified (§4) | ☐ |
-| Stripe live webhook verified (§5) | ☐ |
 | RLS spot-checks passed (§7) | ☐ |
 | Team accepts open placeholders: attorney review pending, no error tracking, dev-stub email, browser E2E deferred | ☐ |
 | Social/phone auth providers verified per §12 — or their flags stay `false` | ☐ |
@@ -267,6 +253,9 @@ every method ships behind a default-`false` flag and renders as
 
 ## Deferred (accepted for beta, revisit after)
 
+- Payments and paid boosts were de-scoped from the MVP in Slice 23; the
+  `jobs.boost` column, enum, and write-protection triggers remain in the
+  schema, intentionally unused. Revisit post-beta.
 - Attorney-reviewed legal copy (placeholder pages ship with review notice)
 - Real email/SMS delivery (dev stub only)
 - Error tracking & product analytics providers

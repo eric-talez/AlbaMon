@@ -40,7 +40,6 @@ const HEALTH_TONES: Record<
 const HEALTH_CHECK_LABELS: Record<keyof HealthChecks, string> = {
   siteUrl: "Site URL",
   supabase: "Supabase",
-  stripe: "Stripe",
   email: "Email",
   analytics: "Analytics",
 };

@@ -27,14 +27,16 @@ After deploying, `GET /api/health` reports whether these variables are present
 
 | Variable | Exposure | Where configured | Placeholder | Validation / failure mode |
 |---|---|---|---|---|
-| `NEXT_PUBLIC_SITE_URL` | client | Vercel (Production scope) | `https://<your-domain>` | Parsed with `new URL()` in `src/lib/site.ts`; malformed/unset falls back to `http://localhost:3000`. Trailing slashes are trimmed for Stripe redirect URLs (`src/lib/payments/config.ts`). A wrong value silently breaks canonical/OG/sitemap URLs and Stripe checkout redirects. |
+| `NEXT_PUBLIC_SITE_URL` | client | Vercel (Production scope) | `https://<your-domain>` | Parsed with `new URL()` in `src/lib/site.ts`; malformed/unset falls back to `http://localhost:3000`. A wrong value silently breaks canonical/OG/sitemap URLs. |
 | `NEXT_PUBLIC_SUPABASE_URL` | client | Vercel; value from Supabase → Project Settings → API | `https://<project-ref>.supabase.co` | Placeholder fragments (`your-project`, `example.com`) are treated as *unconfigured* (`src/lib/supabase/config.ts`). In production the app then **fails closed**: auth throws instead of enabling the forgeable dev role-picker. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | client | Vercel; same Supabase page | `<anon-public-key>` | Safe to expose **only** because RLS is the authorization gate. The `your-anon-key` fragment counts as unconfigured (same fail-closed behavior). Never commit the real JWT-shaped value — `tests/security.test.ts` blocks it. |
-| `SUPABASE_SERVICE_ROLE_KEY` | **server-only** | Vercel; same Supabase page | `<service-role-key>` | Bypasses RLS entirely. Used in exactly one flow: boost activation inside the signature-verified Stripe webhook (`src/lib/supabase/service.ts` → `src/lib/payments/boosts.ts`). Keep service-role usage restricted to trusted server/webhook flows only. |
-| `STRIPE_SECRET_KEY` | **server-only** | Vercel; Stripe → Developers → API keys | `sk_live_...` (Production) / `sk_test_...` (Preview) | Test vs live mode is inferred from the key prefix. Placeholder fragments (`xxx`, `your-`, `example`, `placeholder`) count as unconfigured → boost checkout fails closed (`src/lib/payments/config.ts`). |
-| `STRIPE_WEBHOOK_SECRET` | **server-only** | Vercel; per Stripe webhook endpoint | `whsec_...` | Each endpoint (test vs live) has its **own** signing secret. Signatures are verified with HMAC-SHA256 (`node:crypto`); a bad or missing signature is rejected with a 4xx before any database write. |
-| `STRIPE_FEATURED_PRICE_ID` | **server-only** | Vercel; Stripe Products (live prices for Production) | `price_...` | Mapped by `getStripePriceId("featured")` in `src/lib/payments/config.ts`. Empty/placeholder → the featured boost is unconfigured and the boost page fails closed. |
-| `STRIPE_URGENT_PRICE_ID` | **server-only** | Vercel; Stripe Products (live prices for Production) | `price_...` | Same as above, for `getStripePriceId("urgent")`. |
+| `SUPABASE_SERVICE_ROLE_KEY` | **server-only** | Vercel; same Supabase page | `<service-role-key>` | Bypasses RLS entirely. No app code path currently uses it — the client in `src/lib/supabase/service.ts` is reserved for trusted server-side workflows, and `/api/health` reports the key's *presence* only. Keep any future usage restricted to trusted server flows. |
+
+> **Stripe variables removed (Slice 23).** Payments and paid boosts were
+> de-scoped from the MVP in Slice 23, so `STRIPE_SECRET_KEY`,
+> `STRIPE_WEBHOOK_SECRET`, `STRIPE_FEATURED_PRICE_ID`,
+> `STRIPE_URGENT_PRICE_ID`, and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` are no
+> longer read by any code and must not be configured. Revisit post-beta.
 
 ## Optional / deferred variables
 
@@ -46,7 +48,6 @@ their values. See [`OPERATIONAL_HEALTH.md`](OPERATIONAL_HEALTH.md).)
 
 | Variable | Exposure | Status |
 |---|---|---|
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | client | Reserved for future Stripe.js usage (`pk_live_...` / `pk_test_...`); checkout currently happens on Stripe-hosted pages. |
 | `EMAIL_PROVIDER` | server-only | Keep `dev` for the beta (server-side logging stub). Real `resend` / `sendgrid` delivery is deferred. |
 | `EMAIL_FROM` | server-only | Unused while `EMAIL_PROVIDER=dev`. |
 | `RESEND_API_KEY`, `SENDGRID_API_KEY` | server-only | Only needed once a real email provider is enabled (deferred). |
@@ -74,7 +75,7 @@ unconfigured) shows a "setup required" state — nothing breaks.
 
 CI ([`../.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs with
 **no production secrets by design**: typecheck, lint, tests, and the production
-build all execute in the same "Supabase/Stripe unconfigured" mode as a fresh
+build all execute in the same "Supabase unconfigured" mode as a fresh
 local checkout. Never add production secrets to CI.
 
 Locally, copy `.env.example` to `.env.local` (gitignored) and fill in dev/test
@@ -85,7 +86,6 @@ repo — including this page, which is why every example above is a placeholder.
 ## If a value leaks
 
 1. Rotate at the source: Supabase → Project Settings → API (service role /
-   anon), or Stripe → Developers → API keys / Webhooks (roll the key or the
-   endpoint signing secret).
+   anon).
 2. Update the Vercel environment variable (Production scope).
 3. Redeploy so the new value takes effect, and review provider logs for misuse.

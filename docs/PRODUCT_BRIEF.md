@@ -33,11 +33,14 @@ brand-confusion risk).
 6. Employer dashboard + applicant management.
 7. Admin moderation (approve/reject) with safety flags.
 8. Reports/blocking, employer verification.
-9. Stripe-based featured/urgent boosts.
+9. Stripe-based featured/urgent boosts. *(De-scoped from the MVP in Slice 23.)*
 10. Admin analytics/KPIs.
 
 ### Non-goals (MVP)
 
+- Payments and paid job boosts: de-scoped in Slice 23. The `jobs.boost` column,
+  enum, and write-protection triggers remain in the schema, intentionally
+  unused. Revisit post-beta.
 - Native iOS/Android apps (mobile web first).
 - Payroll, background checks, placement success fees.
 - Determining an individual's legal work eligibility (we provide general info and
@@ -62,7 +65,7 @@ and on job detail, application, and employer posting flows.
 
 - **Frontend/Backend:** Next.js App Router + TypeScript + Tailwind (Server Actions / API routes).
 - **DB/Auth/Storage:** Postgres via Supabase (Auth + RLS).
-- **Payments:** Stripe Checkout. **Email:** Resend/SendGrid. **SMS (Phase 2):** Twilio.
+- **Payments:** none in the MVP (de-scoped in Slice 23). **Email:** Resend/SendGrid. **SMS (Phase 2):** Twilio.
 - **Deploy:** Vercel + Supabase. **Analytics:** PostHog/Plausible or DB aggregation first.
 
 ## Roles
@@ -86,7 +89,7 @@ client-only) and Supabase RLS.
 | 9 | Admin moderation | Approve/reject; flagged keywords reach review queue. |
 | 10 | Application status workflow | Employers update owned application status; seekers see status. |
 | 11 | Verification trust and report queue | Verified badges; signed-in job reports; admin report queue. |
-| 12 | Payments & boosts | Stripe checkout activates boost via webhook. |
+| 12 | Payments & boosts | Stripe checkout activates boost via webhook. *(Removed in Slice 23.)* |
 | 13 | Analytics | Admin KPI dashboard. |
 | 14 | Compliance polish | Disclaimers, posting acknowledgement, risky-language validation, admin flags. |
 | 15 | Launch hardening | QA, a11y, SEO, deploy checklist. |
@@ -187,34 +190,26 @@ client-only) and Supabase RLS.
     are used.
   - Blocking/sanctions, email alerts, and full trust-and-safety case management
     remain deferred.
-- **Slice 12 — Payments and Boosts:** scoped implementation done.
-  - Employers can open `/employer/jobs/[id]/boost` from their owned job list and
-    choose `featured` or `urgent` visibility boosts.
-  - Checkout session creation is server-side only, re-checks ownership, requires
-    configured Stripe price IDs, and records job/company/user/boost metadata
-    without directly changing `jobs.boost`.
-  - Stripe webhook handling lives at `/api/stripe/webhook`, verifies the Stripe
-    signature before parsing trusted metadata, and activates boosts only after a
-    paid `checkout.session.completed` event.
-  - Public cards/details show boost badges for boosted approved jobs only;
-    pending, draft, rejected, paused, or expired jobs remain non-public.
-  - Supabase- or Stripe-unconfigured environments show unavailable states. No
-    refunds, subscriptions, coupons, invoices, payouts, billing portal, taxes,
-    or payment analytics are implemented.
+- **Slice 12 — Payments and Boosts:** implemented, then **removed in Slice 23**.
+  - Originally shipped Stripe Checkout for `featured`/`urgent` boosts (boost
+    page, server-side checkout creation, signature-verified webhook at
+    `/api/stripe/webhook`, boost badges on public cards/details).
+  - Payments and paid boosts were de-scoped from the MVP in Slice 23; the
+    `jobs.boost` column, enum, and write-protection triggers remain in the
+    schema, intentionally unused. Revisit post-beta.
 - **Slice 13 — Admin Analytics and KPI Dashboard:** scoped implementation done.
   - Admins can open `/admin/analytics` from `/admin` to review aggregate
-    marketplace KPIs for jobs, applications, companies, reports, messages, and
-    boost usage.
+    marketplace KPIs for jobs, applications, companies, reports, and messages.
   - Reads use the caller-authenticated Supabase session with existing admin RLS
     and expose counts only, not message bodies, applicant details, application
     notes, report details, or thread content.
-  - Job status, application status, report status, recent activity, company
-    verification, and featured/urgent boost counts are included.
-  - External analytics providers, chart libraries, CSV export, cohort
-    retention, payment revenue tracking, and billing history remain deferred.
+  - Job status, application status, report status, recent activity, and company
+    verification counts are included (boost counts were removed in Slice 23).
+  - External analytics providers, chart libraries, CSV export, and cohort
+    retention remain deferred.
 - **Slice 14 — Compliance Polish:** scoped implementation done.
   - Shared informational disclaimers now cover work authorization, wage/tax
-    classification, employer-provided job details, reports, boosts, and company
+    classification, employer-provided job details, reports, and company
     verification without presenting legal advice or legal determinations.
   - Employer job posting requires a compliance acknowledgement before server-side
     submission; the acknowledgement is validated but not stored.
@@ -265,3 +260,12 @@ client-only) and Supabase RLS.
     empty state is expected. No audit-write behavior was added.
   - No schema/RLS changes, no service-role reads, and payments, auth
     providers, and public job visibility are unchanged.
+- **Slice 23 — De-scope payments:** done.
+  - Removed all Stripe/payment/boost functionality from the MVP: the boost
+    page and checkout Server Action, the `/api/stripe/webhook` route, the
+    payments helpers, Stripe env vars, the `stripe` health check, boost badges
+    and CTAs, and boost analytics.
+  - No schema change: the `jobs.boost` column, `boost_type` enum, boost-is-null
+    insert policy, and `prevent_job_boost_change` trigger remain, intentionally
+    unused. Public job visibility, auth, RLS, admin moderation, reports, and
+    employer access behavior are unchanged.

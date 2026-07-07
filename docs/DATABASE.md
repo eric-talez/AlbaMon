@@ -21,8 +21,10 @@ Without the CLI, run every file in `migrations/` in filename order, then run
 ## Enums
 
 `user_role`, `job_type`, `pay_unit`, `language_requirement`, `job_category`,
-`moderation_status`, `boost_type` — values match the const arrays in
-`src/lib/types.ts` exactly.
+`moderation_status` — values match the const arrays in `src/lib/types.ts`
+exactly. `boost_type` (`featured`, `urgent`) remains in SQL but has no app
+constant since Slice 23 de-scoped paid boosts; `tests/db-schema.test.ts` pins
+its values.
 
 ## Tables
 
@@ -131,13 +133,12 @@ unverified and employer job inserts to remain unboosted. Pinned-search-path
 triggers prevent normal users changing `is_verified` or `boost`, while allowing
 admin, service-role, and trusted migration/database execution.
 
-Slice 12 uses the existing nullable `jobs.boost` field for paid visibility
-boosts. User-facing checkout creation uses the caller-authenticated Supabase
-session only to verify job/company ownership and never changes `jobs.boost`.
-The Stripe webhook verifies `STRIPE_WEBHOOK_SECRET` before using the service-role
-client to set the intended job's boost by both `job_id` and `company_id`.
-No payments table, subscription schema, refund tooling, or billing portal schema
-is introduced in this slice.
+Payments and paid boosts were de-scoped from the MVP in Slice 23; the
+`jobs.boost` column, enum, and write-protection triggers remain in the schema,
+intentionally unused (no app code selects or displays the column; employer
+inserts still set it to an explicit `null` to match the insert policy). No
+payments table, subscription schema, refund tooling, or billing portal schema
+exists.
 
 Admin moderation uses the same cookie-authenticated client through
 `src/lib/db/admin-moderation.ts`. Existing admin RLS permits the required reads
@@ -196,8 +197,9 @@ of this review.
   production email or persist notification preferences.
 - Report review is a queue-status workflow only; blocking, sanctions, email
   alerts, and full trust-and-safety case management are deferred.
-- Boost payment records, refunds, subscriptions, invoices, billing portal,
-  coupons, payouts, taxes, and payment analytics are deferred.
+- Payments and paid boosts were de-scoped from the MVP in Slice 23; the
+  `jobs.boost` column, enum, and write-protection triggers remain in the
+  schema, intentionally unused. Revisit post-beta.
 - Application dashboard reads are unavailable rather than mocked when Supabase
   is not configured.
 - Seed uses fixed UUIDs and inserts into `auth.users`; intended for local/demo

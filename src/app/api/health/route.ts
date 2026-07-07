@@ -7,7 +7,7 @@ export const runtime = "nodejs";
  * Public-safe liveness + configuration-presence endpoint for uptime checks.
  *
  * Always answers 200 with statuses only (never env values or secrets), never
- * touches Supabase/Stripe/network, and requires no auth. Semantics and the
+ * touches Supabase/network, and requires no auth. Semantics and the
  * operator playbook live in docs/OPERATIONAL_HEALTH.md.
  */
 export async function GET(): Promise<NextResponse> {

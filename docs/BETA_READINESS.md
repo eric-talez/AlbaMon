@@ -31,9 +31,9 @@ Hard gates this runbook enforces:
   users, companies, jobs, applications, messages, or reports** (§6).
 - `draft`, `pending`, `rejected`, `paused`, and `expired` jobs must never be
   publicly visible — only `approved` jobs are (§9).
-- Service-role usage stays restricted to trusted server/webhook flows — in
-  this app, exactly one: the signature-verified Stripe webhook (§3).
-- The Stripe webhook must be verified before accepting real boost payments (§8).
+- Service-role usage stays restricted to trusted server flows — since Slice 23
+  de-scoped payments, **no app code path uses the service-role client** (§3).
+- Payments and paid boosts are out of the MVP (de-scoped in Slice 23; §8).
 - Browser E2E automation remains **deferred** (§15); the role smoke tests
   below are the manual compensation.
 
@@ -46,8 +46,8 @@ Hard gates this runbook enforces:
 - [ ] Local Supabase rehearsal completed per [`LOCAL_SUPABASE.md`](LOCAL_SUPABASE.md):
       migrations + seed applied, auth mode and guard behavior smoked, and the
       admin-promotion SQL practiced against a disposable local stack.
-- [ ] Access on hand: Vercel project, Supabase dashboard + SQL editor, Stripe
-      dashboard, and the production URL.
+- [ ] Access on hand: Vercel project, Supabase dashboard + SQL editor, and the
+      production URL.
 - [ ] Two disposable, team-owned test inboxes (employer + seeker accounts for
       §10–§13), clearly identifiable so their data can be attributed in §6.
 - [ ] A named owner for the go/no-go call (§16) and for post-launch log checks
@@ -64,13 +64,13 @@ per-variable reference) using the Vercel procedure in
 - [ ] No value still contains a placeholder fragment (`your-project`,
       `your-anon-key`, `example`, `xxx`, `placeholder`) — the app treats those
       as unconfigured.
-- [ ] No secret has a `NEXT_PUBLIC_` name. Service-role and Stripe secrets are
-      server-only, and service-role usage remains restricted to the verified
-      Stripe webhook flow only.
+- [ ] No secret has a `NEXT_PUBLIC_` name. The service-role key is server-only,
+      and no app code path uses the service-role client (its presence is only
+      reported by `/api/health`).
 - [ ] Redeployed after the last env change (edits do not apply to the running
       deployment).
 - [ ] `GET /api/health` on the production URL returns 200 with
-      `siteUrl`/`supabase`/`stripe` = `configured` and `email`/`analytics` =
+      `siteUrl`/`supabase` = `configured` and `email`/`analytics` =
       `deferred` (statuses reference:
       [`OPERATIONAL_HEALTH.md §2`](OPERATIONAL_HEALTH.md#2-get-apihealth-reference)).
       Any `missing`/`partial` = this section is not done.
@@ -183,38 +183,16 @@ after approval through the normal employer flow.
        and approving it lets that account open `/employer` (re-login not
        required — role is read per request).
 
-## 8. Stripe test/live mode verification
+## 8. Payments (de-scoped in Slice 23)
 
-Setup steps live in [`DEPLOYMENT.md §3`](DEPLOYMENT.md#3-stripe); sign off in
-[`LAUNCH_CHECKLIST.md §5`](LAUNCH_CHECKLIST.md#5-stripe-test--live).
+Payments and paid boosts were de-scoped from the MVP in Slice 23; the
+`jobs.boost` column, enum, and write-protection triggers remain in the schema,
+intentionally unused. Revisit post-beta.
 
-How to tell which mode production is in:
-
-- Key prefixes **as configured in Vercel** (not your local shell): `sk_test_`
-  / `pk_test_` = test mode; `sk_live_` / `pk_live_` = live mode.
-- The Stripe dashboard "Test mode" toggle, and which endpoint list the webhook
-  is registered under — test and live endpoints are separate, each with its
-  own `whsec_...` signing secret.
-
-- [ ] **Test mode first** (Preview env or pre-launch Production): boost
-      checkout → Stripe test card → `checkout.session.completed` delivered →
-      boost badge visible on the job.
-- [ ] Bad-signature request is rejected with a 4xx (covered continuously by
-      `tests/stripe-webhook.test.ts`; spot-check the live endpoint's delivery
-      log for signature failures).
-- [ ] **Going live:** live products/prices created; live price IDs and keys
-      only in Production scope; live webhook endpoint registered for
-      `checkout.session.completed` at
-      `https://<your-domain>/api/stripe/webhook`.
-
-**Hard gate: do not accept or announce real boost payments until a live
-webhook delivery has returned 200** (Stripe Dashboard → Developers → Webhooks
-→ endpoint → deliveries). The launch checklist's one low-value live charge +
-refund is the closing verification.
-
-The beta may start with boosts unannounced (test keys still configured). In
-that case mark the Stripe row in §16 as its conditional form: it blocks
-enabling paid boosts, not the beta itself.
+There is nothing to verify here: no Stripe account, keys, webhook endpoint, or
+test/live-mode transition exists in this build. This numbered section is kept
+as a stub so the runbook's section numbering (asserted by `npm run verify:beta`)
+and cross-references stay stable.
 
 ## 9. Public smoke test
 
@@ -292,9 +270,6 @@ Run after §12 has created a pending job.
 - [ ] After §11 approves it: publicly visible on `/jobs`.
 - [ ] After §13 applies: the application is visible on the employer side, and
       replying in the messaging thread works.
-- [ ] The boost page loads and redirects to Stripe checkout (test mode). The
-      only live-mode purchase is §8's controlled one-off — do not repeat it
-      here.
 
 ## 13. Seeker smoke test
 
@@ -339,8 +314,8 @@ Accepted for the private beta — details in the
   legal, tax, immigration, or employment advice.
 - Email delivery is a dev stub (`EMAIL_PROVIDER=dev`) — no real email/SMS is
   sent.
-- No error-tracking or analytics provider — the beta runs on Vercel, Supabase,
-  and Stripe platform logs, plus the public `GET /api/health` config/liveness
+- No error-tracking or analytics provider — the beta runs on Vercel and
+  Supabase platform logs, plus the public `GET /api/health` config/liveness
   endpoint. Log triage and the incident process live in
   [`OPERATIONAL_HEALTH.md`](OPERATIONAL_HEALTH.md).
 - **Browser E2E automation is deferred** (no Playwright/Cypress unless a later
@@ -371,12 +346,10 @@ the sign-off of record; this one is the execution summary feeding it.
 | Public visibility invariant (approved-only) proven | §9 | ☐ | Hard |
 | Role guards hold for all roles | §10–§13 | ☐ | Hard |
 | Mobile/desktop QA passed | §14 | ☐ | Hard |
-| Live Stripe webhook delivery returned 200 | §8 | ☐ | Conditional — blocks enabling paid boosts, not the beta |
 | Attorney review of legal copy | §15 | ☐ | Conditional — accepted-pending for private beta; hard blocker for public launch |
 
 Any unchecked **Hard** row = **no-go**. Conditional rows must either pass or
-be explicitly accepted (name + date) with their scope limitation enforced —
-e.g. paid boosts stay off until the live webhook is verified.
+be explicitly accepted (name + date) with their scope limitation enforced.
 
 ## 17. Social & phone auth verification
 
@@ -384,8 +357,8 @@ Run per enabled method, after its Supabase dashboard setup
 ([`AUTH_PROVIDERS.md`](AUTH_PROVIDERS.md)) and flag flip. Methods left with
 their default-`false` flags need no verification — they render as
 "setup required" and this section is N/A for them. Not a launch blocker:
-Conditional in the same sense as Stripe (§16) — an unverified method's flag
-simply stays `false`.
+Conditional in the §16 sense — an unverified method's flag simply stays
+`false`.
 
 1. **UI state sanity**: `/login` and `/signup` show enabled buttons only for
    flipped flags; every other method shows the calm setup-required state.

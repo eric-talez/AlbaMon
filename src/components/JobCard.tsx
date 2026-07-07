@@ -6,7 +6,7 @@ import {
   LANGUAGE_REQUIREMENT_LABELS,
   JOB_CATEGORY_LABELS,
 } from "@/lib/types";
-import { Badge, BoostBadge, VerifiedBadge } from "@/components/Badge";
+import { Badge, VerifiedBadge } from "@/components/Badge";
 
 export function JobCard({ job }: { job: Job }) {
   return (
@@ -15,7 +15,6 @@ export function JobCard({ job }: { job: Job }) {
       className="group block rounded-xl border border-border bg-background p-4 transition-colors hover:border-brand focus-visible:outline-2 focus-visible:outline-brand"
     >
       <div className="flex flex-wrap items-center gap-1.5">
-        {job.boost && <BoostBadge boost={job.boost} />}
         <Badge tone="neutral">{JOB_TYPE_LABELS[job.jobType]}</Badge>
         <Badge tone="neutral">{JOB_CATEGORY_LABELS[job.category]}</Badge>
       </div>

@@ -3,7 +3,6 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth/guards";
 import { getEmployerJobs } from "@/lib/db/employer-jobs";
 import { MODERATION_STATUS_LABELS } from "@/lib/types";
-import { Badge, BoostBadge } from "@/components/Badge";
 
 export const metadata: Metadata = { title: "내 공고" };
 
@@ -24,10 +23,6 @@ export default async function EmployerJobsPage() {
         <div>
           <p className="text-xs font-medium text-brand">K-Work US 고용주</p>
           <h1 className="mt-1 text-2xl font-bold">내 공고</h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted">
-            Boosts only affect listing visibility and do not imply job quality,
-            safety, legal compliance, endorsement, applicants, or hires.
-          </p>
         </div>
         <Link href="/employer/jobs/new" className="rounded-full bg-brand px-4 py-2 text-sm font-medium text-brand-foreground">새 공고 등록</Link>
       </div>
@@ -61,12 +56,6 @@ export default async function EmployerJobsPage() {
                 </span>
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4 text-sm">
-                {job.boost ? (
-                  <BoostBadge boost={job.boost} />
-                ) : (
-                  <Badge tone="neutral">No boost</Badge>
-                )}
-                <Link href={`/employer/jobs/${encodeURIComponent(job.id)}/boost`} className="font-medium text-brand hover:underline">Boost this job</Link>
                 {job.moderationStatus === "approved" ? (
                   <Link href={`/jobs/${encodeURIComponent(job.id)}`} className="font-medium text-brand hover:underline">공개 공고 보기</Link>
                 ) : (

@@ -9,10 +9,6 @@ const HEALTH_ENV_VARS = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
-  "STRIPE_SECRET_KEY",
-  "STRIPE_WEBHOOK_SECRET",
-  "STRIPE_FEATURED_PRICE_ID",
-  "STRIPE_URGENT_PRICE_ID",
   "EMAIL_PROVIDER",
   "RESEND_API_KEY",
   "SENDGRID_API_KEY",
@@ -28,10 +24,6 @@ const CONFIGURED_ENV: Record<(typeof HEALTH_ENV_VARS)[number], string> = {
   NEXT_PUBLIC_SUPABASE_URL: "https://kwus-health.supabase.co",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key-for-health-tests",
   SUPABASE_SERVICE_ROLE_KEY: "service-role-for-health-tests",
-  STRIPE_SECRET_KEY: "sk_test_health",
-  STRIPE_WEBHOOK_SECRET: "whsec_health",
-  STRIPE_FEATURED_PRICE_ID: "price_featured_health",
-  STRIPE_URGENT_PRICE_ID: "price_urgent_health",
   EMAIL_PROVIDER: "resend",
   RESEND_API_KEY: "re_health",
   SENDGRID_API_KEY: "",
@@ -67,7 +59,6 @@ describe("buildHealthReport envelope", () => {
     expect(report.checks).toEqual({
       siteUrl: "missing",
       supabase: "missing",
-      stripe: "missing",
       email: "deferred",
       analytics: "deferred",
     });
@@ -78,7 +69,6 @@ describe("buildHealthReport envelope", () => {
     expect(buildHealthReport().checks).toEqual({
       siteUrl: "configured",
       supabase: "configured",
-      stripe: "configured",
       email: "configured",
       analytics: "configured",
     });
@@ -89,11 +79,8 @@ describe("buildHealthReport envelope", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://your-project.supabase.co");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "your-anon-key");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "your-service-role-key");
-    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_xxx");
-    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_xxx");
     const { checks } = buildHealthReport();
     expect(checks.supabase).toBe("missing");
-    expect(checks.stripe).toBe("missing");
   });
 });
 
@@ -119,19 +106,6 @@ describe("supabase check", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://kwus-health.supabase.co");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-for-health-tests");
     expect(buildHealthReport().checks.supabase).toBe("partial");
-  });
-});
-
-describe("stripe check", () => {
-  it("is partial until the secret key, webhook secret, and both price ids exist", () => {
-    stubAllUnset();
-    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_health");
-    expect(buildHealthReport().checks.stripe).toBe("partial");
-    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_health");
-    vi.stubEnv("STRIPE_FEATURED_PRICE_ID", "price_featured_health");
-    expect(buildHealthReport().checks.stripe).toBe("partial");
-    vi.stubEnv("STRIPE_URGENT_PRICE_ID", "price_urgent_health");
-    expect(buildHealthReport().checks.stripe).toBe("configured");
   });
 });
 
@@ -182,7 +156,7 @@ describe("public-safety contract", () => {
 
   it("only ever emits the four known statuses", () => {
     stubAllConfigured();
-    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
     vi.stubEnv("EMAIL_PROVIDER", "dev");
     const { checks } = buildHealthReport();
     for (const status of Object.values(checks)) {
@@ -205,7 +179,6 @@ describe("GET /api/health", () => {
       checks: {
         siteUrl: "missing",
         supabase: "missing",
-        stripe: "missing",
         email: "deferred",
         analytics: "deferred",
       },

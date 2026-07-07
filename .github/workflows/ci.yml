@@ -1,6 +1,6 @@
 # CI gate: every pull request and every push to main must pass all steps
 # below before merging/releasing. No secrets are required — typecheck, lint,
-# tests, and `next build` all run in the same "Supabase/Stripe unconfigured"
+# tests, and `next build` all run in the same "Supabase unconfigured"
 # mode as a fresh local checkout (mock/dev fallbacks, no live services).
 name: CI
 

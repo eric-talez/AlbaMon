@@ -13,7 +13,7 @@ community. Mobile-first. Initial market: **LA / Orange County**.
 - **Tailwind CSS v4**
 - **Supabase Auth + Postgres + Row Level Security**
 - **Vitest** for unit tests
-- Stripe Checkout for paid job boosts; planned: Resend/SendGrid
+- Planned: Resend/SendGrid email
 
 ## Local setup
 
@@ -67,7 +67,7 @@ Node 22). One job runs these steps in order, and any failure fails the run:
 
 CI needs **no secrets or environment variables**: like a fresh checkout, it
 runs in the unconfigured dev/mock mode (see the mock-fallback notes below),
-so the gate never depends on live Supabase or Stripe. To reproduce the
+so the gate never depends on live Supabase. To reproduce the
 whitespace check locally:
 
 ```bash
@@ -192,8 +192,9 @@ of mock or misleading empty application histories.
 
 Employer accounts can create their first company, edit existing owned companies,
 submit a job as `pending`, and review owned-job moderation states. Company
-verification and paid boosts remain trusted-only fields: normal employers cannot
-set either through the UI, Server Actions, or direct RLS-backed writes.
+verification and the retained `jobs.boost` column remain trusted-only fields:
+normal employers cannot set either through the UI, Server Actions, or direct
+RLS-backed writes.
 Supabase-unconfigured environments never simulate persistent company or job data.
 
 > Slice 7 provides the minimum company setup and first pending job submission
@@ -259,32 +260,23 @@ status without exposing applicant, application, message, or broad profile data.
 Blocking/sanctions, email alerts, and full trust-and-safety case management
 remain deferred.
 
-## Payments and boosts (Slice 12)
+## Payments and boosts (Slice 12 — removed in Slice 23)
 
-Employers can open `/employer/jobs/[id]/boost` from the owned job dashboard and
-choose `featured` or `urgent` for a job they own. Checkout creation is
-server-side only, re-checks the authenticated employer/admin ownership path, and
-stores job ID, company ID, boost type, and initiating user ID in Stripe Checkout
-metadata. Creating a Checkout session never updates `jobs.boost`.
+Payments and paid boosts were de-scoped from the MVP in Slice 23; the
+`jobs.boost` column, enum, and write-protection triggers remain in the schema,
+intentionally unused. Revisit post-beta.
 
-Stripe sends payment confirmations to `/api/stripe/webhook`. The webhook verifies
-`STRIPE_WEBHOOK_SECRET` against the raw request body before trusting metadata,
-then uses the service-role Supabase client only to update the intended job boost
-after a paid `checkout.session.completed` event. Duplicate webhook deliveries are
-safe because setting the same boost value is idempotent.
-
-Public job cards and details show boost badges for boosted approved jobs only;
-moderation still controls public visibility. Local/dev environments with
-placeholder Supabase or Stripe variables show unavailable states instead of
-pretending to purchase. Refunds, subscriptions, invoices, coupons, payouts,
-taxes, billing portals, and analytics remain deferred.
+Slice 12 originally added Stripe Checkout for `featured`/`urgent` job boosts
+(boost page, checkout Server Action, and signature-verified webhook). All of
+that code, its Stripe environment variables, and the boost UI were removed in
+Slice 23; no Stripe account is needed to develop, deploy, or launch the MVP.
 
 ## Admin analytics and KPI dashboard (Slice 13)
 
 Admins can open `/admin/analytics` from the admin console to review aggregate
 marketplace health metrics: job moderation status totals, recent job activity,
 application status totals, company verification totals, report status totals,
-message volume, and featured/urgent boost counts.
+and message volume.
 
 Analytics reads use the caller-authenticated Supabase session and existing admin
 RLS. The page displays aggregate counts only; it does not select message bodies,
@@ -298,7 +290,7 @@ retention, payment revenue tracking, or billing history analytics.
 ## Compliance polish (Slice 14)
 
 K-Work US now uses shared informational compliance copy across job detail,
-application, employer posting, report, boost, and verification surfaces.
+application, employer posting, report, and verification surfaces.
 Employers must acknowledge responsibility for accurate job information and
 applicable wage, labor, tax, and work-authorization laws before submitting a new
 job; the server action rejects submissions that omit the acknowledgement.
@@ -311,21 +303,20 @@ moderation computes the same compliance flags for review context and explains
 that a flag is not a legal determination; admins still approve or reject
 manually.
 
-Verification and boosts remain informational. Company review does not guarantee
-job quality, safety, legal compliance, applicants, or hires, and boosts do not
-imply endorsement or higher job quality. This slice is not legal advice and is
-not a legal compliance engine.
+Verification remains informational. Company review does not guarantee job
+quality, safety, legal compliance, applicants, or hires. This slice is not
+legal advice and is not a legal compliance engine.
 
 ## Deployment & launch hardening (Slice 15)
 
 Launch documentation and hardening for the private beta:
 
-- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Vercel + hosted Supabase + Stripe
-  deployment guide (env vars as placeholders, migration order, webhook setup,
-  first-admin promotion, known issues).
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Vercel + hosted Supabase
+  deployment guide (env vars as placeholders, migration order, first-admin
+  promotion, known issues).
 - [`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md) — go/no-go checklist:
-  environment, seed-data verification, admin setup, Stripe test→live, RLS
-  review, QA script (390px/1440px), monitoring, rollback notes.
+  environment, seed-data verification, admin setup, RLS review, QA script
+  (390px/1440px), monitoring, rollback notes.
 
 SEO polish: `metadataBase` + Open Graph identity in the root layout,
 `robots.ts`/`sitemap.ts` (static public pages only; account/auth areas
@@ -366,12 +357,12 @@ observability provider, no product changes:
 - `GET /api/health` — public-safe liveness + configuration-presence endpoint
   for uptime checks. Always 200 JSON with coarse statuses only
   (`configured`/`partial`/`missing`/`deferred`) — never env values or secrets;
-  no Supabase/Stripe/network calls; works unauthenticated and in CI's
+  no Supabase/network calls; works unauthenticated and in CI's
   unconfigured mode (`src/app/api/health/route.ts` → `src/lib/ops/health.ts`,
   contract asserted by `tests/health.test.ts`).
 - [`docs/OPERATIONAL_HEALTH.md`](docs/OPERATIONAL_HEALTH.md) — operator
   runbook: health-endpoint reference, uptime monitoring, the fail-closed
-  behavior map, log triage by symptom (Vercel/Supabase/Stripe), and the
+  behavior map, log triage by symptom (Vercel/Supabase), and the
   private-beta incident response process.
 
 ## Social & phone auth foundation (Slice 19)

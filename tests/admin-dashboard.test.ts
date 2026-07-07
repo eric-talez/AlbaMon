@@ -64,7 +64,6 @@ function healthReport(): HealthReport {
     checks: {
       siteUrl: "configured",
       supabase: "configured",
-      stripe: "partial",
       email: "deferred",
       analytics: "deferred",
     },
