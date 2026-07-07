@@ -170,6 +170,19 @@ is blocked by a DB trigger + RLS — the SQL editor is the only supported path.
 Pass: the query returns exactly the 1–2 intended accounts (beta keeps admin to
 1–2 people), and steps 3–4 behaved as described.
 
+**Employer role (Slice 21):** unlike the admin role, employers no longer need
+SQL. Real users always sign up as `seeker`; a seeker requests employer access
+at `/employer/request-access`, and an admin approves or rejects it at
+`/admin/employer-requests`. Approval flips `profiles.role` to `employer`
+(rejection changes nothing), users cannot self-promote, and approval is not a
+business/legal/work-authorization verification. Company creation still happens
+after approval through the normal employer flow.
+
+6. [ ] After the founding admin exists: a fresh seeker account can submit an
+       employer access request, the admin sees it on `/admin/employer-requests`,
+       and approving it lets that account open `/employer` (re-login not
+       required — role is read per request).
+
 ## 8. Stripe test/live mode verification
 
 Setup steps live in [`DEPLOYMENT.md §3`](DEPLOYMENT.md#3-stripe); sign off in
@@ -325,7 +338,10 @@ Accepted for the private beta — details in the
   slice adds it); automated coverage is Vitest unit + server-render smoke
   tests, and §§9–14 are the manual compensation.
 - Admin promotion is manual SQL (§7); there is deliberately no self-serve
-  path.
+  path to the admin role. The employer role is granted through the Slice 21
+  request flow (`/employer/request-access` → admin review at
+  `/admin/employer-requests`) — a self-serve *request*, never a self-serve
+  *promotion*.
 - No per-job sitemap URLs and no Open Graph preview image.
 
 ## 16. Go / no-go decision table

@@ -11,6 +11,7 @@
  */
 import type {
   BoostType,
+  EmployerAccessRequestStatus,
   JobCategory,
   JobType,
   LanguageRequirement,
@@ -23,6 +24,7 @@ import type {
 
 export type {
   BoostType,
+  EmployerAccessRequestStatus,
   JobCategory,
   JobType,
   LanguageRequirement,
@@ -181,6 +183,23 @@ export interface ReportRow {
   reason: ReportReason;
   details: string | null;
   status: ReportStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmployerAccessRequestRow {
+  id: string;
+  requester_id: string;
+  business_name: string;
+  contact_name: string;
+  phone: string | null;
+  website: string | null;
+  city: string;
+  state: string;
+  reason: string | null;
+  status: EmployerAccessRequestStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
   created_at: string;
   updated_at: string;
 }

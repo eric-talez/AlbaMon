@@ -23,6 +23,17 @@ export default async function ForbiddenPage() {
           ? `현재 ${ROLE_LABELS[user.role]} 권한으로는 이 페이지를 볼 수 없습니다. 권한이 있는 페이지로 이동해 주세요.`
           : "로그인이 필요합니다."}
       </p>
+      {user?.role === "seeker" ? (
+        <p className="mt-3 max-w-md text-sm leading-6 text-muted">
+          고용주 기능이 필요하신가요?{" "}
+          <Link
+            href="/employer/request-access"
+            className="font-medium text-brand hover:underline"
+          >
+            고용주 권한 요청 / Request employer access
+          </Link>
+        </p>
+      ) : null}
       <div className="mt-8 flex gap-3">
         <Link
           href={user ? roleHome(user.role) : "/login"}

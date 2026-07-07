@@ -209,7 +209,11 @@ reading the local database, not mocks. Undo with `supabase db reset`.
 now backed by a real (absent) Supabase session instead of the dev cookie.
 
 **With a session (Appendix A):** new sign-ins get a `profiles` row with role
-`seeker`. Promote your test user to employer in Studio → SQL editor:
+`seeker`. Since Slice 21 the product path to the employer role is the request
+flow — the seeker submits `/employer/request-access` and an admin (§12)
+approves it at `/admin/employer-requests`, which is also the better rehearsal
+once you have an admin account. For a quick local shortcut you can still
+promote your test user in Studio → SQL editor:
 
 ```sql
 -- find your user id first:

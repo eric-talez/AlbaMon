@@ -34,6 +34,7 @@ Without the CLI, run every file in `migrations/` in filename order, then run
 | `applications` | Seeker applications. | `unique(job_id, seeker_id)` blocks duplicates; optional `cover_note` is limited to 1,000 characters; `status` is constrained to the Slice 10 workflow values. |
 | `messages` | Application-centered seeker/employer conversations. | `application_id → applications`; body is nonblank and limited to 2,000 characters. |
 | `reports` | Abuse/quality reports. | Job reports filed by signed-in users; reason/status/details are constrained by Slice 11. |
+| `employer_access_requests` | Seeker requests for the employer role (Slice 21). | `requester_id → profiles`; status is `pending`/`approved`/`rejected`; a partial unique index allows **one pending request per requester**; decided rows carry `reviewed_by`/`reviewed_at`. |
 | `audit_logs` | Append-only audit trail. | No `updated_at`; writes via service-role only. |
 
 `public_job_listings` is a read-only, approved-only view used by public job
@@ -59,10 +60,17 @@ policy, preventing recursion) with a pinned `search_path`:
   trigger; hard-blocks any role change by a non-admin (defense in depth beyond
   the RLS `WITH CHECK`). Admins may still change roles, and trusted server-side
   flows (service role / migrations / seed, where `auth.uid()` is null) pass through.
+- `review_employer_access_request(request_id uuid, decision text)` → Slice 21
+  admin-only `security definer` function (empty pinned `search_path`, execute
+  revoked from `anon`). Raises unless the caller's runtime role is `admin`;
+  approves/rejects a **pending** request, stamps `reviewed_by`/`reviewed_at`,
+  and on approval promotes the requester's `profiles.role` from `seeker` to
+  `employer` in the same transaction. Rejection never changes any role, and an
+  already-decided request returns `conflict`.
 
 ## Row Level Security summary
 
-RLS is enabled on **all seven tables** and is the authorization gate.
+RLS is enabled on **all eight tables** and is the authorization gate.
 
 | Table | Read | Write |
 | --- | --- | --- |
@@ -72,6 +80,7 @@ RLS is enabled on **all seven tables** and is the authorization gate.
 | `applications` | own (seeker); current-role employer for owned jobs; admin | insert only by a **`seeker`-role profile**, as self, for `approved` jobs with initial status `submitted`; current-role owning employers may update status only; admin update |
 | `messages` | applicant; current-role owning employer; admin | applicant/owning employer insert only as `auth.uid()`; no update/delete |
 | `reports` | own (reporter); admin | authenticated reporter insert for approved jobs only; admin status update |
+| `employer_access_requests` | own (requester); admin all | requester insert only as self while runtime role is **`seeker`**, initial `pending` state with empty review fields; **no update/delete policy** — decisions go only through `review_employer_access_request()` |
 | `audit_logs` | admin only | **no policy** — service-role only |
 
 ## App access layer
@@ -159,6 +168,24 @@ Admin report queue reads use existing admin RLS and narrow follow-up reads for
 job title/status, company name, and reporter display name/email only. Admin
 actions update only open report status to `reviewed` or `dismissed`; they do not
 reject jobs, suspend accounts, send email, or expand audit logs.
+
+Employer access requests (Slice 21) use
+[`src/lib/db/employer-access-requests.ts`](../src/lib/db/employer-access-requests.ts).
+Real auth users start as `seeker`; the employer role is granted only through
+admin approval of a request filed at `/employer/request-access`. The
+user-facing flow runs entirely through the caller-authenticated Supabase
+session — no service-role client and no mock persistent writes; unconfigured
+environments show a setup-required state. Inserts rely on the seeker-only
+self-insert RLS policy, and duplicate open requests surface as
+`duplicate_pending` via the partial unique index. Admin review at
+`/admin/employer-requests` calls the `review_employer_access_request()` RPC,
+so approval (request status + `profiles.role` promotion to `employer`) is
+atomic, rejection changes no role, and requesters can never approve
+themselves. Approval does **not** create a company: the new employer still
+registers company details and submits jobs through the existing flow, and
+public job visibility remains approved-only. K-Work US does not verify or
+guarantee business registration, legal status, or work authorization as part
+of this review.
 
 ## Known limitations
 

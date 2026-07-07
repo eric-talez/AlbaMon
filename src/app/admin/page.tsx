@@ -2,12 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/guards";
 import { getAdminModerationCounts } from "@/lib/db/admin-moderation";
+import { getPendingEmployerAccessRequestCount } from "@/lib/db/employer-access-requests";
 
 export const metadata: Metadata = { title: "Admin console / 관리자 콘솔" };
 
 export default async function AdminHomePage() {
   await requireRole("admin", "/admin");
-  const result = await getAdminModerationCounts();
+  const [result, employerRequests] = await Promise.all([
+    getAdminModerationCounts(),
+    getPendingEmployerAccessRequestCount(),
+  ]);
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
@@ -54,6 +58,16 @@ export default async function AdminHomePage() {
             <p className="text-sm text-muted">Open reports / 열린 신고</p>
             <p className="mt-2 text-3xl font-bold">{result.counts.openReports}</p>
             <p className="mt-3 text-sm font-medium text-brand">Review reports</p>
+          </Link>
+          <Link
+            href="/admin/employer-requests"
+            className="rounded-xl border border-border bg-surface p-5 transition-colors hover:bg-brand-soft"
+          >
+            <p className="text-sm text-muted">Employer requests / 고용주 권한 요청</p>
+            <p className="mt-2 text-3xl font-bold">
+              {employerRequests.status === "ok" ? employerRequests.count : "—"}
+            </p>
+            <p className="mt-3 text-sm font-medium text-brand">Review requests</p>
           </Link>
           <Link
             href="/admin/analytics"
