@@ -264,6 +264,10 @@ then finish §11's report-queue step.
 Run after §12 has created a pending job.
 
 - [ ] Sign in as the §7 admin; `/admin` loads.
+- [ ] The dashboard shows the four live queue cards — pending jobs,
+      unverified companies, open reports, employer access requests — with
+      counts matching the test data, plus admin navigation to every tool and
+      an operational-health card linking `/api/health`.
 - [ ] The pending job from §12 appears in the moderation queue with its
       compliance review flags.
 - [ ] Approve it → the job appears on public `/jobs`.
@@ -272,6 +276,11 @@ Run after §12 has created a pending job.
       review and dismiss both work.
 - [ ] `/admin/analytics` renders KPI counts consistent with the test data
       created so far.
+
+> Rehearsing with placeholder Supabase values shows the "Admin setup
+> required" panel instead of live counts — dev-auth admin previews the UI
+> only. Wire a real Supabase per [`LOCAL_SUPABASE.md`](LOCAL_SUPABASE.md)
+> for live queue data.
 
 ## 12. Employer smoke test
 
