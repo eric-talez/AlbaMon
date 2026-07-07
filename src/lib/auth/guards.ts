@@ -34,6 +34,23 @@ export async function requireArea(area: Area, next?: string): Promise<AuthUser> 
   return user as AuthUser;
 }
 
+/**
+ * Employer-area entry with a recovery path (Slice 21): signed-out users go to
+ * /login as before, but seekers are routed to the employer access request
+ * flow instead of a dead-end /forbidden. Employers and admins pass through
+ * unchanged. Any other forbidden state still lands on /forbidden.
+ */
+export async function requireEmployerAreaAccess(next?: string): Promise<AuthUser> {
+  const user = await getCurrentUser();
+  const result = evaluateAccess(user?.role ?? null, "employer");
+
+  if (result === "unauthenticated") redirect(loginUrl(next));
+  if (result === "forbidden") {
+    redirect(user?.role === "seeker" ? "/employer/request-access" : "/forbidden");
+  }
+  return user as AuthUser;
+}
+
 /** Require one exact runtime DB role; hierarchy access does not apply. */
 export async function requireRole(
   role: Role,

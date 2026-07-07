@@ -16,6 +16,7 @@ supabase/
     20260626000000_application_messages.sql # participant-bound message threads
     20260627000000_application_status_workflow.sql # owned employer status updates
     20260628000000_report_queue_hardening.sql # report reason/status constraints + RLS
+    20260706000000_employer_access_requests.sql # seeker→employer request queue + admin review RPC
   seed.sql                            # LA/OC demo companies + jobs
 ```
 
@@ -106,6 +107,19 @@ the verified Stripe webhook uses the service-role key after signature validation
 to set the intended job's boost by both job ID and company ID. There is no
 payments table, refund schema, subscription schema, billing portal, or analytics
 schema in this slice.
+
+Slice 21 adds `employer_access_requests`, the self-service path from `seeker`
+to `employer`. Real auth users always start as `seeker`; a signed-in seeker
+files a request (one open request at a time via a partial unique index), and
+only an admin can decide it. The table has insert/select policies but **no
+update or delete policy** — approval and rejection go exclusively through the
+admin-only `review_employer_access_request()` `security definer` function,
+which stamps `reviewed_by`/`reviewed_at` and, on approval, promotes
+`profiles.role` to `employer` in the same transaction. Rejection changes no
+role, users cannot self-promote, and the user-facing flow never uses the
+service-role key. Approval does not create a company; company registration and
+job submission still follow the existing employer flow, and admin review is
+not a business/legal/work-authorization verification.
 
 ## What the seed contains
 

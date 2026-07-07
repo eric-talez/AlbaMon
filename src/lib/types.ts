@@ -85,6 +85,14 @@ export type ReportReason = (typeof REPORT_REASONS)[number];
 export const REPORT_STATUSES = ["open", "reviewed", "dismissed"] as const;
 export type ReportStatus = (typeof REPORT_STATUSES)[number];
 
+export const EMPLOYER_ACCESS_REQUEST_STATUSES = [
+  "pending",
+  "approved",
+  "rejected",
+] as const;
+export type EmployerAccessRequestStatus =
+  (typeof EMPLOYER_ACCESS_REQUEST_STATUSES)[number];
+
 export type AddressDisplayMode = "full" | "city_only";
 
 export interface Job {
@@ -185,6 +193,15 @@ export const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
   open: "검토 대기 (Open)",
   reviewed: "검토 완료 (Reviewed)",
   dismissed: "기각 (Dismissed)",
+};
+
+export const EMPLOYER_ACCESS_REQUEST_STATUS_LABELS: Record<
+  EmployerAccessRequestStatus,
+  string
+> = {
+  pending: "검토 대기 (Pending)",
+  approved: "승인됨 (Approved)",
+  rejected: "반려됨 (Rejected)",
 };
 
 /** Format a pay range, e.g. "시급 $18–22" or "연봉 $55,000–65,000". */

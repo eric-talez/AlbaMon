@@ -226,3 +226,24 @@ client-only) and Supabase RLS.
     auto-reject jobs.
   - No schema, RLS, service-role, legal review, E-Verify, tax/payroll, sanctions,
     email delivery, or automated enforcement workflow is added.
+- **Slice 21 — Employer access requests:** scoped implementation done.
+  - Real auth users always start as `seeker`. A signed-in seeker requests
+    employer access at `/employer/request-access` (business/contact/location
+    details plus an optional reason); signed-out visitors are redirected to
+    `/login?next=/employer/request-access`.
+  - Employer-area entry routes seekers to the request flow instead of a
+    dead-end forbidden page; employers and admins are unaffected, and
+    employer/admin accounts see an "already has employer access" state instead
+    of the form.
+  - Admins review the queue at `/admin/employer-requests` (pending first,
+    newest first, with a pending count on `/admin`). Approval promotes the
+    requester to `employer` atomically through an admin-only SECURITY DEFINER
+    function; rejection records the decision without changing any role. Users
+    cannot self-promote, and one pending request is allowed per account.
+  - The form and status pages state that admin review is required before
+    posting jobs, that approval is not guaranteed, and that K-Work US does not
+    verify or guarantee business registration, legal status, or work
+    authorization.
+  - Approval does not create a company; company registration, job submission,
+    approved-only public visibility, payments, and auth providers are
+    unchanged. The user-facing flow never uses the service-role client.

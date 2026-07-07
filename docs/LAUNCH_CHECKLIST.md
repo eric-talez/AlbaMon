@@ -78,6 +78,17 @@ a DB trigger + RLS).
       gets `/forbidden`
 - [ ] Documented who holds admin (beta: keep it to 1–2 people)
 
+**Employer access (Slice 21):** employers need no SQL. New users start as
+`seeker` and request employer access at `/employer/request-access`; the admin
+approves or rejects at `/admin/employer-requests`. Approval switches the
+profile role to `employer` (company creation still happens afterwards through
+the employer flow); rejection changes nothing; self-promotion stays blocked.
+Approval is an operational gate only — it is not business, legal, or
+work-authorization verification.
+
+- [ ] Verified: a seeker's request appears in `/admin/employer-requests`, and
+      approving it opens `/employer` for that account
+
 ## 5. Stripe (test → live)
 
 - [ ] Test-mode end-to-end pass: boost checkout → Stripe test payment →

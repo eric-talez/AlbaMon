@@ -42,15 +42,26 @@ export default async function DashboardPage() {
             </p>
           </Link>
         ) : (
-          <Link
-            href="/dashboard/applications"
-            className="rounded-xl border border-border p-5 transition-colors hover:bg-surface"
-          >
-            <h2 className="font-semibold">내 지원 현황</h2>
-            <p className="mt-1 text-sm text-muted">
-              제출한 지원서와 현재 상태를 확인합니다.
-            </p>
-          </Link>
+          <>
+            <Link
+              href="/dashboard/applications"
+              className="rounded-xl border border-border p-5 transition-colors hover:bg-surface"
+            >
+              <h2 className="font-semibold">내 지원 현황</h2>
+              <p className="mt-1 text-sm text-muted">
+                제출한 지원서와 현재 상태를 확인합니다.
+              </p>
+            </Link>
+            <Link
+              href="/employer/request-access"
+              className="rounded-xl border border-border p-5 transition-colors hover:bg-surface"
+            >
+              <h2 className="font-semibold">고용주 권한 요청 / Request employer access</h2>
+              <p className="mt-1 text-sm text-muted">
+                업체를 운영 중이신가요? 관리자 검토 후 공고를 등록할 수 있습니다.
+              </p>
+            </Link>
+          </>
         )}
       </div>
     </main>
