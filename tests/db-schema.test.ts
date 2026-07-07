@@ -283,6 +283,82 @@ describe("no unsafe RLS patterns", () => {
   });
 });
 
+describe("explicit table grants for API roles", () => {
+  // Supabase no longer grants implicit table privileges to anon/authenticated/
+  // service_role on new projects, so every table must carry explicit grants or
+  // real sign-ins fail closed at the profiles.role lookup (42501).
+  const sql = migrationSql();
+
+  function grantsFor(table: string, grantee: string): string[] {
+    return [
+      ...sql.matchAll(
+        new RegExp(
+          `grant\\s+([a-z,\\s]+?)\\s+on\\s+(?:table\\s+)?public\\.${table}\\s+to\\s+([a-z_,\\s]+);`,
+          "gi",
+        ),
+      ),
+    ]
+      .filter((m) =>
+        m[2].split(",").map((r) => r.trim().toLowerCase()).includes(grantee),
+      )
+      .flatMap((m) => m[1].split(",").map((p) => p.trim().toLowerCase()));
+  }
+
+  it("lets authenticated users read and update (never insert/delete) profiles", () => {
+    const privileges = grantsFor("profiles", "authenticated");
+    expect(privileges).toContain("select");
+    expect(privileges).toContain("update");
+    expect(privileges).not.toContain("insert");
+    expect(privileges).not.toContain("delete");
+  });
+
+  it("grants authenticated DML on every RLS-gated app table it must reach", () => {
+    for (const table of ["jobs", "companies", "applications", "reports"]) {
+      const privileges = grantsFor(table, "authenticated");
+      expect(privileges, table).toContain("select");
+      expect(privileges, table).toContain("insert");
+      expect(privileges, table).not.toContain("delete");
+    }
+    expect(grantsFor("employer_access_requests", "authenticated")).toContain("select");
+    expect(grantsFor("audit_logs", "authenticated")).toContain("select");
+  });
+
+  it("keeps anon read-only and off the private tables entirely", () => {
+    for (const table of ["jobs", "companies"]) {
+      const privileges = grantsFor(table, "anon");
+      expect(privileges, table).toEqual(["select"]);
+    }
+    for (const table of [
+      "profiles",
+      "applications",
+      "reports",
+      "employer_access_requests",
+      "audit_logs",
+      "messages",
+    ]) {
+      expect(grantsFor(table, "anon"), table).toEqual([]);
+    }
+  });
+
+  it("restores the service_role DML surface on all app tables", () => {
+    for (const table of [
+      "profiles",
+      "jobs",
+      "companies",
+      "applications",
+      "reports",
+      "employer_access_requests",
+      "audit_logs",
+      "messages",
+    ]) {
+      const privileges = grantsFor(table, "service_role");
+      for (const privilege of ["select", "insert", "update", "delete"]) {
+        expect(privileges, `${table}: ${privilege}`).toContain(privilege);
+      }
+    }
+  });
+});
+
 describe("seed data shape", () => {
   const seed = seedSql();
 
