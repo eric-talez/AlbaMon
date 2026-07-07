@@ -97,7 +97,7 @@ Migrations are verified separately in §5.
 
 ## 5. Migration verification
 
-The 8-migration order table lives in
+The 10-migration order table lives in
 [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project). Verify in the
 Supabase SQL editor:
 
@@ -105,21 +105,34 @@ Supabase SQL editor:
 select version from supabase_migrations.schema_migrations order by version;
 ```
 
-Expected: 8 rows, `20260621000000` through `20260628000000`, in order.
+Expected: 10 rows, `20260621000000` through `20260707000000`, in order.
 
 If migrations were applied by pasting files into the SQL editor (no CLI), that
 table may be empty — fall back to object checks; all three must hold:
 
 ```sql
-select count(*) from pg_tables where schemaname = 'public';                  -- 7
-select count(*) from pg_tables where schemaname = 'public' and rowsecurity;  -- 7
+select count(*) from pg_tables where schemaname = 'public';                  -- 8
+select count(*) from pg_tables where schemaname = 'public' and rowsecurity;  -- 8
 select count(*) from pg_views
   where schemaname = 'public' and viewname = 'public_job_listings';          -- 1
 ```
 
 Pass: the version list matches exactly, or all three object checks return the
-expected counts (7 tables, RLS enabled on all 7, approved-only public view
+expected counts (8 tables, RLS enabled on all 8, approved-only public view
 present).
+
+Also probe the explicit API-role grants
+(`20260707000000_explicit_table_grants.sql`) — on current Supabase a schema
+without them mints sign-in sessions that immediately bounce back to `/login`
+(`permission denied for table profiles`, 42501):
+
+```sql
+select has_table_privilege('authenticated', 'public.profiles', 'select');  -- t
+```
+
+Then run the post-migration smoke in
+[`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project) before
+continuing with §9–§13.
 
 ## 6. Seed / demo-data removal verification
 
@@ -340,7 +353,7 @@ the sign-off of record; this one is the execution summary feeding it.
 | CI green + `npm run verify:beta` pass on the release commit | §2 | ☐ | Hard |
 | Required env vars set and valid, no placeholder fragments | §3 | ☐ | Hard |
 | Supabase configured (auth URLs, backups) | §4 | ☐ | Hard |
-| All 8 migrations verified | §5 | ☐ | Hard |
+| All 10 migrations verified (incl. explicit API-role grants) | §5 | ☐ | Hard |
 | Zero seed/demo data (users, companies, jobs, applications, messages, reports) | §6 | ☐ | Hard |
 | Founding admin verified; no unintended admins | §7 | ☐ | Hard |
 | Public visibility invariant (approved-only) proven | §9 | ☐ | Hard |
@@ -359,6 +372,15 @@ their default-`false` flags need no verification — they render as
 "setup required" and this section is N/A for them. Not a launch blocker:
 Conditional in the §16 sense — an unverified method's flag simply stays
 `false`.
+
+**Precondition: §5 passed on this same project** — the schema is deployed
+including the `20260707…` explicit table grants. E2E needs provider
+credentials, the `/auth/callback` redirect allowlist, the app flag, **and**
+the deployed schema (profiles trigger + grants) on the **same** Supabase
+project. A project missing the schema side fails in a characteristic way:
+consent/OTP succeeds and a session is minted, but the app bounces back to
+`/login` — check for `permission denied for table profiles` (42501) before
+suspecting the provider setup.
 
 1. **UI state sanity**: `/login` and `/signup` show enabled buttons only for
    flipped flags; every other method shows the calm setup-required state.

@@ -23,6 +23,7 @@ Companion docs:
 2. Link and push migrations from the repo root:
 
    ```bash
+   supabase login
    supabase link --project-ref <your-project-ref>
    supabase db push
    ```
@@ -39,6 +40,8 @@ Companion docs:
    | 6 | `20260626000000_application_messages.sql` | Participant-bound message threads |
    | 7 | `20260627000000_application_status_workflow.sql` | Application status constraint + policies |
    | 8 | `20260628000000_report_queue_hardening.sql` | Report reason/status constraints + RLS |
+   | 9 | `20260706000000_employer_access_requests.sql` | Seeker→employer request queue + admin review RPC |
+   | 10 | `20260707000000_explicit_table_grants.sql` | Explicit least-privilege table grants for the API roles — **required**: without it real sign-ins mint a session but fail closed at the `profiles.role` lookup (42501) and bounce to `/login` ([`DATABASE.md`](DATABASE.md#table-grants-supabase-api-roles)) |
 
    Without the CLI: run each file in the Supabase **SQL editor**, in the same
    order.
@@ -47,7 +50,11 @@ Companion docs:
    demo employers, companies, and jobs with well-known UUIDs and a shared
    password — it exists for local dev and demos only. See the
    [launch checklist](LAUNCH_CHECKLIST.md#3-seed--demo-data) for how to verify
-   none of it is present.
+   none of it is present. Likewise, **never run `supabase db reset` against a
+   hosted/production project** — it drops and recreates the database.
+   `supabase db push` is the only schema command this guide uses against
+   hosted; `db reset` belongs to the disposable local stack
+   ([`LOCAL_SUPABASE.md §14`](LOCAL_SUPABASE.md#14-resetting-the-local-db-safely)).
 
 4. Configure Auth (Dashboard → Authentication → URL Configuration):
    - **Site URL**: `https://<your-domain>`
@@ -61,6 +68,26 @@ Companion docs:
      expose it to the browser or commit it anywhere. No app code path currently
      uses it (reserved for trusted server-side workflows; `/api/health` reports
      its presence).
+
+### Post-migration smoke
+
+Run in order after the first Vercel deploy (§4), against the production URL:
+
+1. `GET /api/health` returns 200 with `supabase: "configured"`.
+2. First real sign-up creates a `public.profiles` row with role `seeker`.
+   All auth flags default to `false`, so enable **one** provider for this —
+   its smoke ([`BETA_READINESS.md §17`](BETA_READINESS.md#17-social--phone-auth-verification))
+   doubles as this check. Passing proves the `on_auth_user_created` trigger
+   **and** the `20260707…` table grants in one step; without the grants the
+   sign-in mints a session, then bounces back to `/login` with
+   `permission denied for table profiles` (42501) in the logs.
+3. Promote the founding admin **manually via SQL** (§5 below).
+4. `/admin` (as that admin) shows live queue counts — not the "Admin setup
+   required" panel.
+5. Every other `NEXT_PUBLIC_AUTH_*` flag stays `false` until its own
+   provider smoke passes
+   ([`BETA_READINESS.md §17`](BETA_READINESS.md#17-social--phone-auth-verification),
+   [`LAUNCH_CHECKLIST.md §12`](LAUNCH_CHECKLIST.md#12-social--phone-auth-providers)).
 
 ## 3. Payments (de-scoped in Slice 23)
 

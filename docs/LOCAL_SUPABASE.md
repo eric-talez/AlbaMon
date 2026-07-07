@@ -180,7 +180,10 @@ Supabase configured, expect:
 Consequence: the **basic smoke has no clickable sign-in path**. That is the
 expected zero-config state. To rehearse a real session and the write flows,
 use **Appendix A** (local phone test OTP — no real credentials), or configure
-a real provider per [`AUTH_PROVIDERS.md §5`](AUTH_PROVIDERS.md#5-per-provider-supabase-setup).
+a real provider per [`AUTH_PROVIDERS.md §5`](AUTH_PROVIDERS.md#5-per-provider-supabase-setup)
+— though local Google/Kakao E2E usually cannot complete without real OAuth
+credentials registered against the local callback plus extra local-only
+config; see **Appendix B** before attempting it.
 
 ## 10. Verifying real DB reads on `/jobs`
 
@@ -253,6 +256,9 @@ out, `/admin` must redirect to `/login` like the employer pages.
 | `supabase db reset` errors after a CLI upgrade | Container/image mismatch → `supabase stop --no-backup`, then `supabase start` fresh. |
 | Every sign-in method says "setup required" | Expected while `NEXT_PUBLIC_AUTH_*` flags are `false` (§9). Use Appendix A for a local sign-in path. |
 | Sign-in works but the user has the wrong role | Roles come from `public.profiles.role`, not the auth metadata → update it via SQL (§11/§12). |
+| Phone form errors on send, or phone sign-in stays unavailable after Appendix A | `supabase start` logged "no SMS provider is enabled. Disabling phone login" (CLI ≥ 2.x) → add Appendix A's dummy `[auth.sms.twilio]` block and restart the stack. |
+| Provider consent succeeds but lands on `/login?error=auth_callback` (`pkce_code_verifier_not_found` in the auth logs) | Cookie-host mismatch: GoTrue fell back to `127.0.0.1:3000` while the app ran on `localhost:3000` → Appendix B redirect allowlist; keep the browser on one host. |
+| Sign-in succeeds but bounces straight back to `/login`; `permission denied for table profiles` (42501) in the logs | The DB predates `20260707000000_explicit_table_grants.sql` → `supabase db reset` re-applies all migrations (local stacks only). |
 
 ## 14. Resetting the local DB safely
 
@@ -291,8 +297,10 @@ will later run against the real project.
   reject JWT-shaped strings in tracked files.
 - **A hosted project ref** (the long `<ref>.supabase.co` hostname) — this
   repo's docs and `.env.example` must contain placeholders only.
-- **Appendix A's `test_otp` edit to `supabase/config.toml`** — it is a
-  local-only convenience; revert it before committing
+- **Any local-only `supabase/config.toml` edit from Appendix A or B** — the
+  `test_otp` mapping, the dummy `[auth.sms.twilio]` block, provider
+  credential blocks, and the `site_url`/`additional_redirect_urls`
+  allowlist are all local conveniences; revert them before committing
   (`git checkout -- supabase/config.toml`). `npm run verify:local-supabase`
   fails if a `test_otp` block is committed.
 - `supabase/.branches` and `supabase/.temp` (CLI state) — already gitignored.
@@ -346,13 +354,26 @@ accepts without sending SMS.
    [auth.sms]
    enable_signup = true
 
+   # CLI ≥ 2.x refuses to enable phone auth without an SMS provider — even
+   # for test OTPs, `supabase start` otherwise logs "no SMS provider is
+   # enabled. Disabling phone login". The values below are never used:
+   # test-OTP numbers are intercepted before any Twilio call, so
+   # obviously-fake placeholders are fine (and must stay fake).
+   [auth.sms.twilio]
+   enabled = true
+   account_sid = "dummy"
+   message_service_sid = "dummy"
+   auth_token = "dummy"
+
    [auth.sms.test_otp]
    # digits exactly as the login form will submit them, without the "+"
    15005550006 = "123456"
    ```
 
    `15005550006` is a well-known fake US test number — use any number you
-   like, as long as it is not a real person's.
+   like, as long as it is not a real person's. If `supabase start` still
+   prints the disabled-phone warning, the dummy provider block is missing or
+   the stack was not restarted.
 
 2. Enable the phone method for the app, in `.env.local`:
 
@@ -380,7 +401,57 @@ accepts without sending SMS.
    `NEXT_PUBLIC_AUTH_PHONE_ENABLED` back to `false` if you want the
    zero-config state back.
 
+Local test OTP and hosted SMS are **separate flows**: this appendix never
+sends an SMS and needs no vendor account, while real phone sign-in on a
+hosted project requires an SMS provider configured in the Supabase dashboard
+([`AUTH_PROVIDERS.md §5`](AUTH_PROVIDERS.md#5-per-provider-supabase-setup))
+and its own smoke
+([`BETA_READINESS.md §17`](BETA_READINESS.md#17-social--phone-auth-verification)) —
+passing here validates the app flow, not your SMS vendor setup. In either
+flow, a verified phone only proves control of that number; it is not
+identity or work-authorization verification.
+
 > Never configure test OTP codes on a **hosted** project — it would let
 > anyone sign in with the published code. It is safe only on a throwaway
 > local stack. If your CLI version rejects the snippet keys, check
 > `supabase start` output and the CLI auth config reference for your version.
+
+## Appendix B — optional: local Google/Kakao OAuth callback config
+
+Local social E2E usually **cannot complete** on this guide's zero-config
+stack, and that is expected — the basic smoke treats "setup required" as the
+passing state (§9). A full local Google/Kakao round-trip needs both of the
+following; most people should skip them and verify social login against the
+hosted project after its schema deploy instead
+([`BETA_READINESS.md §17`](BETA_READINESS.md#17-social--phone-auth-verification)).
+
+1. **Real OAuth credentials registered against the local callback.** The
+   provider console (Google Cloud / Kakao Developers) must allow the *local*
+   GoTrue callback `http://127.0.0.1:54321/auth/v1/callback`, and the client
+   id/secret go into a **local-only** provider block in
+   `supabase/config.toml` (see the Supabase CLI auth config reference for
+   your version) — never into this repo, `.env` files, or the tracked
+   config.
+
+2. **A local-only redirect allowlist in `supabase/config.toml`** (do **not**
+   commit — §16):
+
+   ```toml
+   [auth]
+   site_url = "http://localhost:3000"
+   additional_redirect_urls = ["http://localhost:3000/auth/callback"]
+   ```
+
+   Why this matters: with the minimal tracked config, GoTrue rejects
+   non-allowlisted `redirect_to` values and silently falls back to
+   `http://127.0.0.1:3000` — a **different cookie host** than
+   `localhost:3000`. The PKCE verifier cookie set on `localhost` is missing
+   there, so `/auth/callback` fails with `pkce_code_verifier_not_found` and
+   lands on `/login?error=auth_callback` even though the provider consent
+   succeeded. Keep the browser on the exact host the app runs on
+   (this guide uses `localhost:3000`). This is the local mirror of the
+   hosted-dashboard allowlist requirement in
+   [`AUTH_PROVIDERS.md §4`](AUTH_PROVIDERS.md#4-redirect-safety).
+
+Restart the stack after any config change (`supabase stop && supabase
+start`), and revert every local-only block before committing (§16).

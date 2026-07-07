@@ -85,6 +85,37 @@ RLS is enabled on **all eight tables** and is the authorization gate.
 | `employer_access_requests` | own (requester); admin all | requester insert only as self while runtime role is **`seeker`**, initial `pending` state with empty review fields; **no update/delete policy** — decisions go only through `review_employer_access_request()` |
 | `audit_logs` | admin only | **no policy** — service-role only |
 
+## Table grants (Supabase API roles)
+
+Current Supabase projects (and current CLI local stacks) apply **no implicit
+table privileges** to the API roles `anon`, `authenticated`, and
+`service_role`: tables created by migrations start with no
+SELECT/INSERT/UPDATE/DELETE for them. The Slice 3 schema predated that change,
+so before `20260707000000_explicit_table_grants.sql` every real sign-in
+(social or phone OTP) minted a valid session and then **failed closed at the
+`profiles.role` lookup** — `permission denied for table profiles` (42501) —
+bouncing the user back to `/login` on every provider.
+
+That migration adds deterministic, least-privilege **table-level** grants
+(revoke-then-grant, so projects created under the legacy implicit defaults
+end up identical):
+
+- `anon` — SELECT on `jobs` and `companies` only (RLS still limits the rows
+  to approved/verified ones); nothing on any other table.
+- `authenticated` — SELECT/INSERT/UPDATE matching the policy matrix above,
+  never DELETE. No INSERT on `profiles` (rows are provisioned only by the
+  security-definer `on_auth_user_created` trigger) and no UPDATE on
+  `employer_access_requests` (decisions go through
+  `review_employer_access_request()`).
+- `service_role` — full DML restored on all app tables (trusted server-side
+  key; bypasses RLS by design).
+
+`messages` and the `public_job_listings` view already carried explicit grants
+from earlier migrations and are unchanged. **RLS remains the row-level
+authorization gate on every table** — the grants are the table-level floor,
+the policies filter the rows. `tests/db-schema.test.ts` ("explicit table
+grants for API roles") pins the grant surface.
+
 ## App access layer
 
 [`src/lib/db/applications.ts`](../src/lib/db/applications.ts) creates applications

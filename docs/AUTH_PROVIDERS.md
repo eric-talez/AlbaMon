@@ -36,6 +36,27 @@ button shows a calm "setup required" state (never a crash):
 3. For Naver: `NEXT_PUBLIC_AUTH_NAVER_PROVIDER_ID` contains a valid slug
    (lowercase `[a-z0-9_-]`, max 63 chars — anything else is ignored).
 
+Rendering clickable is necessary but not sufficient. A **real end-to-end
+sign-in** requires all of the following on the **same** Supabase project:
+
+1. Provider credentials registered and enabled in that project (dashboard →
+   Authentication → Providers; for the local stack, a local-only
+   `config.toml` block —
+   [`LOCAL_SUPABASE.md` Appendix B](LOCAL_SUPABASE.md#appendix-b--optional-local-googlekakao-oauth-callback-config)).
+2. The redirect allowlist covering `/auth/callback` with the wildcard (§4).
+3. The method's `NEXT_PUBLIC_AUTH_*` flag `true` in that deployment's env.
+4. The database schema deployed **including** the `on_auth_user_created`
+   profiles trigger and the `20260707000000_explicit_table_grants.sql`
+   grants ([`DATABASE.md`](DATABASE.md#table-grants-supabase-api-roles)).
+   Without them, consent/OTP succeeds and a session is minted, but the app
+   fails closed at the `profiles.role` lookup (`permission denied`, 42501)
+   and bounces to `/login`.
+
+A project with credentials but no schema — or schema but no credentials —
+fails E2E in exactly that mint-then-bounce way. Verify **both** halves before
+flipping a flag
+([`BETA_READINESS.md §17`](BETA_READINESS.md#17-social--phone-auth-verification)).
+
 Notes:
 
 - The flags are **public booleans, not secrets**. Real client IDs/secrets and
@@ -92,6 +113,11 @@ Configuration) must include wildcard entries:
 Without the `*`, Supabase silently falls back to the Site URL and the return
 path is dropped.
 
+The **local stack** has the same allowlist requirement with a sharper
+failure mode (GoTrue falls back to `127.0.0.1`, a different cookie host than
+`localhost`, and the PKCE exchange fails) — see
+[`LOCAL_SUPABASE.md` Appendix B](LOCAL_SUPABASE.md#appendix-b--optional-local-googlekakao-oauth-callback-config).
+
 ## 5. Per-provider Supabase setup
 
 All of this happens in the Supabase dashboard and the provider consoles —
@@ -147,6 +173,13 @@ button in its setup-required state — do not work around it in app code.
 3. Set `NEXT_PUBLIC_AUTH_PHONE_ENABLED=true` and redeploy.
 4. Smoke-test send + verify with a real number (see
    [`BETA_READINESS.md §17`](BETA_READINESS.md#17-social--phone-auth-verification)).
+
+The local test OTP
+([`LOCAL_SUPABASE.md` Appendix A](LOCAL_SUPABASE.md#appendix-a--optional-real-sign-in-via-local-phone-test-otp))
+is a **separate flow**: no vendor, no SMS sent, local stack only — passing it
+validates the app's phone flow, not your hosted SMS setup, which needs its
+own §17 smoke. In both flows, phone verification proves control of the
+number only — never identity or work authorization (§3).
 
 ## 6. Testing & CI
 

@@ -123,11 +123,19 @@ committed.
 ## Database (Slice 3)
 
 The Postgres schema lives in [`supabase/`](supabase/) and is the source of truth:
-enums, the seven core tables (`profiles`, `companies`, `jobs`, `applications`,
-`messages`, `reports`, `audit_logs`), constraints, an `updated_at` trigger, authorization
-helper functions, and **Row Level Security** on every table. See
-[`docs/DATABASE.md`](docs/DATABASE.md) for the full schema + RLS summary and
-[`supabase/README.md`](supabase/README.md) for how to apply migrations and seed.
+enums, the eight core tables (`profiles`, `companies`, `jobs`, `applications`,
+`messages`, `reports`, `employer_access_requests`, `audit_logs`), constraints, an
+`updated_at` trigger, authorization helper functions, and **Row Level Security**
+on every table. See [`docs/DATABASE.md`](docs/DATABASE.md) for the full schema +
+RLS summary and [`supabase/README.md`](supabase/README.md) for how to apply
+migrations and seed.
+
+Table privileges for the Supabase API roles are **explicit**
+(`20260707000000_explicit_table_grants.sql`): current Supabase applies no
+implicit grants, and without that migration real sign-ins mint a session but
+fail closed at the `profiles.role` lookup (`permission denied`, 42501) and
+bounce back to `/login`. RLS remains the row-level authorization gate on top —
+see [`docs/DATABASE.md`](docs/DATABASE.md#table-grants-supabase-api-roles).
 
 ```bash
 supabase db reset   # apply migrations/ + seed.sql to a local DB (CLI + Docker)
@@ -391,7 +399,10 @@ Auth** (no hand-rolled OAuth, no SMS SDKs, no new secrets):
   backslash/control-character `//` bypasses).
 - New accounts get their `profiles` row from the existing
   `on_auth_user_created` trigger (role `seeker`); authorization still reads
-  `profiles.role` only. Setup guide: [`docs/AUTH_PROVIDERS.md`](docs/AUTH_PROVIDERS.md).
+  `profiles.role` only. Real provider E2E needs a Supabase project with both
+  the schema deployed (trigger + the `20260707…` explicit table grants) and
+  that provider's credentials — setup guide:
+  [`docs/AUTH_PROVIDERS.md`](docs/AUTH_PROVIDERS.md).
 
 ## Local Supabase (Slice 20)
 

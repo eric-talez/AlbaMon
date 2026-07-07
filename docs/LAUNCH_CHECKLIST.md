@@ -40,8 +40,18 @@ Per-variable reference (exposure, validation, placeholders):
       migrations + seed + auth mode + admin promotion verified against a
       disposable local stack **before** touching the hosted project
 - [ ] Hosted project created; region appropriate for LA/OC
-- [ ] All 8 migrations applied **in filename order** via `supabase db push`
-      (order table in [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project))
+- [ ] All 10 migrations applied **in filename order** via `supabase db push`
+      (order table in [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project)),
+      after `supabase login` + `supabase link --project-ref <project-ref>`
+- [ ] **Never `supabase db reset` against the hosted project** — it wipes the
+      database; `db push` is the only hosted schema command (`reset` is for
+      the disposable local stack). And never apply `supabase/seed.sql` to
+      production (§3)
+- [ ] Post-migration smoke completed per
+      [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project): `/api/health`
+      shows Supabase `configured` → first sign-up gets `profiles.role =
+      'seeker'` → founding admin promoted via SQL (§4) → `/admin` shows live
+      queue counts → auth flags flipped only after per-provider smoke (§12)
 - [ ] Auth URL configuration: Site URL + `/auth/callback` redirect
 - [ ] Email confirmations setting reviewed (Supabase Auth → Providers → Email)
 - [ ] Database backups enabled (daily is fine for beta); note the restore path
@@ -115,8 +125,12 @@ legal review.
 ## 7. RLS / security review
 
 RLS is the authorization gate; the anon key is safe to expose **only** because
-of it. Static tests assert the policy files; live-DB verification needs the
-Supabase CLI + Docker (see `supabase/README.md`).
+of it. Since `20260707000000_explicit_table_grants.sql`, table-level privileges
+for the API roles are **explicit** (current Supabase applies no implicit
+grants); RLS remains the row gate on top
+([`DATABASE.md`](DATABASE.md#table-grants-supabase-api-roles)). Static tests
+assert the policy files; live-DB verification needs the Supabase CLI + Docker
+(see `supabase/README.md`).
 
 | Area | Migration | Static test |
 |---|---|---|
@@ -128,6 +142,8 @@ Supabase CLI + Docker (see `supabase/README.md`).
 | Participant-bound messages | `20260626…_application_messages.sql` | `tests/messaging-routes-security.test.ts`, `tests/db-messages.test.ts` |
 | Status workflow constraints | `20260627…_application_status_workflow.sql` | `tests/application-status-migration.test.ts` |
 | Report queue constraints | `20260628…_report_queue_hardening.sql` | `tests/report-workflow-migration.test.ts`, `tests/db-reports.test.ts` |
+| Seeker→employer request queue + review RPC | `20260706…_employer_access_requests.sql` | `tests/db-employer-access-requests.test.ts`, `tests/employer-access-migration.test.ts` |
+| Explicit API-role table grants (fail-closed sign-in fix) | `20260707…_explicit_table_grants.sql` | `tests/db-schema.test.ts` |
 
 - [ ] Role guards remain server-side (`src/lib/auth/guards.ts`; every
       `/admin`, `/employer`, `/dashboard` page calls them — no client-only gating)
