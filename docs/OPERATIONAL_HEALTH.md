@@ -40,6 +40,15 @@ Expected on a launch-ready production deployment:
 - `"missing"` / `"partial"` anywhere → the process is up but misconfigured;
   §2 says what each status means, §4 says how the app behaves meanwhile.
 
+Also confirm the production **security headers** (Slice 26) are present —
+`curl -I https://<your-domain>/` should show `Content-Security-Policy`,
+`Strict-Transport-Security`, `X-Frame-Options`, `X-Content-Type-Options`,
+`Referrer-Policy`, and `Permissions-Policy`. They are emitted only when
+`NODE_ENV=production`; if they are missing on a production URL, the deploy is
+not running in production mode. The CSP `connect-src` must name your Supabase
+origin (derived from `NEXT_PUBLIC_SUPABASE_URL`) or browser auth calls are
+blocked.
+
 ## 2. `GET /api/health` reference
 
 Implementation: [`src/app/api/health/route.ts`](../src/app/api/health/route.ts)
