@@ -217,6 +217,12 @@ Signed out, against the production URL:
 - [ ] `/robots.txt` and `/sitemap.xml` respond; the sitemap lists only public
       static pages (no `/admin`, `/employer`, `/dashboard`, no per-job URLs).
 - [ ] `/login` and `/signup` are reachable.
+- [ ] Security headers set on every response (Slice 26): `curl -I` the
+      production URL for `/` and `/api/health` and confirm
+      `Content-Security-Policy`, `Strict-Transport-Security`, `X-Frame-Options`,
+      `X-Content-Type-Options`, `Referrer-Policy`, and `Permissions-Policy`, and
+      that the CSP `connect-src` names your Supabase origin (code-level headers
+      ship in `next.config.ts`; live-domain confirmation is this step).
 
 **Visibility invariant: only `approved` jobs are ever publicly visible.**
 `draft`, `pending`, `rejected`, `paused`, and `expired` jobs must not appear

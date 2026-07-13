@@ -155,6 +155,16 @@ assert the policy files; live-DB verification needs the Supabase CLI + Docker
       (`tests/seo.test.ts`)
 - [ ] Spot-check in prod: signed-out user cannot fetch `/admin`, `/employer`,
       `/dashboard` (redirects), and a pending job's URL 404s
+- [ ] Production security headers present on every response (Slice 26):
+      `Content-Security-Policy`, `Strict-Transport-Security`,
+      `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
+      `Referrer-Policy`, `Permissions-Policy`
+      (`src/lib/security/headers.ts`, wired in `next.config.ts`; unit-tested by
+      `tests/security-headers.test.ts`). **Code-level only** — after deploy,
+      verify on the live domain with `curl -I https://<your-domain>/` (and
+      `/api/health`) that all six are set and the CSP `connect-src` lists your
+      Supabase origin. A strict nonce-based CSP (dropping `script-src
+      'unsafe-inline'`) remains future hardening.
 
 ## 8. Monitoring & operations
 

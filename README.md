@@ -423,6 +423,26 @@ rehearsal before any hosted setup
 `npm run verify:local-supabase` is the offline gate that keeps the guide,
 the local stack inputs, and the placeholder hygiene intact.
 
+## Production security headers (Slice 26)
+
+Every response carries a baseline security-header policy, built by the pure
+helper [`src/lib/security/headers.ts`](src/lib/security/headers.ts) and wired
+through `async headers()` in [`next.config.ts`](next.config.ts):
+`Content-Security-Policy`, `Strict-Transport-Security`, `X-Frame-Options: DENY`,
+`X-Content-Type-Options: nosniff`, `Referrer-Policy`, and a restrictive
+`Permissions-Policy`. The CSP is `'self'`-based; the only external origins are
+the Supabase HTTP(S)+WS(S) hosts derived from `NEXT_PUBLIC_SUPABASE_URL` for
+`connect-src`. CSP and HSTS are **production-only** (a strict CSP fights
+`next dev`'s React `eval`/HMR); development sends only the four always-safe
+headers. Unit-tested by
+[`tests/security-headers.test.ts`](tests/security-headers.test.ts).
+
+This is **code-level** hardening: after deploy, confirm the headers on the live
+domain (`curl -I`) per [`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md)
+§7. A strict **nonce-based** CSP (removing `script-src 'unsafe-inline'`) is
+deliberately deferred — it would force every page into dynamic rendering — and
+remains future hardening.
+
 ## Development approach
 
 Work is delivered in small, reviewable **slices** (one PR each), Slice 0 → 15.
