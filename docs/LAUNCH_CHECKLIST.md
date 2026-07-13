@@ -40,7 +40,7 @@ Per-variable reference (exposure, validation, placeholders):
       migrations + seed + auth mode + admin promotion verified against a
       disposable local stack **before** touching the hosted project
 - [ ] Hosted project created; region appropriate for LA/OC
-- [ ] All 10 migrations applied **in filename order** via `supabase db push`
+- [ ] All 11 migrations applied **in filename order** via `supabase db push`
       (order table in [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project)),
       after `supabase login` + `supabase link --project-ref <project-ref>`
 - [ ] **Never `supabase db reset` against the hosted project** — it wipes the

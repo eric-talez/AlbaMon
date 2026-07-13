@@ -41,7 +41,12 @@ its values.
 
 `public_job_listings` is a read-only, approved-only view used by public job
 pages. It includes job fields plus `company_name` / `company_is_verified`, but
-does not expose private company profile columns.
+does not expose private company profile columns. Since Slice 25 it is the
+**only** public path to company identity: `anon` and ordinary seeker callers
+cannot read the `companies` base table at all (no anon grant, no public SELECT
+policy), so private columns such as `phone`, `address_display`, `website`, and
+`owner_id` are never reachable through PostgREST. The view runs with its
+owner's rights, so it is unaffected by the base-table grant/policy changes.
 
 Constraints: `pay_min >= 0`, `pay_max >= pay_min`, non-empty `jobs.title`,
 `companies.name`, `jobs.description`. Indexes cover the public query
@@ -77,7 +82,7 @@ RLS is enabled on **all eight tables** and is the authorization gate.
 | Table | Read | Write |
 | --- | --- | --- |
 | `profiles` | self; admin all | self-update only, and **role cannot change** (RLS pins it + a `before update of role` trigger hard-blocks non-admins); admin all |
-| `companies` | verified (public); current-role owner; admin | owner insert/update own — **requires employer or admin role**; admin all |
+| `companies` | current-role owner; admin (**no public/seeker base-table read** — Slice 25 dropped `companies_select_public_verified`; the public sees company identity only through `public_job_listings`) | owner insert/update own — **requires employer or admin role**; admin all |
 | `jobs` | **`approved` only (public)**; current-role owner; admin | employer/admin owner insert **forced to `pending`**; owner update cannot set `approved`; admin all |
 | `applications` | own (seeker); current-role employer for owned jobs; admin | insert only by a **`seeker`-role profile**, as self, for `approved` jobs with initial status `submitted`; current-role owning employers may update status only; admin update |
 | `messages` | applicant; current-role owning employer; admin | applicant/owning employer insert only as `auth.uid()`; no update/delete |
@@ -100,8 +105,10 @@ That migration adds deterministic, least-privilege **table-level** grants
 (revoke-then-grant, so projects created under the legacy implicit defaults
 end up identical):
 
-- `anon` — SELECT on `jobs` and `companies` only (RLS still limits the rows
-  to approved/verified ones); nothing on any other table.
+- `anon` — SELECT on `jobs` only (RLS limits rows to `approved`); **no grant
+  on `companies`** (revoked in `20260713000000_restrict_company_public_reads.sql`,
+  Slice 25 — public company identity comes only through `public_job_listings`);
+  nothing on any other table.
 - `authenticated` — SELECT/INSERT/UPDATE matching the policy matrix above,
   never DELETE. No INSERT on `profiles` (rows are provisioned only by the
   security-definer `on_auth_user_created` trigger) and no UPDATE on
@@ -115,6 +122,15 @@ from earlier migrations and are unchanged. **RLS remains the row-level
 authorization gate on every table** — the grants are the table-level floor,
 the policies filter the rows. `tests/db-schema.test.ts` ("explicit table
 grants for API roles") pins the grant surface.
+
+`20260713000000_restrict_company_public_reads.sql` (Slice 25) then tightens the
+`companies` base table: it drops the `companies_select_public_verified` policy
+and revokes the `anon` SELECT grant, so verification alone no longer exposes a
+company's base row to the public or to unrelated seekers. Employers still read
+their own company (`companies_select_owner`), admins read all
+(`companies_select_admin`), and public company identity is served exclusively by
+`public_job_listings`. The `authenticated` grant is retained so the owner/admin
+policies can still return rows.
 
 ## App access layer
 

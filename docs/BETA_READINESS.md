@@ -97,7 +97,7 @@ Migrations are verified separately in §5.
 
 ## 5. Migration verification
 
-The 10-migration order table lives in
+The 11-migration order table lives in
 [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project). Verify in the
 Supabase SQL editor:
 
@@ -105,7 +105,7 @@ Supabase SQL editor:
 select version from supabase_migrations.schema_migrations order by version;
 ```
 
-Expected: 10 rows, `20260621000000` through `20260707000000`, in order.
+Expected: 11 rows, `20260621000000` through `20260713000000`, in order.
 
 If migrations were applied by pasting files into the SQL editor (no CLI), that
 table may be empty — fall back to object checks; all three must hold:
@@ -353,7 +353,7 @@ the sign-off of record; this one is the execution summary feeding it.
 | CI green + `npm run verify:beta` pass on the release commit | §2 | ☐ | Hard |
 | Required env vars set and valid, no placeholder fragments | §3 | ☐ | Hard |
 | Supabase configured (auth URLs, backups) | §4 | ☐ | Hard |
-| All 10 migrations verified (incl. explicit API-role grants) | §5 | ☐ | Hard |
+| All 11 migrations verified (incl. explicit API-role grants) | §5 | ☐ | Hard |
 | Zero seed/demo data (users, companies, jobs, applications, messages, reports) | §6 | ☐ | Hard |
 | Founding admin verified; no unintended admins | §7 | ☐ | Hard |
 | Public visibility invariant (approved-only) proven | §9 | ☐ | Hard |

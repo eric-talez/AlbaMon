@@ -42,6 +42,7 @@ Companion docs:
    | 8 | `20260628000000_report_queue_hardening.sql` | Report reason/status constraints + RLS |
    | 9 | `20260706000000_employer_access_requests.sql` | Seeker→employer request queue + admin review RPC |
    | 10 | `20260707000000_explicit_table_grants.sql` | Explicit least-privilege table grants for the API roles — **required**: without it real sign-ins mint a session but fail closed at the `profiles.role` lookup (42501) and bounce to `/login` ([`DATABASE.md`](DATABASE.md#table-grants-supabase-api-roles)) |
+   | 11 | `20260713000000_restrict_company_public_reads.sql` | Drops the public verified-company read policy and revokes the `anon` SELECT on `companies`, so company identity is public only via `public_job_listings` (Slice 25) |
 
    Without the CLI: run each file in the Supabase **SQL editor**, in the same
    order.

@@ -18,6 +18,7 @@ supabase/
     20260628000000_report_queue_hardening.sql # report reason/status constraints + RLS
     20260706000000_employer_access_requests.sql # seeker→employer request queue + admin review RPC
     20260707000000_explicit_table_grants.sql # explicit least-privilege API-role grants (RLS stays the row gate)
+    20260713000000_restrict_company_public_reads.sql # drop public companies read + revoke anon SELECT (view-only company identity)
   seed.sql                            # LA/OC demo companies + jobs
 ```
 
@@ -58,8 +59,13 @@ the app automatically switches from mock data to live DB reads — see
 Public job pages query the approved-only `public_job_listings` view. The view
 includes only the company name and verification flag needed by public listings,
 including for an unverified company, without exposing the rest of that company
-row. Production runtime DB/configuration failures are surfaced; mock jobs are
-limited to development, tests, and production builds.
+row. Since Slice 25 (`20260713000000_restrict_company_public_reads.sql`) this
+view is the **only** public path to company identity: `anon` and unrelated
+seekers can no longer read the `companies` base table directly (the anon SELECT
+grant is revoked and the public verified-company policy is dropped), so private
+columns like `phone`, `address_display`, `website`, and `owner_id` are not
+reachable through PostgREST. Production runtime DB/configuration failures are
+surfaced; mock jobs are limited to development, tests, and production builds.
 
 Application dashboards call two authenticated, parameterless RPCs. The seeker
 RPC is bound to `auth.uid()`; the employer RPC is limited to caller-owned
@@ -131,12 +137,19 @@ Supabase API roles. Current Supabase projects apply no implicit table
 privileges, so without it every real sign-in minted a session and then failed
 closed at the `profiles.role` lookup (`permission denied for table profiles`,
 42501). The grants are least-privilege and deterministic (revoke-then-grant):
-`anon` may only SELECT `jobs`/`companies`, `authenticated` gets the narrow
-DML surface its policies expect (no DELETEs; no `profiles` INSERT —
-provisioning stays with the `on_auth_user_created` trigger), and
-`service_role` regains full DML. RLS remains the row-level authorization gate
-on every table; `tests/db-schema.test.ts` pins the grant surface. Details:
+`authenticated` gets the narrow DML surface its policies expect (no DELETEs; no
+`profiles` INSERT — provisioning stays with the `on_auth_user_created`
+trigger), and `service_role` regains full DML. RLS remains the row-level
+authorization gate on every table; `tests/db-schema.test.ts` pins the grant
+surface. Details:
 [`docs/DATABASE.md`](../docs/DATABASE.md#table-grants-supabase-api-roles).
+
+`20260713000000_restrict_company_public_reads.sql` (Slice 25) then narrows the
+public read surface: after it, `anon` may only SELECT `jobs` (rows limited to
+`approved` by RLS). The `companies` base table is no longer publicly readable —
+its anon SELECT grant is revoked and the `companies_select_public_verified`
+policy is dropped — so public company identity is served only through
+`public_job_listings`. Employer-owner and admin company reads are unchanged.
 
 ## What the seed contains
 
