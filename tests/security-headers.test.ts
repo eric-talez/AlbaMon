@@ -101,6 +101,32 @@ describe("security headers — CSP policy shape", () => {
     expect(csp).not.toContain("'unsafe-eval'");
   });
 
+  it("blocks inline HTML event-handler attributes via script-src-attr 'none'", () => {
+    const csp = cspOf(prod);
+    // Parse directives independently: split on ';' and match exact names, so
+    // `script-src` never accidentally matches `script-src-attr`.
+    const directives = csp.split(";").map((d) => d.trim());
+
+    // script-src-attr exists exactly once with the exact value.
+    expect(directives.filter((d) => d === "script-src-attr 'none'")).toHaveLength(1);
+    expect(
+      directives.filter((d) => d.split(/\s+/)[0] === "script-src-attr"),
+    ).toHaveLength(1);
+    expect(directive("script-src-attr", csp)).toBe("script-src-attr 'none'");
+
+    // The base script-src keeps its Next.js-compatible value, unconfused with -attr.
+    expect(directive("script-src", csp)).toBe("script-src 'self' 'unsafe-inline'");
+
+    // No script-src-elem was added (no evidence it is needed), and no unsafe-eval.
+    expect(directives.some((d) => d.split(/\s+/)[0] === "script-src-elem")).toBe(false);
+    expect(csp).not.toContain("'unsafe-eval'");
+
+    // Development still ships no CSP at all.
+    expect(
+      buildSecurityHeaders(dev).some((h) => h.key === "Content-Security-Policy"),
+    ).toBe(false);
+  });
+
   it("connect-src carries the derived Supabase https and wss origins", () => {
     expect(supabaseConnectOrigins(SAMPLE_URL)).toEqual([
       "https://abcdefgh.supabase.co",

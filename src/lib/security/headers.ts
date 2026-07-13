@@ -104,6 +104,11 @@ export function buildContentSecurityPolicy(
     "form-action 'self'",
     // Next emits an unnonced inline bootstrap script; no external/eval scripts.
     "script-src 'self' 'unsafe-inline'",
+    // `script-src 'unsafe-inline'` is temporarily required for Next's inline
+    // bootstrap, but nothing in this app uses inline HTML event-handler
+    // attributes (onclick/onerror/onload/…). Block them outright — this narrows
+    // the `'unsafe-inline'` blast radius without affecting the bootstrap.
+    "script-src-attr 'none'",
     // App pages need only 'self'; 'unsafe-inline' keeps Next's inline-styled
     // framework error page rendering (low risk — style only, no XSS sinks).
     "style-src 'self' 'unsafe-inline'",

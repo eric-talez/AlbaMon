@@ -437,6 +437,17 @@ the Supabase HTTP(S)+WS(S) hosts derived from `NEXT_PUBLIC_SUPABASE_URL` for
 headers. Unit-tested by
 [`tests/security-headers.test.ts`](tests/security-headers.test.ts).
 
+The CSP also sets `script-src-attr 'none'` (blocks inline HTML event-handler
+attributes such as `onclick`/`onerror`/`onload`, independent of the bootstrap
+`'unsafe-inline'`) and `frame-src 'none'`. **`frame-src 'none'` is correct for
+the current product** because the app uses no CAPTCHA iframe, payment widget,
+embedded support widget, or other framed third-party content. A future
+integration with **Supabase CAPTCHA, Cloudflare Turnstile, hCaptcha, reCAPTCHA,
+a payment widget, or an embedded support/identity-verification tool** will
+require a *reviewed* CSP change (typically `frame-src`, and possibly
+`script-src`/`connect-src`). Do not loosen `frame-src`, `script-src`, or
+`connect-src` preemptively.
+
 This is **code-level** hardening: after deploy, confirm the headers on the live
 domain (`curl -I`) per [`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md)
 §7. A strict **nonce-based** CSP (removing `script-src 'unsafe-inline'`) is
