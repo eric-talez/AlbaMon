@@ -195,6 +195,48 @@ export const EMPLOYER_ACCESS_REQUEST_STATUS_LABELS: Record<
   rejected: "반려됨 (Rejected)",
 };
 
+/**
+ * Admin audit-log action taxonomy (Slice 27). These are the exact `action`
+ * values the admin-only SQL review functions write; the migration static test
+ * asserts the SQL literals match this list, so the two stay in lockstep.
+ */
+export const ADMIN_AUDIT_ACTIONS = [
+  "job.approved",
+  "job.rejected",
+  "company.verified",
+  "company.unverified",
+  "report.reviewed",
+  "report.dismissed",
+  "employer_access.approved",
+  "employer_access.rejected",
+] as const;
+
+export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number];
+
+export const AUDIT_ACTION_LABELS: Record<AdminAuditAction, string> = {
+  "job.approved": "공고 승인 (Job approved)",
+  "job.rejected": "공고 반려 (Job rejected)",
+  "company.verified": "회사 인증 (Company verified)",
+  "company.unverified": "회사 인증 해제 (Company unverified)",
+  "report.reviewed": "신고 검토 완료 (Report reviewed)",
+  "report.dismissed": "신고 기각 (Report dismissed)",
+  "employer_access.approved": "고용주 권한 승인 (Employer access approved)",
+  "employer_access.rejected": "고용주 권한 반려 (Employer access rejected)",
+};
+
+export type AdminAuditEntityType =
+  | "job"
+  | "company"
+  | "report"
+  | "employer_access_request";
+
+export const AUDIT_ENTITY_TYPE_LABELS: Record<AdminAuditEntityType, string> = {
+  job: "공고",
+  company: "회사",
+  report: "신고",
+  employer_access_request: "고용주 권한 요청",
+};
+
 /** Format a pay range, e.g. "시급 $18–22" or "연봉 $55,000–65,000". */
 export function formatPayRange(
   payMin: number,

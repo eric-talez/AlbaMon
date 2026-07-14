@@ -40,7 +40,7 @@ Per-variable reference (exposure, validation, placeholders):
       migrations + seed + auth mode + admin promotion verified against a
       disposable local stack **before** touching the hosted project
 - [ ] Hosted project created; region appropriate for LA/OC
-- [ ] All 11 migrations applied **in filename order** via `supabase db push`
+- [ ] All 12 migrations applied **in filename order** via `supabase db push`
       (order table in [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project)),
       after `supabase login` + `supabase link --project-ref <project-ref>`
 - [ ] **Never `supabase db reset` against the hosted project** — it wipes the
@@ -144,6 +144,7 @@ assert the policy files; live-DB verification needs the Supabase CLI + Docker
 | Report queue constraints | `20260628…_report_queue_hardening.sql` | `tests/report-workflow-migration.test.ts`, `tests/db-reports.test.ts` |
 | Seeker→employer request queue + review RPC | `20260706…_employer_access_requests.sql` | `tests/db-employer-access-requests.test.ts`, `tests/employer-access-migration.test.ts` |
 | Explicit API-role table grants (fail-closed sign-in fix) | `20260707…_explicit_table_grants.sql` | `tests/db-schema.test.ts` |
+| Transactional admin audit logs + append-only guard | `20260714…_transactional_admin_audit_logs.sql` | `tests/admin-audit-migration.test.ts` |
 
 - [ ] Role guards remain server-side (`src/lib/auth/guards.ts`; every
       `/admin`, `/employer`, `/dashboard` page calls them — no client-only gating)

@@ -268,23 +268,31 @@ export async function getAdminCompanies(): Promise<AdminCompaniesResult> {
 export async function moderatePendingJob(
   jobId: string,
   decision: "approve" | "reject",
-  approvedAt: string,
 ): Promise<AdminMutationResult> {
   if (!isSupabaseConfigured()) return { status: "unavailable" };
   try {
     const supabase = await createSupabaseServerClient();
-    const payload = decision === "approve"
-      ? { moderation_status: "approved" as const, posted_at: approvedAt }
-      : { moderation_status: "rejected" as const };
-    const { data, error } = await supabase
-      .from("jobs")
-      .update(payload)
-      .eq("id", jobId)
-      .eq("moderation_status", "pending")
-      .select("id")
-      .maybeSingle();
-    if (error) throw error;
-    return data ? { status: "updated" } : { status: "conflict" };
+    // Admin-only SQL function: mutates the job and records the audit entry in
+    // one transaction. Approval timestamps posted_at inside Postgres.
+    const { data, error } = await supabase.rpc("moderate_pending_job", {
+      job_id: jobId,
+      decision: decision === "approve" ? "approved" : "rejected",
+    });
+    if (error) {
+      // P0001 = the function's own admin/decision exceptions; 42501 = execute
+      // privilege missing. requireRole("admin") makes both unreachable in
+      // normal flows, so they surface as a generic error.
+      if (error.code === "P0001" || error.code === "42501") {
+        console.error("[db] moderatePendingJob blocked:", error.code);
+        return { status: "error" };
+      }
+      throw error;
+    }
+    if (data === "conflict") return { status: "conflict" };
+    if (data === "approved" || data === "rejected") {
+      return { status: "updated" };
+    }
+    throw new Error(`Unexpected moderation result: ${String(data)}`);
   } catch {
     console.error("[db] moderatePendingJob failed");
     return { status: "error" };
@@ -298,14 +306,25 @@ export async function setCompanyVerification(
   if (!isSupabaseConfigured()) return { status: "unavailable" };
   try {
     const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("companies")
-      .update({ is_verified: isVerified })
-      .eq("id", companyId)
-      .select("id")
-      .maybeSingle();
-    if (error) throw error;
-    return data ? { status: "updated" } : { status: "conflict" };
+    // Admin-only SQL function: flips verification and records the audit entry
+    // in one transaction. A company already in the requested state returns
+    // conflict and writes nothing.
+    const { data, error } = await supabase.rpc("set_company_verification", {
+      company_id: companyId,
+      verified: isVerified,
+    });
+    if (error) {
+      if (error.code === "P0001" || error.code === "42501") {
+        console.error("[db] setCompanyVerification blocked:", error.code);
+        return { status: "error" };
+      }
+      throw error;
+    }
+    if (data === "conflict") return { status: "conflict" };
+    if (data === "verified" || data === "unverified") {
+      return { status: "updated" };
+    }
+    throw new Error(`Unexpected verification result: ${String(data)}`);
   } catch {
     console.error("[db] setCompanyVerification failed");
     return { status: "error" };

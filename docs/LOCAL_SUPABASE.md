@@ -333,8 +333,10 @@ With a real session (Appendix A):
 - [ ] Promote a user to admin via SQL (`role = 'admin'`, §12) → approve the
       job in `/admin` → it appears on `/jobs`
 - [ ] `/admin` shows live counts on its queue cards (the seed leaves 1
-      pending job) and the recent-activity section shows its calm empty
-      state — nothing writes `audit_logs` yet
+      pending job), and after the approval above the recent-activity section
+      shows a "공고 승인 (Job approved)" entry — admin decisions write
+      `audit_logs` transactionally since Slice 27 (before any decision it
+      shows the calm empty state)
 
 > Before §6 is done (placeholder values), a dev-auth admin sees the "Admin
 > setup required" panel on `/admin` with these exact §§3–7 commands — the

@@ -13,6 +13,12 @@ import {
   type HealthChecks,
 } from "@/lib/ops/health";
 import { Badge } from "@/components/Badge";
+import {
+  AUDIT_ACTION_LABELS,
+  AUDIT_ENTITY_TYPE_LABELS,
+  type AdminAuditAction,
+  type AdminAuditEntityType,
+} from "@/lib/types";
 
 export const metadata: Metadata = { title: "Admin console / 관리자 콘솔" };
 
@@ -43,6 +49,16 @@ const HEALTH_CHECK_LABELS: Record<keyof HealthChecks, string> = {
   email: "Email",
   analytics: "Analytics",
 };
+
+// Stable audit action/entity values map to Korean-first labels; unknown values
+// (older or future taxonomies) fall back to the raw string so nothing hides.
+function auditActionLabel(action: string): string {
+  return AUDIT_ACTION_LABELS[action as AdminAuditAction] ?? action;
+}
+
+function auditEntityLabel(entityType: string): string {
+  return AUDIT_ENTITY_TYPE_LABELS[entityType as AdminAuditEntityType] ?? entityType;
+}
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -276,8 +292,8 @@ export default async function AdminHomePage() {
             <div className="mt-3 rounded-xl border border-dashed border-border p-6 text-center">
               <p className="font-medium">아직 기록된 활동이 없습니다.</p>
               <p className="mt-2 text-sm text-muted">
-                No admin activity recorded yet — audit writes arrive in a later
-                slice.
+                No admin activity recorded yet — moderation decisions appear
+                here automatically.
               </p>
             </div>
           ) : (
@@ -288,8 +304,12 @@ export default async function AdminHomePage() {
                   className="flex flex-col gap-1 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{entry.action}</span>
-                    <Badge tone="neutral">{entry.entityType}</Badge>
+                    <span className="text-sm font-medium">
+                      {auditActionLabel(entry.action)}
+                    </span>
+                    <Badge tone="neutral">
+                      {auditEntityLabel(entry.entityType)}
+                    </Badge>
                   </div>
                   <p className="text-xs text-muted">
                     {formatDate(entry.createdAt)}

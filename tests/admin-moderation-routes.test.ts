@@ -219,9 +219,12 @@ describe("admin moderation static security boundaries", () => {
     expect(dbSource).toContain('.select("id, display_name, email")');
     expect(dbSource).not.toMatch(/\.select\("id, display_name, email, phone/i);
     expect(dbSource).not.toMatch(/service.?role/i);
-    expect(dbSource).toContain('.eq("id", jobId)');
-    expect(dbSource).toContain('.eq("moderation_status", "pending")');
-    expect(dbSource).toContain('{ is_verified: isVerified }');
+    // Writes go through the transactional admin-only SQL functions (Slice 27),
+    // never direct table updates from the app.
+    expect(dbSource).toContain('.rpc("moderate_pending_job"');
+    expect(dbSource).toContain('.rpc("set_company_verification"');
+    expect(dbSource).not.toMatch(/from\("jobs"\)\s*\.update/);
+    expect(dbSource).not.toMatch(/from\("companies"\)\s*\.update/);
   });
 
   it("relies on existing admin policies, trusted triggers, and approved-only public view", () => {
