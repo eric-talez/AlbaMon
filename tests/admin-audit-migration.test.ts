@@ -230,19 +230,23 @@ describe("transactional admin audit migration (Slice 27)", () => {
     expect(sliceSql).not.toMatch(/function public\.(record|write|log)_audit/i);
   });
 
-  it("blocks API-originated UPDATE/DELETE on audit rows while sparing owner maintenance", () => {
+  it("blocks ordinary API roles from UPDATE/DELETE on audit rows while sparing trusted maintenance", () => {
     const guard = lastFunctionDefinition(sliceSql, "prevent_audit_log_mutation");
-    expect(guard).toMatch(/security definer/i);
+    // SECURITY INVOKER on purpose: the guard keys on the session's role
+    // identity, so owner maintenance, service_role repair, restores, and the
+    // actor_id ON DELETE SET NULL cascade (referential actions run as the
+    // table owner) all pass.
+    expect(guard).not.toMatch(/security definer/i);
     expect(guard).toMatch(/set search_path = ''/i);
-    expect(guard).toMatch(
-      /auth\.uid\(\) is not null or coalesce\(auth\.role\(\), ''\) <> ''/i,
-    );
+    expect(guard).toMatch(/current_user in \('anon', 'authenticated'\)/i);
+    // Role identity, not JWT-claim presence.
+    expect(guard).not.toMatch(/auth\.(uid|role)\(\)/i);
     expect(guard).toMatch(/errcode = '42501'/i);
-    // BEFORE DELETE must return OLD (NEW is null on delete) or owner deletes
+    // BEFORE DELETE must return OLD (NEW is null on delete) or trusted deletes
     // would be silently skipped.
     expect(guard).toMatch(/return old/i);
-    // Admins are deliberately NOT exempt: audit history is append-only for
-    // every API session.
+    // Admins are deliberately NOT exempt: they act through the authenticated
+    // role, and audit history is append-only for ordinary API sessions.
     expect(guard).not.toMatch(/is_admin/i);
     expect(sliceSql).toMatch(
       /create trigger audit_logs_prevent_mutation\s+before update or delete on public\.audit_logs\s+for each row/i,

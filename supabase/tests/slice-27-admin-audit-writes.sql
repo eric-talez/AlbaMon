@@ -20,10 +20,10 @@
 --   K. a forced audit-insert failure rolls back the job mutation (atomicity);
 --   L. anon cannot execute any review function (42501);
 --   M. seeker and employer callers are rejected (P0001) and write nothing;
---   N. direct audit_logs DML is denied for authenticated sessions (grants),
---      blocked for JWT-bearing owner/service_role sessions (append-only
---      trigger), allowed for claim-free owner maintenance; seekers read zero
---      audit rows while admins read them.
+--   N. direct audit_logs DML is denied for authenticated sessions (grants);
+--      the append-only trigger backstops the ordinary API roles even under
+--      simulated grant/RLS drift; trusted maintenance (owner and service_role)
+--      may update/delete; seekers read zero audit rows while admins read them.
 --
 -- Run ONLY against a disposable LOCAL stack (never hosted):
 --   supabase start && supabase db reset            # applies migrations + seed
@@ -524,7 +524,7 @@ rollback;
 
 -- --- N. audit_logs is append-only across grants and the guard trigger ----------
 begin;
--- Seed one committed-within-tx row as claim-free owner (maintenance path).
+-- Seed one row as the owner inside this rolled-back transaction.
 insert into public.audit_logs (actor_id, action, entity_type, entity_id, metadata)
 values ('66666666-6666-6666-6666-666666666666', 'job.approved', 'job',
         'bbbbbbbb-0000-0000-0000-000000000101', '{}');
@@ -566,46 +566,46 @@ begin
   raise notice 'PASS N2: seeker reads zero audit rows';
 end $$;
 reset role;
--- (c) owner session carrying JWT claims: grants pass, the trigger blocks.
+-- (c) Defense-in-depth: even if the audit_logs grants/RLS ever drifted open,
+-- the trigger still blocks the ordinary API roles. Simulate the drift inside
+-- this rolled-back transaction only (never against real state).
+grant update, delete on table public.audit_logs to authenticated;
+alter table public.audit_logs disable row level security;
+set local role authenticated;
 do $$
 begin
   begin
     update public.audit_logs set action = 'tampered';
-    raise exception 'FAIL N: JWT-bearing owner session updated an audit row';
+    raise exception 'FAIL N: trigger did not block authenticated update after simulated drift';
   exception when insufficient_privilege then null;
   end;
   begin
     delete from public.audit_logs;
-    raise exception 'FAIL N: JWT-bearing owner session deleted an audit row';
+    raise exception 'FAIL N: trigger did not block authenticated delete after simulated drift';
   exception when insufficient_privilege then null;
   end;
-  raise notice 'PASS N3: append-only trigger blocks JWT-bearing sessions';
+  raise notice 'PASS N3: append-only trigger backstops ordinary API roles under drift';
 end $$;
--- (d) service_role API session: table grants pass, the trigger still blocks.
+reset role;
+-- (d) service_role is trusted maintenance and may repair audit rows.
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 set local role service_role;
 do $$
 begin
-  begin
-    update public.audit_logs set action = 'tampered';
-    raise exception 'FAIL N: service_role updated an audit row';
-  exception when insufficient_privilege then null;
-  end;
-  begin
-    delete from public.audit_logs;
-    raise exception 'FAIL N: service_role deleted an audit row';
-  exception when insufficient_privilege then null;
-  end;
-  raise notice 'PASS N4: append-only trigger blocks service_role API sessions';
+  update public.audit_logs set actor_id = null;
+  if (select count(*) from public.audit_logs where actor_id is null) <> 1 then
+    raise exception 'FAIL N: service_role repair update did not apply';
+  end if;
+  raise notice 'PASS N4: service_role maintenance can update audit rows';
 end $$;
 reset role;
--- (e) claim-free owner maintenance may still correct/purge rows.
-select set_config('request.jwt.claims', '', true);
+-- (e) Owner maintenance can update/delete regardless of any JWT claims left
+-- in the session — the guard keys on role identity, not claim presence.
 do $$
 begin
-  update public.audit_logs set actor_id = null;
+  update public.audit_logs set action = 'job.approved';
   delete from public.audit_logs;
-  raise notice 'PASS N5: claim-free owner maintenance can update/delete';
+  raise notice 'PASS N5: owner maintenance can update/delete';
 end $$;
 rollback;
 

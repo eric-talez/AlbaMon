@@ -25,14 +25,14 @@
 -- ids) — never emails, phone numbers, addresses, or free-text fields.
 --
 -- Append-only guard: a BEFORE UPDATE OR DELETE trigger rejects changes to
--- audit rows from ANY session that carries API JWT claims — anon, authenticated
--- (admins included), and service_role alike. Sessions without claims (owner
--- migrations, SQL-editor maintenance, GoTrue's supabase_auth_admin) pass, so
--- the actor_id ON DELETE SET NULL cascade from auth-admin account deletions
--- keeps working. Consequence to keep in mind: a future account-deletion flow
--- must remove profiles via the auth admin API or an owner/maintenance session,
--- not via a service_role PostgREST table delete, or the cascade will be
--- rejected by this guard.
+-- audit rows from the ordinary API roles (anon, authenticated — admins
+-- included, since admins act through those roles). It is SECURITY INVOKER and
+-- keys on role identity (current_user), so trusted maintenance is untouched:
+-- the service_role key, owner migrations, SQL-editor sessions, restores, and
+-- the actor_id ON DELETE SET NULL cascade (referential actions run as the
+-- table owner) all pass. Ordinary roles already hold no UPDATE/DELETE grants
+-- on audit_logs; the trigger is defense-in-depth should those grants or the
+-- RLS surface ever drift.
 
 -- ----------------------------------------------------------------------------
 -- 1. Append-only guard for audit_logs
@@ -40,23 +40,24 @@
 create or replace function public.prevent_audit_log_mutation()
 returns trigger
 language plpgsql
-security definer
 set search_path = ''
 as $$
 begin
-  if auth.uid() is not null or coalesce(auth.role(), '') <> '' then
-    raise exception 'audit_logs is append-only: rows cannot be updated or deleted through the API'
+  if current_user in ('anon', 'authenticated') then
+    raise exception 'audit_logs is append-only'
       using errcode = '42501';
   end if;
+
   if tg_op = 'DELETE' then
     return old;
   end if;
+
   return new;
 end;
 $$;
 
 comment on function public.prevent_audit_log_mutation() is
-  'Blocks UPDATE/DELETE on audit_logs for every session carrying API JWT claims (anon, authenticated, service_role); owner/maintenance sessions without claims pass.';
+  'Defense-in-depth: blocks UPDATE/DELETE on audit_logs for the ordinary API roles (anon, authenticated); trusted maintenance (owner, service_role, referential actions) passes.';
 
 drop trigger if exists audit_logs_prevent_mutation on public.audit_logs;
 create trigger audit_logs_prevent_mutation

@@ -307,9 +307,10 @@ client-only) and Supabase RLS.
     `report.dismissed`, `employer_access.approved`,
     `employer_access.rejected`) with minimal structured metadata — statuses,
     booleans, and ids only; no emails, phones, addresses, or free text.
-  - Audit rows are append-only through the API: no new policies or table
-    grants, and a guard trigger rejects UPDATE/DELETE from any JWT-bearing
-    session (service-role keys included). Job approval timestamps `posted_at`
+  - Audit rows are append-only for ordinary API roles: no new policies or
+    table grants, and a guard trigger backstops UPDATE/DELETE for
+    `anon`/`authenticated` even under grant drift; trusted maintenance (owner,
+    `service_role`, FK cascades) passes. Job approval timestamps `posted_at`
     in Postgres (`now()`), replacing the app-minted timestamp.
   - The admin dashboard's recent-activity section now shows these decisions
     with Korean-first labels. Rejection reasons, audit search/export, and

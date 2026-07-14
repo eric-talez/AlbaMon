@@ -166,9 +166,11 @@ report review (`review_report`), and the redefined
 lock the target row, apply the change, and insert exactly one `audit_logs` row
 with `actor_id = auth.uid()` — conflicts and failures write nothing. The
 migration adds **no** `audit_logs` policies or table grants; a new
-`before update or delete` trigger keeps rows append-only for every
-JWT-bearing API session (service-role keys included) while sparing claim-free
-owner/maintenance sessions. Action taxonomy and metadata schema:
+`before update or delete` trigger (SECURITY INVOKER, keyed on `current_user`)
+backstops the ordinary API roles (`anon`/`authenticated`) against ever gaining
+an update/delete path, while trusted maintenance — owner sessions,
+`service_role`, restores, and the `actor_id` FK cascade — passes untouched.
+Action taxonomy and metadata schema:
 [`docs/DATABASE.md`](../docs/DATABASE.md#admin-audit-trail-slice-27). Live
 verification: `supabase/tests/slice-27-admin-audit-writes.sql` (run only
 against a disposable local stack).

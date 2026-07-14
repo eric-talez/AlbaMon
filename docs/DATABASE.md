@@ -37,7 +37,7 @@ its values.
 | `messages` | Application-centered seeker/employer conversations. | `application_id → applications`; body is nonblank and limited to 2,000 characters. |
 | `reports` | Abuse/quality reports. | Job reports filed by signed-in users; reason/status/details are constrained by Slice 11. |
 | `employer_access_requests` | Seeker requests for the employer role (Slice 21). | `requester_id → profiles`; status is `pending`/`approved`/`rejected`; a partial unique index allows **one pending request per requester**; decided rows carry `reviewed_by`/`reviewed_at`. |
-| `audit_logs` | Append-only audit trail of admin moderation decisions (Slice 27). | No `updated_at`; rows are written only by the admin-only `security definer` review functions, atomically with each decision; an append-only trigger rejects API `UPDATE`/`DELETE`. |
+| `audit_logs` | Append-only audit trail of admin moderation decisions (Slice 27). | No `updated_at`; rows are written only by the admin-only `security definer` review functions, atomically with each decision; an append-only trigger rejects `UPDATE`/`DELETE` from the ordinary API roles. |
 
 `public_job_listings` is a read-only, approved-only view used by public job
 pages. It includes job fields plus `company_name` / `company_is_verified`, but
@@ -88,14 +88,15 @@ policy, preventing recursion) with a pinned `search_path`:
   state) return `conflict` and write nothing. Job approval stamps `posted_at`
   with `now()` inside Postgres.
 - `prevent_audit_log_mutation()` → `before update or delete on audit_logs`
-  trigger (Slice 27). Rejects the statement (42501) for **every** session
-  carrying API JWT claims — `anon`, `authenticated` (admins included), and
-  `service_role` alike — so audit history is append-only through the API.
-  Claim-free owner/maintenance sessions (migrations, SQL editor, GoTrue's
-  auth-admin cascades) pass, which keeps the `actor_id` `ON DELETE SET NULL`
-  cascade working for auth-level account deletions; a future account-deletion
-  flow must delete profiles through the auth admin API or an owner session,
-  not a service-role PostgREST table delete.
+  trigger (Slice 27). SECURITY INVOKER on purpose: it keys on role identity
+  (`current_user`) and rejects the row change (42501) when the session runs as
+  an **ordinary API role** — `anon` or `authenticated` (admins included, since
+  admins act through `authenticated`). Those roles already hold no
+  UPDATE/DELETE grants on `audit_logs`, so the trigger is defense-in-depth
+  should grants or RLS ever drift. Trusted maintenance is untouched: owner
+  migrations, SQL-editor sessions, restores, `service_role` operational
+  repair, and the `actor_id` `ON DELETE SET NULL` cascade (referential actions
+  run as the table owner) all pass, so account-deletion flows keep working.
 
 ## Row Level Security summary
 
@@ -110,7 +111,7 @@ RLS is enabled on **all eight tables** and is the authorization gate.
 | `messages` | applicant; current-role owning employer; admin | applicant/owning employer insert only as `auth.uid()`; no update/delete |
 | `reports` | own (reporter); admin | authenticated reporter insert for approved jobs only; admin status update |
 | `employer_access_requests` | own (requester); admin all | requester insert only as self while runtime role is **`seeker`**, initial `pending` state with empty review fields; **no update/delete policy** — decisions go only through `review_employer_access_request()` |
-| `audit_logs` | admin only | **no policy** — inserts happen only inside the Slice 27 admin `security definer` review functions (owner rights); the `audit_logs_prevent_mutation` trigger blocks update/delete from any API session |
+| `audit_logs` | admin only | **no policy** — inserts happen only inside the Slice 27 admin `security definer` review functions (owner rights); the `audit_logs_prevent_mutation` trigger backstops update/delete against the ordinary API roles (owner/service_role maintenance passes) |
 
 ## Table grants (Supabase API roles)
 
@@ -289,10 +290,12 @@ Guarantees:
 - Metadata is minimal and structured — statuses, booleans, and ids only. No
   emails, phone numbers, addresses, report details, job descriptions, or
   request notes are recorded.
-- Rows are append-only through the API: authenticated clients hold only the
-  SELECT grant (admin-filtered by RLS), and the `audit_logs_prevent_mutation`
-  trigger rejects UPDATE/DELETE from any JWT-bearing session, including
-  service-role keys. Claim-free owner/maintenance sessions are exempt.
+- Rows are append-only for ordinary API roles: authenticated clients hold only
+  the SELECT grant (admin-filtered by RLS), and the
+  `audit_logs_prevent_mutation` trigger backstops UPDATE/DELETE for
+  `anon`/`authenticated` even if that grant surface ever drifts. Trusted
+  maintenance — owner sessions, `service_role`, restores, and the `actor_id`
+  FK cascade — is deliberately exempt.
 - The admin dashboard's recent-activity section reads the newest rows and maps
   these actions to Korean-first labels; unknown actions render raw rather than
   hiding.
