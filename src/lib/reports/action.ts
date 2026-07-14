@@ -4,11 +4,14 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/guards";
 import { createJobReport } from "@/lib/db/reports";
 import { parseReportForm } from "@/lib/reports/validation";
+import { enforceUserPolicy } from "@/lib/rate-limit/service";
+import { RATE_LIMIT_POLICIES } from "@/lib/rate-limit/policies";
+import { rateLimitedResult } from "@/lib/rate-limit/types";
+import type { RateLimitedResult } from "@/lib/rate-limit/types";
 
-export interface ReportJobFormState {
-  status: "idle" | "success" | "duplicate" | "error";
-  message: string;
-}
+export type ReportJobFormState =
+  | { status: "idle" | "success" | "duplicate" | "error"; message: string }
+  | RateLimitedResult;
 
 export async function submitJobReportForUser(
   jobId: string,
@@ -17,6 +20,9 @@ export async function submitJobReportForUser(
   const user = await requireUser(`/jobs/${encodeURIComponent(jobId)}/report`);
   const parsed = parseReportForm(formData);
   if (!parsed.ok) return { status: "error", message: parsed.message };
+
+  const limit = await enforceUserPolicy(RATE_LIMIT_POLICIES.createReport, user.id);
+  if (!limit.allowed) return rateLimitedResult(limit.retryAfterSeconds);
 
   const result = await createJobReport(
     jobId,

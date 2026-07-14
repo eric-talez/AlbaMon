@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/auth/guards", () => ({ requireRole: vi.fn() }));
-vi.mock("@/lib/supabase/config", () => ({ isSupabaseConfigured: vi.fn() }));
+vi.mock("@/lib/supabase/config", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/supabase/config")>();
+  return { ...actual, isSupabaseConfigured: vi.fn() };
+});
 vi.mock("@/lib/db/companies", () => ({
   createEmployerCompany: vi.fn(),
   getOwnedEmployerCompany: vi.fn(),

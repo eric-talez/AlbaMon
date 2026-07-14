@@ -38,6 +38,19 @@ export function isProduction(): boolean {
 }
 
 /**
+ * Production-*safe* runtime: real production OR any Vercel deployment (both the
+ * `production` and `preview` environments). Fail-closed paths — e.g. the rate
+ * limiter denying when its counter is unavailable — must engage everywhere a
+ * real user can reach the app, not only on the production alias. Local dev/test
+ * (no VERCEL_ENV, non-production NODE_ENV) is the only place they fail open.
+ */
+export function isProductionRuntime(): boolean {
+  if (isProduction()) return true;
+  const vercelEnv = process.env.VERCEL_ENV;
+  return vercelEnv === "production" || vercelEnv === "preview";
+}
+
+/**
  * Dev-mode auth (the unsigned `kw_dev_session` role picker) is permitted ONLY
  * outside production AND only while Supabase is not configured. It must never be
  * reachable in production — an unsigned cookie there would be trivially forgeable.

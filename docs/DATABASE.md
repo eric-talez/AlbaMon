@@ -100,7 +100,11 @@ policy, preventing recursion) with a pinned `search_path`:
 
 ## Row Level Security summary
 
-RLS is enabled on **all eight tables** and is the authorization gate.
+RLS is enabled on **all nine tables** and is the authorization gate. Eight are
+application tables (below); the ninth, `rate_limit_buckets` (Slice 28), is a
+private operational counter with RLS on and **no policies at all** — the API
+roles see zero rows and hold no privileges; it is reached only through the
+`service_role`-only `consume_rate_limit` function.
 
 | Table | Read | Write |
 | --- | --- | --- |
@@ -112,6 +116,7 @@ RLS is enabled on **all eight tables** and is the authorization gate.
 | `reports` | own (reporter); admin | authenticated reporter insert for approved jobs only; admin status update |
 | `employer_access_requests` | own (requester); admin all | requester insert only as self while runtime role is **`seeker`**, initial `pending` state with empty review fields; **no update/delete policy** — decisions go only through `review_employer_access_request()` |
 | `audit_logs` | admin only | **no policy** — inserts happen only inside the Slice 27 admin `security definer` review functions (owner rights); the `audit_logs_prevent_mutation` trigger backstops update/delete against the ordinary API roles (owner/service_role maintenance passes) |
+| `rate_limit_buckets` | **no policy** (none for `anon`/`authenticated`) | **no policy** — all reads/writes go through the `service_role`-only `consume_rate_limit()` function (Slice 28); stores only opaque HMAC subject hashes |
 
 ## Table grants (Supabase API roles)
 
@@ -145,6 +150,18 @@ from earlier migrations and are unchanged. **RLS remains the row-level
 authorization gate on every table** — the grants are the table-level floor,
 the policies filter the rows. `tests/db-schema.test.ts` ("explicit table
 grants for API roles") pins the grant surface.
+
+`20260714010000_server_rate_limiting.sql` (Slice 28) adds the private
+`rate_limit_buckets` counter following the same revoke-then-grant discipline but
+even tighter: **nothing** for `public`/`anon`/`authenticated`, and only
+`SELECT/INSERT/UPDATE/DELETE` for `service_role`. RLS is on with no policies, so
+the sole path to the table is the `service_role`-only `consume_rate_limit(scope,
+subject_hash, max_attempts, window_seconds)` function — a SECURITY DEFINER
+routine (pinned empty `search_path`, execute revoked from
+`public`/`anon`/`authenticated`) that atomically increments a fixed window from
+database time and returns `(allowed, remaining, retry_after_seconds)`. It stores
+only 64-hex HMAC subject hashes — never raw phone numbers, IPs, user IDs, emails,
+or OTP codes. `tests/db-rate-limit.test.ts` pins the grant/policy/function surface.
 
 `20260713000000_restrict_company_public_reads.sql` (Slice 25) then tightens the
 `companies` base table: it drops the `companies_select_public_verified` policy

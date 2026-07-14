@@ -5,11 +5,14 @@ import { createApplication } from "@/lib/db/applications";
 import { requireUser } from "@/lib/auth/guards";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { notifyApplicationSubmitted } from "@/lib/notifications/dev";
+import { enforceUserPolicy } from "@/lib/rate-limit/service";
+import { RATE_LIMIT_POLICIES } from "@/lib/rate-limit/policies";
+import { rateLimitedResult } from "@/lib/rate-limit/types";
+import type { RateLimitedResult } from "@/lib/rate-limit/types";
 
-export interface ApplicationFormState {
-  status: "idle" | "success" | "duplicate" | "error";
-  message: string;
-}
+export type ApplicationFormState =
+  | { status: "idle" | "success" | "duplicate" | "error"; message: string }
+  | RateLimitedResult;
 
 export async function submitApplication(
   jobId: string,
@@ -45,6 +48,14 @@ export async function submitApplication(
       message: "지원 메모는 1,000자 이하로 작성해 주세요.",
     };
   }
+
+  // Rate-limit before any business DB work (job lookup / insert). A denied
+  // request performs no read and no mutation.
+  const limit = await enforceUserPolicy(
+    RATE_LIMIT_POLICIES.submitApplication,
+    user.id,
+  );
+  if (!limit.allowed) return rateLimitedResult(limit.retryAfterSeconds);
 
   try {
     const job = await getApprovedJobById(jobId);

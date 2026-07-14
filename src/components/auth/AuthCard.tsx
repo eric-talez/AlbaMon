@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSocialProviders, isPhoneAuthEnabled } from "@/lib/auth/providers";
+import { requestPhoneOtp, verifyPhoneOtpAction } from "@/lib/auth/otp-actions";
 import { DevAuthForm } from "@/components/auth/DevAuthForm";
 import { PhoneOtpForm } from "@/components/auth/PhoneOtpForm";
 import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
@@ -69,7 +70,11 @@ export function AuthCard({ mode, next, error }: AuthCardProps) {
           휴대폰으로 로그인 (Sign in with phone)
         </h2>
         {isPhoneAuthEnabled() ? (
-          <PhoneOtpForm next={next} />
+          <PhoneOtpForm
+            next={next}
+            requestOtp={requestPhoneOtp}
+            verifyOtp={verifyPhoneOtpAction}
+          />
         ) : (
           <p className="mt-2 text-xs text-muted">
             휴대폰 인증은 SMS 설정 후 이용 가능합니다. (Phone verification

@@ -20,6 +20,7 @@ supabase/
     20260707000000_explicit_table_grants.sql # explicit least-privilege API-role grants (RLS stays the row gate)
     20260713000000_restrict_company_public_reads.sql # drop public companies read + revoke anon SELECT (view-only company identity)
     20260714000000_transactional_admin_audit_logs.sql # admin review functions write audit_logs atomically + append-only guard
+    20260714010000_server_rate_limiting.sql # private rate_limit_buckets + atomic consume_rate_limit RPC (service_role-only)
   seed.sql                            # LA/OC demo companies + jobs
   tests/                              # live psql verification scripts (disposable local stacks only)
 ```

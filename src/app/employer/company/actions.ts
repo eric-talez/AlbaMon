@@ -9,12 +9,14 @@ import {
   updateEmployerCompany,
 } from "@/lib/db/companies";
 import { parseEmployerCompanyForm } from "@/lib/employer/validation";
+import { enforceUserPolicy } from "@/lib/rate-limit/service";
+import { RATE_LIMIT_POLICIES } from "@/lib/rate-limit/policies";
+import { rateLimitedResult } from "@/lib/rate-limit/types";
+import type { RateLimitedResult } from "@/lib/rate-limit/types";
 
-export interface CompanyFormState {
-  status: "idle" | "success" | "error";
-  message: string;
-  companyId?: string;
-}
+export type CompanyFormState =
+  | { status: "idle" | "success" | "error"; message: string; companyId?: string }
+  | RateLimitedResult;
 
 export async function saveEmployerCompany(
   _previousState: CompanyFormState,
@@ -38,6 +40,14 @@ export async function saveEmployerCompany(
     if (!owned) {
       return { status: "error", message: "수정할 수 있는 회사 정보를 찾지 못했습니다." };
     }
+  } else {
+    // Rate-limit company CREATION only. Ordinary profile edits (companyId set)
+    // are intentionally left unlimited.
+    const limit = await enforceUserPolicy(
+      RATE_LIMIT_POLICIES.createCompany,
+      user.id,
+    );
+    if (!limit.allowed) return rateLimitedResult(limit.retryAfterSeconds);
   }
 
   const result = companyId
