@@ -259,8 +259,9 @@ describe("transactional admin audit migration (Slice 27)", () => {
       "review_employer_access_request",
     );
     expect(finalReview).toMatch(/insert into public\.audit_logs/i);
-    expect(finalReview).toMatch(/get diagnostics promoted_count = row_count/i);
-    expect(finalReview).toMatch(/'role_promoted', promoted_count > 0/i);
+    expect(finalReview).toMatch(/get diagnostics v_promoted_count = row_count/i);
+    expect(finalReview).toMatch(/v_role_promoted := v_promoted_count = 1/i);
+    expect(finalReview).toMatch(/'role_promoted', v_role_promoted/i);
     // Original review semantics survive the redefinition.
     expect(finalReview).toMatch(/target\.status <> 'pending'/i);
     expect(finalReview).toMatch(/reviewed_by = auth\.uid\(\)/i);

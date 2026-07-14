@@ -270,7 +270,8 @@ set search_path = ''
 as $$
 declare
   target public.employer_access_requests%rowtype;
-  promoted_count integer := 0;
+  v_promoted_count integer := 0;
+  v_role_promoted boolean := false;
 begin
   if auth.uid() is null or not public.is_admin() then
     raise exception 'Only an admin may review employer access requests';
@@ -302,7 +303,8 @@ begin
     set role = 'employer'
     where id = target.requester_id
       and role = 'seeker';
-    get diagnostics promoted_count = row_count;
+    get diagnostics v_promoted_count = row_count;
+    v_role_promoted := v_promoted_count = 1;
   end if;
 
   insert into public.audit_logs (actor_id, action, entity_type, entity_id, metadata)
@@ -319,7 +321,7 @@ begin
       'requester_id', target.requester_id,
       'from_status', target.status,
       'to_status', decision,
-      'role_promoted', promoted_count > 0
+      'role_promoted', v_role_promoted
     )
   );
 
