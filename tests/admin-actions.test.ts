@@ -57,11 +57,7 @@ describe("admin job moderation action", () => {
   it("reauthenticates exact admin and revalidates public routes on approval", async () => {
     const result = await moderateJob(idle, jobForm("approve"));
     expect(mockRequireRole).toHaveBeenCalledWith("admin", "/admin/jobs");
-    expect(mockModerateJob).toHaveBeenCalledWith(
-      validJobId,
-      "approve",
-      expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
-    );
+    expect(mockModerateJob).toHaveBeenCalledWith(validJobId, "approve");
     expect(result.status).toBe("success");
     for (const path of ["/admin", "/admin/jobs", "/jobs", `/jobs/${validJobId}`]) {
       expect(revalidatePath).toHaveBeenCalledWith(path);

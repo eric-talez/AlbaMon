@@ -192,15 +192,26 @@ export async function updateReportStatus(
 
   try {
     const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("reports")
-      .update({ status })
-      .eq("id", reportId)
-      .eq("status", "open")
-      .select("id")
-      .maybeSingle();
-    if (error) throw error;
-    return data ? { status: "updated" } : { status: "conflict" };
+    // Admin-only SQL function: transitions the open report and records the
+    // audit entry in one transaction; non-open reports return conflict.
+    const { data, error } = await supabase.rpc("review_report", {
+      report_id: reportId,
+      decision: status,
+    });
+    if (error) {
+      // P0001 = the function's own admin/decision exceptions; 42501 = execute
+      // privilege missing. Both are unreachable behind requireRole("admin").
+      if (error.code === "P0001" || error.code === "42501") {
+        console.error("[db] updateReportStatus blocked:", error.code);
+        return { status: "error" };
+      }
+      throw error;
+    }
+    if (data === "conflict") return { status: "conflict" };
+    if (data === "reviewed" || data === "dismissed") {
+      return { status: "updated" };
+    }
+    throw new Error(`Unexpected report review result: ${String(data)}`);
   } catch (error) {
     console.error("[db] updateReportStatus failed:", error);
     return { status: "error" };

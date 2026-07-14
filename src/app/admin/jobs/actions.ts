@@ -36,11 +36,7 @@ export async function moderateJob(
     return { status: "error", message: "올바른 검토 요청이 아닙니다." };
   }
 
-  const result = await moderatePendingJob(
-    jobId,
-    decision,
-    new Date().toISOString(),
-  );
+  const result = await moderatePendingJob(jobId, decision);
   if (result.status === "updated") {
     refreshAdminJobPaths(jobId, decision === "approve");
     return {

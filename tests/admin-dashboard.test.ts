@@ -182,14 +182,25 @@ describe("admin operations dashboard", () => {
       entries: [
         {
           id: "log-1",
-          action: "job.approve",
+          action: "job.approved",
           entityType: "job",
+          createdAt: "2026-07-01T00:00:00Z",
+        },
+        {
+          id: "log-2",
+          action: "custom.future_action",
+          entityType: "widget",
           createdAt: "2026-07-01T00:00:00Z",
         },
       ],
     });
     let html = renderToStaticMarkup(await AdminHomePage());
-    expect(html).toContain("job.approve");
+    // Known taxonomy values render their Korean-first labels...
+    expect(html).toContain("공고 승인 (Job approved)");
+    expect(html).toContain(">공고<");
+    // ...and unknown values fall back to the raw strings instead of hiding.
+    expect(html).toContain("custom.future_action");
+    expect(html).toContain("widget");
     // ko-KR medium date; day shifts with the runner's timezone, year doesn't.
     expect(html).toMatch(/2026\. \d{1,2}\. \d{1,2}\./);
 

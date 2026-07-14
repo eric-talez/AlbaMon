@@ -19,7 +19,9 @@ supabase/
     20260706000000_employer_access_requests.sql # seeker→employer request queue + admin review RPC
     20260707000000_explicit_table_grants.sql # explicit least-privilege API-role grants (RLS stays the row gate)
     20260713000000_restrict_company_public_reads.sql # drop public companies read + revoke anon SELECT (view-only company identity)
+    20260714000000_transactional_admin_audit_logs.sql # admin review functions write audit_logs atomically + append-only guard
   seed.sql                            # LA/OC demo companies + jobs
+  tests/                              # live psql verification scripts (disposable local stacks only)
 ```
 
 ## Apply locally (Supabase CLI)
@@ -81,11 +83,14 @@ and employer-created jobs to remain pending and unboosted. Triggers block normal
 users from changing verification or boost fields, while allowing admin,
 service-role, and trusted unauthenticated migration/database execution.
 
-Slice 8 admin moderation requires no additional migration. Cookie-authenticated
-admins use the existing admin RLS policies and trusted trigger paths to approve
-or reject pending jobs and change only company verification status. Public job
-reads remain constrained by the approved-only view; no service-role client is
-used for these user-facing actions.
+Slice 8 admin moderation required no additional migration at the time:
+cookie-authenticated admins used the existing admin RLS policies and trusted
+trigger paths to approve or reject pending jobs and change only company
+verification status. Since Slice 27 (`20260714000000`) those decisions run
+through admin-only `security definer` functions that also record the decision
+in `audit_logs` atomically. Public job reads remain constrained by the
+approved-only view; no service-role client is used for these user-facing
+actions.
 
 Slice 9 adds `messages` and application-thread access helpers. RLS derives the
 caller from `auth.uid()` and permits reads only to the seeker applicant, owning
@@ -126,9 +131,10 @@ only an admin can decide it. The table has insert/select policies but **no
 update or delete policy** — approval and rejection go exclusively through the
 admin-only `review_employer_access_request()` `security definer` function,
 which stamps `reviewed_by`/`reviewed_at` and, on approval, promotes
-`profiles.role` to `employer` in the same transaction. Rejection changes no
-role, users cannot self-promote, and the user-facing flow never uses the
-service-role key. Approval does not create a company; company registration and
+`profiles.role` to `employer` in the same transaction (and, since Slice 27,
+records the decision in `audit_logs` within that transaction too). Rejection
+changes no role, users cannot self-promote, and the user-facing flow never
+uses the service-role key. Approval does not create a company; company registration and
 job submission still follow the existing employer flow, and admin review is
 not a business/legal/work-authorization verification.
 
@@ -150,6 +156,24 @@ public read surface: after it, `anon` may only SELECT `jobs` (rows limited to
 its anon SELECT grant is revoked and the `companies_select_public_verified`
 policy is dropped — so public company identity is served only through
 `public_job_listings`. Employer-owner and admin company reads are unchanged.
+
+`20260714000000_transactional_admin_audit_logs.sql` (Slice 27) makes every
+admin moderation decision transactional with its audit trail. Job moderation
+(`moderate_pending_job`), company verification (`set_company_verification`),
+report review (`review_report`), and the redefined
+`review_employer_access_request` are admin-only `security definer` functions
+(empty pinned `search_path`, execute granted only to `authenticated`) that
+lock the target row, apply the change, and insert exactly one `audit_logs` row
+with `actor_id = auth.uid()` — conflicts and failures write nothing. The
+migration adds **no** `audit_logs` policies or table grants; a new
+`before update or delete` trigger (SECURITY INVOKER, keyed on `current_user`)
+backstops the ordinary API roles (`anon`/`authenticated`) against ever gaining
+an update/delete path, while trusted maintenance — owner sessions,
+`service_role`, restores, and the `actor_id` FK cascade — passes untouched.
+Action taxonomy and metadata schema:
+[`docs/DATABASE.md`](../docs/DATABASE.md#admin-audit-trail-slice-27). Live
+verification: `supabase/tests/slice-27-admin-audit-writes.sql` (run only
+against a disposable local stack).
 
 ## What the seed contains
 

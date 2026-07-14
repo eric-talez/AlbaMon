@@ -179,49 +179,71 @@ describe("admin moderation reads", () => {
 });
 
 describe("admin moderation writes", () => {
-  it("filters approval by id and pending status and sets only approval fields", async () => {
-    const maybeSingle = vi.fn().mockResolvedValue({ data: { id: "job-1" }, error: null });
-    const select = vi.fn(() => ({ maybeSingle }));
-    const statusEq = vi.fn(() => ({ select }));
-    const idEq = vi.fn(() => ({ eq: statusEq }));
-    const update = vi.fn(() => ({ eq: idEq }));
-    mockClient.mockResolvedValue({ from: vi.fn(() => ({ update })) } as never);
+  it("delegates job approval to the transactional admin SQL function", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "approved", error: null });
+    mockClient.mockResolvedValue({ rpc } as never);
 
-    await expect(
-      moderatePendingJob("job-1", "approve", "2026-06-21T12:00:00.000Z"),
-    ).resolves.toEqual({ status: "updated" });
-    expect(update).toHaveBeenCalledWith({
-      moderation_status: "approved",
-      posted_at: "2026-06-21T12:00:00.000Z",
+    await expect(moderatePendingJob("job-1", "approve")).resolves.toEqual({
+      status: "updated",
     });
-    expect(idEq).toHaveBeenCalledWith("id", "job-1");
-    expect(statusEq).toHaveBeenCalledWith("moderation_status", "pending");
+    expect(rpc).toHaveBeenCalledWith("moderate_pending_job", {
+      job_id: "job-1",
+      decision: "approved",
+    });
   });
 
-  it("rejects with only status and treats no updated row as a conflict", async () => {
-    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-    const select = vi.fn(() => ({ maybeSingle }));
-    const statusEq = vi.fn(() => ({ select }));
-    const idEq = vi.fn(() => ({ eq: statusEq }));
-    const update = vi.fn(() => ({ eq: idEq }));
-    mockClient.mockResolvedValue({ from: vi.fn(() => ({ update })) } as never);
+  it("delegates job rejection and maps a stale review to a conflict", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "conflict", error: null });
+    mockClient.mockResolvedValue({ rpc } as never);
 
-    await expect(
-      moderatePendingJob("job-1", "reject", "ignored"),
-    ).resolves.toEqual({ status: "conflict" });
-    expect(update).toHaveBeenCalledWith({ moderation_status: "rejected" });
+    await expect(moderatePendingJob("job-1", "reject")).resolves.toEqual({
+      status: "conflict",
+    });
+    expect(rpc).toHaveBeenCalledWith("moderate_pending_job", {
+      job_id: "job-1",
+      decision: "rejected",
+    });
   });
 
-  it("updates only the company verification field", async () => {
-    const maybeSingle = vi.fn().mockResolvedValue({ data: { id: "company-1" }, error: null });
-    const select = vi.fn(() => ({ maybeSingle }));
-    const eq = vi.fn(() => ({ select }));
-    const update = vi.fn(() => ({ eq }));
-    mockClient.mockResolvedValue({ from: vi.fn(() => ({ update })) } as never);
+  it("maps the job function's admin gate to a generic error", async () => {
+    for (const code of ["P0001", "42501"]) {
+      const rpc = vi.fn().mockResolvedValue({ data: null, error: { code } });
+      mockClient.mockResolvedValue({ rpc } as never);
+      await expect(moderatePendingJob("job-1", "approve")).resolves.toEqual({
+        status: "error",
+      });
+    }
+  });
 
-    await expect(setCompanyVerification("company-1", true)).resolves.toEqual({ status: "updated" });
-    expect(update).toHaveBeenCalledWith({ is_verified: true });
-    expect(eq).toHaveBeenCalledWith("id", "company-1");
+  it("delegates company verification to the transactional SQL function", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "verified", error: null });
+    mockClient.mockResolvedValue({ rpc } as never);
+
+    await expect(setCompanyVerification("company-1", true)).resolves.toEqual({
+      status: "updated",
+    });
+    expect(rpc).toHaveBeenCalledWith("set_company_verification", {
+      company_id: "company-1",
+      verified: true,
+    });
+  });
+
+  it("maps unverification and a no-op company state to updated/conflict", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "unverified", error: null });
+    mockClient.mockResolvedValue({ rpc } as never);
+    await expect(setCompanyVerification("company-1", false)).resolves.toEqual({
+      status: "updated",
+    });
+    expect(rpc).toHaveBeenCalledWith("set_company_verification", {
+      company_id: "company-1",
+      verified: false,
+    });
+
+    const conflictRpc = vi.fn().mockResolvedValue({ data: "conflict", error: null });
+    mockClient.mockResolvedValue({ rpc: conflictRpc } as never);
+    await expect(setCompanyVerification("company-1", false)).resolves.toEqual({
+      status: "conflict",
+    });
   });
 });
 

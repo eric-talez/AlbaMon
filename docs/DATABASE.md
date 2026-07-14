@@ -37,7 +37,7 @@ its values.
 | `messages` | Application-centered seeker/employer conversations. | `application_id → applications`; body is nonblank and limited to 2,000 characters. |
 | `reports` | Abuse/quality reports. | Job reports filed by signed-in users; reason/status/details are constrained by Slice 11. |
 | `employer_access_requests` | Seeker requests for the employer role (Slice 21). | `requester_id → profiles`; status is `pending`/`approved`/`rejected`; a partial unique index allows **one pending request per requester**; decided rows carry `reviewed_by`/`reviewed_at`. |
-| `audit_logs` | Append-only audit trail. | No `updated_at`; writes via service-role only. |
+| `audit_logs` | Append-only audit trail of admin moderation decisions (Slice 27). | No `updated_at`; rows are written only by the admin-only `security definer` review functions, atomically with each decision; an append-only trigger rejects `UPDATE`/`DELETE` from the ordinary API roles. |
 
 `public_job_listings` is a read-only, approved-only view used by public job
 pages. It includes job fields plus `company_name` / `company_is_verified`, but
@@ -73,7 +73,30 @@ policy, preventing recursion) with a pinned `search_path`:
   approves/rejects a **pending** request, stamps `reviewed_by`/`reviewed_at`,
   and on approval promotes the requester's `profiles.role` from `seeker` to
   `employer` in the same transaction. Rejection never changes any role, and an
-  already-decided request returns `conflict`.
+  already-decided request returns `conflict`. Since Slice 27 the same
+  transaction also inserts one `employer_access.approved`/`.rejected`
+  `audit_logs` row (with a `role_promoted` flag).
+- `moderate_pending_job(job_id uuid, decision text)`,
+  `set_company_verification(company_id uuid, verified boolean)`, and
+  `review_report(report_id uuid, decision text)` → Slice 27 admin-only
+  `security definer` mutations (empty pinned `search_path`, execute revoked
+  from `public`/`anon`, granted only to `authenticated`). Each requires a
+  non-null `auth.uid()` plus `is_admin()`, validates the requested decision,
+  locks the target row with `FOR UPDATE`, applies the entity change, and
+  inserts exactly one `audit_logs` row — all in one transaction. Stale or
+  repeated requests (and a company already in the requested verification
+  state) return `conflict` and write nothing. Job approval stamps `posted_at`
+  with `now()` inside Postgres.
+- `prevent_audit_log_mutation()` → `before update or delete on audit_logs`
+  trigger (Slice 27). SECURITY INVOKER on purpose: it keys on role identity
+  (`current_user`) and rejects the row change (42501) when the session runs as
+  an **ordinary API role** — `anon` or `authenticated` (admins included, since
+  admins act through `authenticated`). Those roles already hold no
+  UPDATE/DELETE grants on `audit_logs`, so the trigger is defense-in-depth
+  should grants or RLS ever drift. Trusted maintenance is untouched: owner
+  migrations, SQL-editor sessions, restores, `service_role` operational
+  repair, and the `actor_id` `ON DELETE SET NULL` cascade (referential actions
+  run as the table owner) all pass, so account-deletion flows keep working.
 
 ## Row Level Security summary
 
@@ -88,7 +111,7 @@ RLS is enabled on **all eight tables** and is the authorization gate.
 | `messages` | applicant; current-role owning employer; admin | applicant/owning employer insert only as `auth.uid()`; no update/delete |
 | `reports` | own (reporter); admin | authenticated reporter insert for approved jobs only; admin status update |
 | `employer_access_requests` | own (requester); admin all | requester insert only as self while runtime role is **`seeker`**, initial `pending` state with empty review fields; **no update/delete policy** — decisions go only through `review_employer_access_request()` |
-| `audit_logs` | admin only | **no policy** — service-role only |
+| `audit_logs` | admin only | **no policy** — inserts happen only inside the Slice 27 admin `security definer` review functions (owner rights); the `audit_logs_prevent_mutation` trigger backstops update/delete against the ordinary API roles (owner/service_role maintenance passes) |
 
 ## Table grants (Supabase API roles)
 
@@ -187,12 +210,17 @@ inserts still set it to an explicit `null` to match the insert policy). No
 payments table, subscription schema, refund tooling, or billing portal schema
 exists.
 
-Admin moderation uses the same cookie-authenticated client through
-`src/lib/db/admin-moderation.ts`. Existing admin RLS permits the required reads
-and narrow updates, so Slice 8 adds no migration. Job decisions filter by both
-job ID and current `pending` status; approval updates status and `posted_at`,
-rejection updates status only, and company verification updates only
-`is_verified`. Owner profile lookups select only ID, display name, and email.
+Admin moderation reads use the same cookie-authenticated client through
+`src/lib/db/admin-moderation.ts`; existing admin RLS permits them. Since
+Slice 27 the **writes** no longer touch tables directly: job decisions call
+`moderate_pending_job()` and company verification calls
+`set_company_verification()`, so each decision and its `audit_logs` entry
+commit or roll back together. Only a `pending` job can be moderated (approval
+stamps `posted_at` via `now()` in Postgres, rejection changes status only),
+and a company already in the requested verification state returns `conflict`
+without writing anything. The actor recorded on every audit row is
+`auth.uid()` — never a client-supplied value. Owner profile lookups select
+only ID, display name, and email.
 
 Application messages use `src/lib/db/messages.ts` and the Slice 9
 `can_access_application_thread(uuid)` helper. The helper derives identity and
@@ -214,8 +242,12 @@ reporting the same job with the same reason.
 
 Admin report queue reads use existing admin RLS and narrow follow-up reads for
 job title/status, company name, and reporter display name/email only. Admin
-actions update only open report status to `reviewed` or `dismissed`; they do not
-reject jobs, suspend accounts, send email, or expand audit logs.
+decisions call the Slice 27 `review_report()` function: only an `open` report
+can move to `reviewed` or `dismissed`, the decision writes one
+`report.reviewed`/`report.dismissed` audit row in the same transaction, and a
+stale/repeated request returns `conflict` and writes nothing. Report free-text
+`details` never enter audit metadata. Admin actions still do not reject jobs,
+suspend accounts, or send email.
 
 Employer access requests (Slice 21) use
 [`src/lib/db/employer-access-requests.ts`](../src/lib/db/employer-access-requests.ts).
@@ -227,13 +259,50 @@ environments show a setup-required state. Inserts rely on the seeker-only
 self-insert RLS policy, and duplicate open requests surface as
 `duplicate_pending` via the partial unique index. Admin review at
 `/admin/employer-requests` calls the `review_employer_access_request()` RPC,
-so approval (request status + `profiles.role` promotion to `employer`) is
-atomic, rejection changes no role, and requesters can never approve
-themselves. Approval does **not** create a company: the new employer still
+so approval (request status + `profiles.role` promotion to `employer` + the
+`audit_logs` entry since Slice 27) is atomic, rejection changes no role, and
+requesters can never approve themselves. Approval does **not** create a company: the new employer still
 registers company details and submits jobs through the existing flow, and
 public job visibility remains approved-only. K-Work US does not verify or
 guarantee business registration, legal status, or work authorization as part
 of this review.
+
+## Admin audit trail (Slice 27)
+
+Every admin moderation decision writes exactly one `audit_logs` row inside the
+same database transaction as the entity change. The stable action taxonomy:
+
+| Action | Entity (`entity_type` / `entity_id`) | Metadata keys |
+| --- | --- | --- |
+| `job.approved` / `job.rejected` | `job` / job id | `decision`, `from_status`, `to_status` |
+| `company.verified` / `company.unverified` | `company` / company id | `from_verified`, `to_verified` |
+| `report.reviewed` / `report.dismissed` | `report` / report id | `from_status`, `to_status` |
+| `employer_access.approved` / `employer_access.rejected` | `employer_access_request` / request id | `decision`, `requester_id`, `from_status`, `to_status`, `role_promoted` |
+
+Guarantees:
+
+- `actor_id` is always `auth.uid()` captured inside Postgres; callers cannot
+  supply actor, action, entity, or metadata values (there is no generic
+  audit-write RPC).
+- Conflicts, validation failures, and unauthorized calls return/raise **before**
+  the audit insert, so they never leave rows behind; if the audit insert itself
+  fails, the entity mutation rolls back with it.
+- Metadata is minimal and structured — statuses, booleans, and ids only. No
+  emails, phone numbers, addresses, report details, job descriptions, or
+  request notes are recorded.
+- Rows are append-only for ordinary API roles: authenticated clients hold only
+  the SELECT grant (admin-filtered by RLS), and the
+  `audit_logs_prevent_mutation` trigger backstops UPDATE/DELETE for
+  `anon`/`authenticated` even if that grant surface ever drifts. Trusted
+  maintenance — owner sessions, `service_role`, restores, and the `actor_id`
+  FK cascade — is deliberately exempt.
+- The admin dashboard's recent-activity section reads the newest rows and maps
+  these actions to Korean-first labels; unknown actions render raw rather than
+  hiding.
+
+Static coverage lives in `tests/admin-audit-migration.test.ts`; live coverage
+in `supabase/tests/slice-27-admin-audit-writes.sql` (disposable local stack
+only).
 
 ## Known limitations
 

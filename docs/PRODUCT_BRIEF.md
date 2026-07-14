@@ -115,7 +115,8 @@ client-only) and Supabase RLS.
     1 draft job). See [`DATABASE.md`](DATABASE.md).
   - **Row Level Security** on all tables: public reads only `approved` jobs;
     profile self-update cannot change role; employer job inserts are forced to
-    `pending`; audit logs are admin-read / service-role-write only.
+    `pending`; audit logs are admin-read only and, since Slice 27, written by
+    the admin-only SECURITY DEFINER review functions (never by clients).
   - Slice 4.5 owner policies require the actor's current employer/admin role, so
     role demotion revokes private ownership-based access.
 - **Slice 4 — Job browse/search:** ✅ scoped implementation done.
@@ -256,8 +257,9 @@ client-only) and Supabase RLS.
     from [`LOCAL_SUPABASE.md`](LOCAL_SUPABASE.md); dev-auth admin previews
     the UI only, live counts need a configured Supabase.
   - Read-only recent-activity section on `audit_logs` (admin-read RLS,
-    narrow select, latest 5); nothing writes the table yet, so its calm
-    empty state is expected. No audit-write behavior was added.
+    narrow select, latest 5); at the time nothing wrote the table, so its
+    calm empty state was expected. Audit writes arrived in Slice 27 and now
+    populate this section.
   - No schema/RLS changes, no service-role reads, and payments, auth
     providers, and public job visibility are unchanged.
 - **Slice 23 — De-scope payments:** done.
@@ -292,3 +294,25 @@ client-only) and Supabase RLS.
     before provider E2E can complete. Naver stays setup-required pending
     custom-OIDC verification; local phone test OTP and hosted SMS remain
     separate flows; payments/boosts stay de-scoped (Slice 23).
+- **Slice 27 — Transactional admin audit logs:** scoped implementation done.
+  - Every admin moderation decision — job approve/reject, company
+    verify/unverify, report review/dismiss, employer-access approve/reject —
+    now runs through an admin-only SECURITY DEFINER function
+    (`20260714000000_transactional_admin_audit_logs.sql`) that applies the
+    entity change and inserts exactly one `audit_logs` row in the same
+    transaction. Actor identity is always `auth.uid()` inside Postgres;
+    conflicts, validation failures, and unauthorized calls write nothing.
+  - Stable action taxonomy (`job.approved`, `job.rejected`,
+    `company.verified`, `company.unverified`, `report.reviewed`,
+    `report.dismissed`, `employer_access.approved`,
+    `employer_access.rejected`) with minimal structured metadata — statuses,
+    booleans, and ids only; no emails, phones, addresses, or free text.
+  - Audit rows are append-only for ordinary API roles: no new policies or
+    table grants, and a guard trigger backstops UPDATE/DELETE for
+    `anon`/`authenticated` even under grant drift; trusted maintenance (owner,
+    `service_role`, FK cascades) passes. Job approval timestamps `posted_at`
+    in Postgres (`now()`), replacing the app-minted timestamp.
+  - The admin dashboard's recent-activity section now shows these decisions
+    with Korean-first labels. Rejection reasons, audit search/export, and
+    account deletion remain out of scope
+    ([`DATABASE.md`](DATABASE.md#admin-audit-trail-slice-27)).

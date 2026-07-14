@@ -175,18 +175,36 @@ describe("getAdminReports", () => {
 });
 
 describe("updateReportStatus", () => {
-  it("updates only open reports to reviewed or dismissed", async () => {
-    const maybeSingle = vi.fn().mockResolvedValue({ data: { id: "report-1" }, error: null });
-    const select = vi.fn(() => ({ maybeSingle }));
-    const statusEq = vi.fn(() => ({ select }));
-    const idEq = vi.fn(() => ({ eq: statusEq }));
-    const update = vi.fn(() => ({ eq: idEq }));
-    mockClient.mockResolvedValue({ from: vi.fn(() => ({ update })) } as never);
+  it("delegates review decisions to the transactional admin SQL function", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "reviewed", error: null });
+    mockClient.mockResolvedValue({ rpc } as never);
 
     await expect(updateReportStatus("report-1", "reviewed")).resolves.toEqual({
       status: "updated",
     });
-    expect(update).toHaveBeenCalledWith({ status: "reviewed" });
-    expect(statusEq).toHaveBeenCalledWith("status", "open");
+    expect(rpc).toHaveBeenCalledWith("review_report", {
+      report_id: "report-1",
+      decision: "reviewed",
+    });
+  });
+
+  it("maps a non-open report to a conflict and the admin gate to an error", async () => {
+    const conflictRpc = vi.fn().mockResolvedValue({ data: "conflict", error: null });
+    mockClient.mockResolvedValue({ rpc: conflictRpc } as never);
+    await expect(updateReportStatus("report-1", "dismissed")).resolves.toEqual({
+      status: "conflict",
+    });
+    expect(conflictRpc).toHaveBeenCalledWith("review_report", {
+      report_id: "report-1",
+      decision: "dismissed",
+    });
+
+    for (const code of ["P0001", "42501"]) {
+      const rpc = vi.fn().mockResolvedValue({ data: null, error: { code } });
+      mockClient.mockResolvedValue({ rpc } as never);
+      await expect(updateReportStatus("report-1", "reviewed")).resolves.toEqual({
+        status: "error",
+      });
+    }
   });
 });
