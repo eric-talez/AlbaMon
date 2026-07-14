@@ -23,7 +23,12 @@
 --   N. direct audit_logs DML is denied for authenticated sessions (grants);
 --      the append-only trigger backstops the ordinary API roles even under
 --      simulated grant/RLS drift; trusted maintenance (owner and service_role)
---      may update/delete; seekers read zero audit rows while admins read them.
+--      may update/delete; seekers read zero audit rows while admins read them;
+--   O. service_role may DELETE an audit row (trusted maintenance) — the
+--      append-only trigger does not raise;
+--   P. deleting a profile referenced by an audit row runs the actor_id
+--      ON DELETE SET NULL cascade under service_role: the audit row survives
+--      and its actor_id becomes NULL, with no append-only-trigger exception.
 --
 -- Run ONLY against a disposable LOCAL stack (never hosted):
 --   supabase start && supabase db reset            # applies migrations + seed
@@ -607,6 +612,79 @@ begin
   delete from public.audit_logs;
   raise notice 'PASS N5: owner maintenance can update/delete';
 end $$;
+rollback;
+
+-- --- O. service_role DELETE of an audit row (trusted maintenance) -------------
+begin;
+-- Independent throwaway audit row (distinct from case P's FK-cascade row).
+insert into public.audit_logs (id, actor_id, action, entity_type, entity_id, metadata)
+values ('eeeeeeee-0000-0000-0000-000000000001',
+        '66666666-6666-6666-6666-666666666666', 'job.approved', 'job',
+        'bbbbbbbb-0000-0000-0000-000000000101', '{}');
+set local role service_role;
+do $$
+begin
+  begin
+    delete from public.audit_logs
+      where id = 'eeeeeeee-0000-0000-0000-000000000001';
+  exception when others then
+    raise exception 'FAIL O: append-only trigger blocked a service_role delete (%)', sqlerrm;
+  end;
+  if exists (select 1 from public.audit_logs
+             where id = 'eeeeeeee-0000-0000-0000-000000000001') then
+    raise exception 'FAIL O: service_role delete did not remove the audit row';
+  end if;
+  raise notice 'PASS O: service_role can delete audit rows (trusted maintenance)';
+end $$;
+reset role;
+rollback;
+
+-- --- P. profile deletion nulls actor_id via ON DELETE SET NULL ----------------
+begin;
+-- Fresh throwaway principal (fresh UUID, no collision with 1111/4444/5555/
+-- 6666/7777 fixtures). on_auth_user_created provisions the matching profile.
+insert into auth.users (
+  instance_id, id, aud, role, email,
+  encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+) values
+  ('00000000-0000-0000-0000-000000000000',
+   '88888888-8888-8888-8888-888888888888',
+   'authenticated', 'authenticated', 'slice27-fk-actor@example.com',
+   crypt('x', gen_salt('bf')), now(),
+   '{"provider":"email","providers":["email"]}', '{}', now(), now());
+insert into public.audit_logs (id, actor_id, action, entity_type, entity_id, metadata)
+values ('eeeeeeee-0000-0000-0000-000000000002',
+        '88888888-8888-8888-8888-888888888888', 'job.approved', 'job',
+        'bbbbbbbb-0000-0000-0000-000000000101', '{}');
+do $$
+begin
+  if (select actor_id from public.audit_logs
+      where id = 'eeeeeeee-0000-0000-0000-000000000002')
+     is distinct from '88888888-8888-8888-8888-888888888888' then
+    raise exception 'FAIL P: audit row did not capture the actor UUID';
+  end if;
+end $$;
+set local role service_role;
+do $$
+begin
+  begin
+    delete from public.profiles
+      where id = '88888888-8888-8888-8888-888888888888';
+  exception when others then
+    raise exception 'FAIL P: profile delete failed or the append-only trigger raised (%)', sqlerrm;
+  end;
+  if not exists (select 1 from public.audit_logs
+                 where id = 'eeeeeeee-0000-0000-0000-000000000002') then
+    raise exception 'FAIL P: the audit row was removed by the profile delete';
+  end if;
+  if (select actor_id from public.audit_logs
+      where id = 'eeeeeeee-0000-0000-0000-000000000002') is not null then
+    raise exception 'FAIL P: actor_id was not set to NULL by the FK cascade';
+  end if;
+  raise notice 'PASS P: profile delete preserved the audit row and nulled actor_id';
+end $$;
+reset role;
 rollback;
 
 \echo 'Slice 27 live verification: all cases passed.'
