@@ -5,12 +5,14 @@ import { requireRole } from "@/lib/auth/guards";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createEmployerJob } from "@/lib/db/employer-jobs";
 import { parseEmployerJobForm } from "@/lib/employer/validation";
+import { enforceUserPolicy } from "@/lib/rate-limit/service";
+import { RATE_LIMIT_POLICIES } from "@/lib/rate-limit/policies";
+import { rateLimitedResult } from "@/lib/rate-limit/types";
+import type { RateLimitedResult } from "@/lib/rate-limit/types";
 
-export interface JobFormState {
-  status: "idle" | "success" | "error";
-  message: string;
-  jobId?: string;
-}
+export type JobFormState =
+  | { status: "idle" | "success" | "error"; message: string; jobId?: string }
+  | RateLimitedResult;
 
 export async function submitEmployerJob(
   _previousState: JobFormState,
@@ -27,6 +29,9 @@ export async function submitEmployerJob(
   }
   const parsed = parseEmployerJobForm(formData);
   if (!parsed.ok) return { status: "error", message: parsed.message };
+
+  const limit = await enforceUserPolicy(RATE_LIMIT_POLICIES.createJob, user.id);
+  if (!limit.allowed) return rateLimitedResult(limit.retryAfterSeconds);
 
   const result = await createEmployerJob(user.id, rawCompanyId.trim(), parsed.value);
   if (result.status === "created") {

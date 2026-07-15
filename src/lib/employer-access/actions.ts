@@ -4,11 +4,14 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/guards";
 import { createEmployerAccessRequest } from "@/lib/db/employer-access-requests";
 import { parseEmployerAccessRequestForm } from "@/lib/employer-access/validation";
+import { enforceUserPolicy } from "@/lib/rate-limit/service";
+import { RATE_LIMIT_POLICIES } from "@/lib/rate-limit/policies";
+import { rateLimitedResult } from "@/lib/rate-limit/types";
+import type { RateLimitedResult } from "@/lib/rate-limit/types";
 
-export interface EmployerAccessRequestFormState {
-  status: "idle" | "success" | "duplicate_pending" | "error";
-  message: string;
-}
+export type EmployerAccessRequestFormState =
+  | { status: "idle" | "success" | "duplicate_pending" | "error"; message: string }
+  | RateLimitedResult;
 
 /**
  * Submit an employer access request for the signed-in user. Only seekers may
@@ -28,6 +31,12 @@ export async function submitEmployerAccessRequestForUser(
 
   const parsed = parseEmployerAccessRequestForm(formData);
   if (!parsed.ok) return { status: "error", message: parsed.message };
+
+  const limit = await enforceUserPolicy(
+    RATE_LIMIT_POLICIES.employerAccessRequest,
+    user.id,
+  );
+  if (!limit.allowed) return rateLimitedResult(limit.retryAfterSeconds);
 
   const result = await createEmployerAccessRequest(user.id, parsed.value);
 

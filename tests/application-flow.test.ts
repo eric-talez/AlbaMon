@@ -5,7 +5,10 @@ import { join } from "node:path";
 vi.mock("@/lib/auth/guards", () => ({ requireUser: vi.fn() }));
 vi.mock("@/lib/db/jobs", () => ({ getApprovedJobById: vi.fn() }));
 vi.mock("@/lib/db/applications", () => ({ createApplication: vi.fn() }));
-vi.mock("@/lib/supabase/config", () => ({ isSupabaseConfigured: vi.fn() }));
+vi.mock("@/lib/supabase/config", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/supabase/config")>();
+  return { ...actual, isSupabaseConfigured: vi.fn() };
+});
 vi.mock("@/lib/notifications/dev", () => ({ notifyApplicationSubmitted: vi.fn() }));
 
 import { requireUser } from "@/lib/auth/guards";

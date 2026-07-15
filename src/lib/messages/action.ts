@@ -4,11 +4,14 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth/guards";
 import { sendApplicationMessage } from "@/lib/db/messages";
 import { notifyNewMessage } from "@/lib/notifications/dev";
+import { enforceUserPolicy } from "@/lib/rate-limit/service";
+import { RATE_LIMIT_POLICIES } from "@/lib/rate-limit/policies";
+import { rateLimitedResult } from "@/lib/rate-limit/types";
+import type { RateLimitedResult } from "@/lib/rate-limit/types";
 
-export interface MessageFormState {
-  status: "idle" | "success" | "error";
-  message: string;
-}
+export type MessageFormState =
+  | { status: "idle" | "success" | "error"; message: string }
+  | RateLimitedResult;
 
 type ParticipantRole = "seeker" | "employer";
 
@@ -40,6 +43,9 @@ export async function sendMessageForRole(
       message: "메시지는 1자 이상 2,000자 이하로 입력해 주세요.",
     };
   }
+
+  const limit = await enforceUserPolicy(RATE_LIMIT_POLICIES.sendMessage, user.id);
+  if (!limit.allowed) return rateLimitedResult(limit.retryAfterSeconds);
 
   const result = await sendApplicationMessage(applicationId, user.id, body);
   if (result.status === "sent") {

@@ -44,6 +44,7 @@ Companion docs:
    | 10 | `20260707000000_explicit_table_grants.sql` | Explicit least-privilege table grants for the API roles — **required**: without it real sign-ins mint a session but fail closed at the `profiles.role` lookup (42501) and bounce to `/login` ([`DATABASE.md`](DATABASE.md#table-grants-supabase-api-roles)) |
    | 11 | `20260713000000_restrict_company_public_reads.sql` | Drops the public verified-company read policy and revokes the `anon` SELECT on `companies`, so company identity is public only via `public_job_listings` (Slice 25) |
    | 12 | `20260714000000_transactional_admin_audit_logs.sql` | Admin-only SECURITY DEFINER review functions that apply each moderation decision and its `audit_logs` row in one transaction, plus an append-only guard trigger on audit rows (Slice 27) |
+   | 13 | `20260714010000_server_rate_limiting.sql` | Private `rate_limit_buckets` counter (RLS on, **no policies**, `service_role`-only DML) + atomic `consume_rate_limit` SECURITY DEFINER RPC for the durable server-side rate limiter; stores only opaque HMAC subject hashes (Slice 28) |
 
    Without the CLI: run each file in the Supabase **SQL editor**, in the same
    order.
@@ -113,7 +114,8 @@ stay stable.
    | `NEXT_PUBLIC_SITE_URL` | `https://<your-domain>` | client | Canonical/OG/sitemap base; falls back to localhost if unset |
    | `NEXT_PUBLIC_SUPABASE_URL` | `https://<project-ref>.supabase.co` | client | |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `<anon-public-key>` | client | RLS is the authorization gate |
-   | `SUPABASE_SERVICE_ROLE_KEY` | `<service-role-key>` | server-only | Reserved for trusted server-side workflows; no app code path uses it |
+   | `SUPABASE_SERVICE_ROLE_KEY` | `<service-role-key>` | server-only | Sole consumer is the Slice 28 rate limiter (private `consume_rate_limit` RPC); never used for OTP or business writes |
+   | `RATE_LIMIT_HMAC_SECRET` | `openssl rand -hex 32` (64 hex) | server-only | Set on **both Production and Preview**. Missing/invalid ⇒ rate-limited actions (phone OTP, high-risk writes) fail closed. See [`PRODUCTION_ENV_VARS.md`](PRODUCTION_ENV_VARS.md) |
    | `EMAIL_PROVIDER` | `dev` | server-only | Real delivery (`resend`/`sendgrid`) is deferred; `dev` logs stubs |
    | `EMAIL_FROM` | `K-Work US <no-reply@your-domain>` | server-only | Unused while `EMAIL_PROVIDER=dev` |
    | `RESEND_API_KEY` / `SENDGRID_API_KEY` | *(empty)* | server-only | Only when a real provider is enabled |
@@ -122,6 +124,16 @@ stay stable.
    The production build **fails closed**: with `NODE_ENV=production` and
    missing/placeholder Supabase credentials, auth throws instead of silently
    enabling the forgeable dev role-picker.
+
+   **Trusted client IP (Slice 28).** The OTP rate limiter derives its per-IP
+   bucket from Vercel-provided headers — `x-vercel-forwarded-for`, then
+   `x-forwarded-for`, then `x-real-ip` — and trusts them **only** when
+   `VERCEL === "1"`. Vercel's edge sets and overwrites these on every request, so
+   an inbound client-supplied `x-forwarded-for` cannot spoof them
+   ([Vercel request headers](https://vercel.com/docs/edge-network/headers/request-headers)).
+   Off Vercel (or when no trusted IP is present) all such requests share one
+   `unknown` bucket — never unlimited. The raw IP is HMAC-hashed before it reaches
+   the DB and is never logged or stored (`src/lib/rate-limit/client-ip.ts`).
 
 3. Deploy. Then complete the
    [post-deploy verification](LAUNCH_CHECKLIST.md#10-qa--verification) —
