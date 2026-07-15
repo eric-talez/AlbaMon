@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
     "verify:beta": "node scripts/verify-beta-readiness.mjs",
     "verify:local-supabase": "node scripts/verify-local-supabase-readiness.mjs",
     "verify:rate-limit": "node scripts/verify-rate-limit-concurrency.mjs"
@@ -23,6 +24,7 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

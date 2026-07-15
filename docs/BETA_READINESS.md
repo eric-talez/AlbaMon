@@ -35,8 +35,9 @@ Hard gates this runbook enforces:
   consumer is the Slice 28 rate limiter's private `consume_rate_limit` RPC,
   never OTP send/verify and never a business mutation (§3).
 - Payments and paid boosts are out of the MVP (de-scoped in Slice 23; §8).
-- Browser E2E automation remains **deferred** (§15); the role smoke tests
-  below are the manual compensation.
+- Browser E2E covers the credential-free Chromium/dev-auth surface (Slice 30,
+  §15); the role smoke tests below still cover the real-Supabase and provider
+  flows that E2E does not.
 
 ## 2. Required preconditions
 
@@ -338,9 +339,12 @@ Accepted for the private beta — details in the
   Supabase platform logs, plus the public `GET /api/health` config/liveness
   endpoint. Log triage and the incident process live in
   [`OPERATIONAL_HEALTH.md`](OPERATIONAL_HEALTH.md).
-- **Browser E2E automation is deferred** (no Playwright/Cypress unless a later
-  slice adds it); automated coverage is Vitest unit + server-render smoke
-  tests, and §§9–14 are the manual compensation.
+- **Browser E2E (Slice 30) covers the credential-free Chromium/dev-auth surface
+  only**: public shell + hydration, job-discovery filters, dev-auth role guards,
+  responsive nav, and `/api/health`, all against mock data with placeholder
+  Supabase — no real database writes. Real-Supabase flows, OAuth/SMS provider
+  callbacks, Safari, responsive *visual* review, and keyboard/VoiceOver remain
+  manual; §§9–14 are that manual compensation.
 - Admin promotion is manual SQL (§7); there is deliberately no self-serve
   path to the admin role. The employer role is granted through the Slice 21
   request flow (`/employer/request-access` → admin review at

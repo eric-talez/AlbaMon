@@ -11,7 +11,10 @@ const ITEMS = [
 /** Compact bottom navigation for mobile (hidden on desktop). */
 export function MobileBottomNav() {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 backdrop-blur sm:hidden">
+    <nav
+      data-testid="mobile-bottom-nav"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 backdrop-blur sm:hidden"
+    >
       <ul className="mx-auto flex max-w-5xl items-stretch justify-around">
         {ITEMS.map((item) => (
           <li key={item.href} className="flex-1">

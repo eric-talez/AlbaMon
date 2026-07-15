@@ -364,3 +364,15 @@ client-only) and Supabase RLS.
   - Adds no migration, provider, product feature, or broader service-role
     authority; the service-role client's sole consumer remains the Slice 28
     limiter's `consume_rate_limit` call.
+- **Slice 30 — Core browser E2E (Playwright, Chromium):** tests only.
+  - Hermetic dev-auth browser coverage under `next dev` with placeholder
+    Supabase (deterministic mock jobs, no DB): the public shell + client
+    hydration, job-discovery filters and URL query state, the dev-auth
+    role-guard matrix (seeker/employer/admin, forbidden/redirect + safe `next`,
+    logout), responsive desktop/390px navigation, and `/api/health`. A separate
+    CI job runs `npm run test:e2e` after the unit/build gate and installs only
+    pinned Chromium — no credentials, network services, or database.
+  - Scope is the credential-free surface only. Real Supabase persistence,
+    OAuth/SMS provider callbacks, Safari, responsive *visual* review, and
+    keyboard/VoiceOver stay manually verified. Adds no migration, provider,
+    product feature, or broader service-role authority.
