@@ -2,6 +2,7 @@ import "server-only";
 
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { isSupabaseServiceRoleConfigured } from "@/lib/supabase/service";
+import { hmacConfigured } from "@/lib/rate-limit/keys";
 
 /**
  * Operational health report for the private beta, served by `GET /api/health`.
@@ -31,6 +32,7 @@ export type HealthCheckStatus =
 export interface HealthChecks {
   siteUrl: HealthCheckStatus;
   supabase: HealthCheckStatus;
+  rateLimit: HealthCheckStatus;
   email: HealthCheckStatus;
   analytics: HealthCheckStatus;
 }
@@ -62,14 +64,24 @@ function checkSiteUrl(): HealthCheckStatus {
   }
 }
 
-/** Anon (auth) credentials plus the server-only service-role key reserved for
- * trusted server-side workflows. Placeholder values from `.env.example` count
- * as missing. */
+/** Anon (auth) credentials plus the server-only service-role key — the latter
+ * is used by the Slice 28 durable rate limiter to reach its private
+ * `consume_rate_limit` counter (never for OTP or business writes). Placeholder
+ * values from `.env.example` count as missing. */
 function checkSupabase(): HealthCheckStatus {
   const present = [isSupabaseConfigured(), isSupabaseServiceRoleConfigured()];
   if (present.every(Boolean)) return "configured";
   if (present.some(Boolean)) return "partial";
   return "missing";
+}
+
+/** The durable rate limiter's HMAC secret (`RATE_LIMIT_HMAC_SECRET`). Reports
+ * only whether the secret passes the limiter's own 64-hex validation via the
+ * shared `hmacConfigured()` predicate — kept separate from Supabase because a
+ * missing/placeholder secret makes protected actions fail closed in
+ * production/preview even when Supabase is fully configured. */
+function checkRateLimit(): HealthCheckStatus {
+  return hmacConfigured() ? "configured" : "missing";
 }
 
 /** `EMAIL_PROVIDER=dev` (or unset) is the accepted beta state → "deferred".
@@ -101,6 +113,7 @@ export function buildHealthReport(now: Date = new Date()): HealthReport {
     checks: {
       siteUrl: checkSiteUrl(),
       supabase: checkSupabase(),
+      rateLimit: checkRateLimit(),
       email: checkEmail(),
       analytics: checkAnalytics(),
     },

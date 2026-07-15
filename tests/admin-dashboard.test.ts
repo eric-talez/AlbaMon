@@ -64,6 +64,7 @@ function healthReport(): HealthReport {
     checks: {
       siteUrl: "configured",
       supabase: "configured",
+      rateLimit: "configured",
       email: "deferred",
       analytics: "deferred",
     },
@@ -164,6 +165,7 @@ describe("admin operations dashboard", () => {
     expect(html).toContain('href="/api/health"');
     expect(html).toContain("Health check / 상태 점검");
     expect(html).toContain("Operational health / 운영 상태");
+    expect(html).toContain("Rate limiting");
   });
 
   it("stays admin-only and skips queue reads when the guard rejects", async () => {

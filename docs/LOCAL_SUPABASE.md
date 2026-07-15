@@ -132,8 +132,13 @@ Rules:
   `your-project`, `your-anon-key`, `your-service-role-key`, or `example.com`
   as "not configured" and stays in dev auth mode.
 - Set **all three**. The app's auth works with URL + anon key alone, but
-  `/api/health` then reports Supabase as `"partial"` (the service_role key is
-  reserved for trusted server-side workflows; only its presence is checked).
+  `/api/health` then reports Supabase as `"partial"` (the service_role key is the
+  durable rate limiter's path to its `consume_rate_limit` counter; `/api/health`
+  reports only its presence).
+- `RATE_LIMIT_HMAC_SECRET` can stay the shipped `generate-with-openssl-rand-hex-32`
+  placeholder locally — the durable rate limiter **fails open** in dev/test, so no
+  real key is needed. Set one (64 hex, `openssl rand -hex 32`) only to exercise
+  throttling locally, and never commit a real value.
 
 ## 7. Running the app
 

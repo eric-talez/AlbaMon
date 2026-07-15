@@ -9,11 +9,17 @@ const HEALTH_ENV_VARS = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
+  "RATE_LIMIT_HMAC_SECRET",
   "EMAIL_PROVIDER",
   "RESEND_API_KEY",
   "SENDGRID_API_KEY",
   "NEXT_PUBLIC_POSTHOG_KEY",
 ] as const;
+
+/** A valid RATE_LIMIT_HMAC_SECRET is exactly 64 hex chars (→ 32 bytes). Built by
+ * repetition so no 64-hex literal appears in this source file (tests/security.test.ts
+ * scans every tracked file for secret shapes). */
+const VALID_HMAC_SECRET = "0f".repeat(32);
 
 /** Realistic-but-fake values. Deliberately short tails so the repo-wide
  * secret-pattern scan (tests/security.test.ts) never mistakes them for real
@@ -24,6 +30,7 @@ const CONFIGURED_ENV: Record<(typeof HEALTH_ENV_VARS)[number], string> = {
   NEXT_PUBLIC_SUPABASE_URL: "https://kwus-health.supabase.co",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key-for-health-tests",
   SUPABASE_SERVICE_ROLE_KEY: "service-role-for-health-tests",
+  RATE_LIMIT_HMAC_SECRET: VALID_HMAC_SECRET,
   EMAIL_PROVIDER: "resend",
   RESEND_API_KEY: "re_health",
   SENDGRID_API_KEY: "",
@@ -59,6 +66,7 @@ describe("buildHealthReport envelope", () => {
     expect(report.checks).toEqual({
       siteUrl: "missing",
       supabase: "missing",
+      rateLimit: "missing",
       email: "deferred",
       analytics: "deferred",
     });
@@ -69,6 +77,7 @@ describe("buildHealthReport envelope", () => {
     expect(buildHealthReport().checks).toEqual({
       siteUrl: "configured",
       supabase: "configured",
+      rateLimit: "configured",
       email: "configured",
       analytics: "configured",
     });
@@ -106,6 +115,42 @@ describe("supabase check", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://kwus-health.supabase.co");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-for-health-tests");
     expect(buildHealthReport().checks.supabase).toBe("partial");
+  });
+});
+
+describe("rateLimit check", () => {
+  it("is configured only for a valid 64-hex secret", () => {
+    stubAllUnset();
+    expect(buildHealthReport().checks.rateLimit).toBe("missing");
+    vi.stubEnv("RATE_LIMIT_HMAC_SECRET", VALID_HMAC_SECRET);
+    expect(buildHealthReport().checks.rateLimit).toBe("configured");
+  });
+
+  it("treats the .env.example placeholder as missing", () => {
+    stubAllUnset();
+    vi.stubEnv("RATE_LIMIT_HMAC_SECRET", "generate-with-openssl-rand-hex-32");
+    expect(buildHealthReport().checks.rateLimit).toBe("missing");
+  });
+
+  it("rejects malformed and wrong-length secrets", () => {
+    stubAllUnset();
+    for (const bad of [
+      "g" + "0".repeat(63), // 64 chars, one non-hex
+      "0".repeat(63), // too short
+      "0".repeat(65), // too long
+      "   ", // whitespace only
+    ]) {
+      vi.stubEnv("RATE_LIMIT_HMAC_SECRET", bad);
+      expect(buildHealthReport().checks.rateLimit).toBe("missing");
+    }
+  });
+
+  it("is an independent signal — not combined with the supabase status", () => {
+    stubAllConfigured();
+    vi.stubEnv("RATE_LIMIT_HMAC_SECRET", "");
+    const { checks } = buildHealthReport();
+    expect(checks.supabase).toBe("configured");
+    expect(checks.rateLimit).toBe("missing");
   });
 });
 
@@ -179,6 +224,7 @@ describe("GET /api/health", () => {
       checks: {
         siteUrl: "missing",
         supabase: "missing",
+        rateLimit: "missing",
         email: "deferred",
         analytics: "deferred",
       },

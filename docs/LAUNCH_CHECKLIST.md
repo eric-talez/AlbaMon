@@ -26,6 +26,9 @@ Per-variable reference (exposure, validation, placeholders):
 - [ ] `NEXT_PUBLIC_SITE_URL` = `https://<your-domain>` (canonical/OG/sitemap base)
 - [ ] `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` set (real project, not placeholders)
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` set as **server-only** (never `NEXT_PUBLIC_*`)
+- [ ] `RATE_LIMIT_HMAC_SECRET` set as **server-only** on **Production + Preview**
+      (64 hex chars via `openssl rand -hex 32`); missing/invalid ⇒ rate-limited
+      actions (phone OTP, high-risk writes) fail closed
 - [ ] `EMAIL_PROVIDER=dev` confirmed (real email delivery is out of beta scope)
 - [ ] PostHog vars left empty (analytics provider not initialized in this build)
 - [ ] `NEXT_PUBLIC_AUTH_*` flags decided per provider — keep the default
@@ -40,7 +43,7 @@ Per-variable reference (exposure, validation, placeholders):
       migrations + seed + auth mode + admin promotion verified against a
       disposable local stack **before** touching the hosted project
 - [ ] Hosted project created; region appropriate for LA/OC
-- [ ] All 12 migrations applied **in filename order** via `supabase db push`
+- [ ] All 13 migrations applied **in filename order** via `supabase db push`
       (order table in [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project)),
       after `supabase login` + `supabase link --project-ref <project-ref>`
 - [ ] **Never `supabase db reset` against the hosted project** — it wipes the
@@ -144,12 +147,15 @@ assert the policy files; live-DB verification needs the Supabase CLI + Docker
 | Report queue constraints | `20260628…_report_queue_hardening.sql` | `tests/report-workflow-migration.test.ts`, `tests/db-reports.test.ts` |
 | Seeker→employer request queue + review RPC | `20260706…_employer_access_requests.sql` | `tests/db-employer-access-requests.test.ts`, `tests/employer-access-migration.test.ts` |
 | Explicit API-role table grants (fail-closed sign-in fix) | `20260707…_explicit_table_grants.sql` | `tests/db-schema.test.ts` |
+| Public companies read dropped, anon SELECT revoked (view-only identity) | `20260713…_restrict_company_public_reads.sql` | `tests/db-schema.test.ts` |
 | Transactional admin audit logs + append-only guard | `20260714…_transactional_admin_audit_logs.sql` | `tests/admin-audit-migration.test.ts` |
+| Private rate-limit counter + `consume_rate_limit` RPC (service_role-only) | `20260714010000_server_rate_limiting.sql` | `tests/db-rate-limit.test.ts` |
 
 - [ ] Role guards remain server-side (`src/lib/auth/guards.ts`; every
       `/admin`, `/employer`, `/dashboard` page calls them — no client-only gating)
-- [ ] No app code path uses the service-role client (`src/lib/supabase/service.ts`
-      is retained infrastructure; the health check only reports the key's presence)
+- [ ] Service-role client used only by the Slice 28 rate limiter
+      (`src/lib/supabase/service.ts` → private `consume_rate_limit` RPC; never OTP
+      send/verify or business writes; the health check reports the key's presence)
 - [ ] Public job surfaces read approved listings only (`public_job_listings`
       view; `tests/smoke-public-pages.test.ts` asserts non-approved ids 404)
 - [ ] Sitemap/robots expose no private routes and no per-job URLs

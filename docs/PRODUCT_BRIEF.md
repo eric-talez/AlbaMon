@@ -109,10 +109,13 @@ client-only) and Supabase RLS.
   - Configured runtime authorization reads `profiles.role`; `user_metadata.role`
     is not trusted. Email/password and OAuth initiation UI remain future work.
 - **Slice 3 — Database schema & seed:** ✅ done.
-  - Migrations are the source of truth: `supabase/migrations/` (enums, six core
-    tables, constraints/indexes, `updated_at` trigger, auth helper functions) +
-    `supabase/seed.sql` (3 fictional LA/OC companies, 8 approved + 1 pending +
-    1 draft job). See [`DATABASE.md`](DATABASE.md).
+  - Migrations are the source of truth in `supabase/migrations/`. The schema now
+    spans **eight core business tables** (`profiles`, `companies`, `jobs`,
+    `applications`, `messages`, `reports`, `employer_access_requests`,
+    `audit_logs`) plus the private operational `rate_limit_buckets` counter,
+    alongside enums, constraints/indexes, an `updated_at` trigger, and auth
+    helper functions; `supabase/seed.sql` seeds 3 fictional LA/OC companies
+    (8 approved + 1 pending + 1 draft job). See [`DATABASE.md`](DATABASE.md).
   - **Row Level Security** on all tables: public reads only `approved` jobs;
     profile self-update cannot change role; employer job inserts are forced to
     `pending`; audit logs are admin-read only and, since Slice 27, written by
@@ -222,6 +225,20 @@ client-only) and Supabase RLS.
     auto-reject jobs.
   - No schema, RLS, service-role, legal review, E-Verify, tax/payroll, sanctions,
     email delivery, or automated enforcement workflow is added.
+- **Slice 15 — Launch hardening:** done. QA smoke tests, SEO/a11y polish, and the
+  deploy checklist ([`LAUNCH_CHECKLIST.md`](LAUNCH_CHECKLIST.md)).
+- **Slice 16 — CI and release gate:** done. GitHub Actions runs typecheck → lint →
+  test → build on every push ([`../.github/workflows/ci.yml`](../.github/workflows/ci.yml)).
+- **Slice 17 — Production beta readiness:** done. The pre-launch runbook
+  ([`BETA_READINESS.md`](BETA_READINESS.md)) and the offline `verify:beta` docs gate.
+- **Slice 18 — Observability & operational health:** done. `GET /api/health`
+  presence-only status report plus the incident runbook
+  ([`OPERATIONAL_HEALTH.md`](OPERATIONAL_HEALTH.md)); no network/DB probing.
+- **Slice 19 — Social & phone auth foundation:** done. Google/Kakao/Naver OIDC and
+  phone-OTP wiring behind `NEXT_PUBLIC_AUTH_*` flags
+  ([`AUTH_PROVIDERS.md`](AUTH_PROVIDERS.md)); real credentials live only in Supabase.
+- **Slice 20 — Local Supabase readiness:** done. Disposable local-stack guide plus
+  the `verify:local-supabase` gate ([`LOCAL_SUPABASE.md`](LOCAL_SUPABASE.md)).
 - **Slice 21 — Employer access requests:** scoped implementation done.
   - Real auth users always start as `seeker`. A signed-in seeker requests
     employer access at `/employer/request-access` (business/contact/location
@@ -282,8 +299,9 @@ client-only) and Supabase RLS.
     ([`DATABASE.md`](DATABASE.md#table-grants-supabase-api-roles)).
 - **Slice 24 — Post-grants readiness docs:** done (docs-only).
   - Runbooks updated for the hosted schema deploy: `supabase login` →
-    `supabase link` → `supabase db push`, 10 migrations, never `db reset` or
-    `seed.sql` against hosted/production, and a post-migration smoke
+    `supabase link` → `supabase db push` (all migrations in filename order — see
+    [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project)), never
+    `db reset` or `seed.sql` against hosted/production, and a post-migration smoke
     (health → first `seeker` signup → admin via SQL → `/admin` live counts →
     auth flags last) in [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project).
   - Where auth stands: the Slice 19 foundation (buttons, flags, callback,
@@ -294,6 +312,13 @@ client-only) and Supabase RLS.
     before provider E2E can complete. Naver stays setup-required pending
     custom-OIDC verification; local phone test OTP and hosted SMS remain
     separate flows; payments/boosts stay de-scoped (Slice 23).
+- **Slice 25 — Restrict company base-table reads:** done. Dropped the public
+  verified-company read policy and revoked the `anon` SELECT on `companies`, so
+  company identity is public only through the `public_job_listings` view
+  (`20260713000000_restrict_company_public_reads.sql`).
+- **Slice 26 — Production security headers:** done. Production-only CSP, HSTS, and
+  hardening headers (including `script-src-attr 'none'`) via `next.config` plus a
+  pure, unit-tested helper.
 - **Slice 27 — Transactional admin audit logs:** scoped implementation done.
   - Every admin moderation decision — job approve/reject, company
     verify/unverify, report review/dismiss, employer-access approve/reject —
@@ -316,3 +341,16 @@ client-only) and Supabase RLS.
     with Korean-first labels. Rejection reasons, audit search/export, and
     account deletion remain out of scope
     ([`DATABASE.md`](DATABASE.md#admin-audit-trail-slice-27)).
+- **Slice 28 — Durable server-side rate limiting:** scoped implementation done.
+  - A private `rate_limit_buckets` counter plus an atomic, `service_role`-only
+    `consume_rate_limit` RPC (`20260714010000_server_rate_limiting.sql`) back a
+    fixed-window limiter over phone-OTP send/verify and the high-risk
+    authenticated writes (applications, reports, messages, employer-access
+    requests, job/company creation).
+  - Subjects (phone / IP / user) are HMAC-hashed with the server-only
+    `RATE_LIMIT_HMAC_SECRET` (64 hex → 32 bytes) before they reach the DB, so raw
+    identifiers are never stored. Missing/invalid config makes the protected
+    actions **fail closed** in production/preview (allow-open only in dev/test).
+  - This is the **only** app consumer of the service-role client; it calls
+    `consume_rate_limit` and nothing else — never OTP send/verify, never a
+    business mutation. `/api/health` adds a coarse `rateLimit` presence check.
