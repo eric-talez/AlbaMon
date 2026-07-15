@@ -45,6 +45,7 @@ Companion docs:
    | 11 | `20260713000000_restrict_company_public_reads.sql` | Drops the public verified-company read policy and revokes the `anon` SELECT on `companies`, so company identity is public only via `public_job_listings` (Slice 25) |
    | 12 | `20260714000000_transactional_admin_audit_logs.sql` | Admin-only SECURITY DEFINER review functions that apply each moderation decision and its `audit_logs` row in one transaction, plus an append-only guard trigger on audit rows (Slice 27) |
    | 13 | `20260714010000_server_rate_limiting.sql` | Private `rate_limit_buckets` counter (RLS on, **no policies**, `service_role`-only DML) + atomic `consume_rate_limit` SECURITY DEFINER RPC for the durable server-side rate limiter; stores only opaque HMAC subject hashes (Slice 28) |
+   | 14 | `20260715000000_expired_job_visibility.sql` | Public visibility becomes **approved AND unexpired**: `jobs_select_public_approved`, the `public_job_listings` view, and `applications_insert_seeker` all add `expires_at is null or expires_at > now()`. Expired approved jobs drop off public lists/search, 404 on the public detail route, and reject new seeker applications, while staying visible to owner/admin history (Slice 31) |
 
    Without the CLI: run each file in the Supabase **SQL editor**, in the same
    order.
