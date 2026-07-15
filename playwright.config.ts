@@ -63,7 +63,11 @@ export default defineConfig({
   webServer: {
     command: `npm run dev -- -p ${PORT}`,
     url: BASE_URL,
-    reuseExistingServer: !process.env.CI,
+    // Never reuse a server already on this port (local OR CI): an arbitrary
+    // process could be running with real or unknown env — tests must only run
+    // against this config's own dev-auth server. A port conflict then fails
+    // loudly instead of silently testing the wrong server.
+    reuseExistingServer: false,
     timeout: 120_000,
     env: DEV_AUTH_ENV,
   },

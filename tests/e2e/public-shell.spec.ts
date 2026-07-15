@@ -1,4 +1,3 @@
-import { test as baseTest } from "@playwright/test";
 import { test, expect, APPROVED_JOB } from "./helpers";
 
 /**
@@ -74,11 +73,16 @@ test.describe("public shell", () => {
 });
 
 /**
- * A non-approved/unknown job id must 404. This one deliberately navigates to a
- * 404, which logs an expected "resource 404" console message — so it uses the
- * base test (without the no-console-errors fixture) and asserts the status.
+ * A non-approved/unknown job id must 404. Navigating to a 404 logs an expected
+ * "resource 404" console message, so this test narrowly allows only that one
+ * pattern (via allowConsoleErrors) — the external-network guard still applies,
+ * and every other console/page error still fails the test.
  */
-baseTest("unknown job id returns 404", async ({ page }) => {
-  const response = await page.goto("/jobs/kw-does-not-exist");
-  expect(response?.status()).toBe(404);
+test.describe("expected 404", () => {
+  test.use({ allowConsoleErrors: [/Failed to load resource.*404/i] });
+
+  test("unknown job id returns 404", async ({ page }) => {
+    const response = await page.goto("/jobs/kw-does-not-exist");
+    expect(response?.status()).toBe(404);
+  });
 });

@@ -215,7 +215,7 @@ Automated (all must pass on the release commit):
 - [ ] `git diff --check` (no whitespace/conflict markers)
 - [ ] `npm run typecheck`
 - [ ] `npm run lint`
-- [ ] `npm test` (unit + server-render smoke tests; 39 files)
+- [ ] `npm test` (unit + server-render smoke tests; Playwright specs excluded)
 - [ ] `npm run build`
 - [ ] `npm run verify:beta` (readiness docs gate: required docs + CI workflow
       present, checklist topics intact, placeholder-only secret hygiene)

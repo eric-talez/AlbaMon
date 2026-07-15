@@ -2,27 +2,94 @@ import { test as base, expect, type Page } from "@playwright/test";
 
 /**
  * Browser errors that are benign under `next dev` and must not fail a test.
- * Keep this list tight — real hydration/app errors must still surface.
+ * Keep this list tight — real hydration/app errors must still surface. Tests
+ * that legitimately expect a specific console error (e.g. the deliberate 404
+ * navigation) opt in narrowly via the `allowConsoleErrors` fixture option.
  */
 const IGNORED_BROWSER_ERRORS: RegExp[] = [
   /favicon\.ico/i, // no favicon asset shipped → benign 404 in dev
 ];
 
+/** Hosts that count as the local E2E origin (any port). */
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
 /**
- * `test` extended with an auto fixture that captures uncaught page errors and
- * `console.error` output, failing the test if any un-ignored ones occur. This
- * is how the scenarios assert "no uncaught page errors, hydration errors, or
- * unexpected console errors".
+ * True for the local E2E origin and for inert, non-network browser URLs
+ * (`about:`, `data:`, `blob:`). Everything else is an external request.
  */
-export const test = base.extend<{ noBrowserErrors: void }>({
-  noBrowserErrors: [
+function isAllowedUrl(rawUrl: string): boolean {
+  if (/^(?:about|data|blob|chrome|chrome-extension):/i.test(rawUrl)) return true;
+  try {
+    return LOCAL_HOSTS.has(new URL(rawUrl).hostname);
+  } catch {
+    return true; // unparseable → inert, do not block
+  }
+}
+
+type E2EFixtures = {
+  /**
+   * Console-error message patterns a single test is allowed to emit (in
+   * addition to IGNORED_BROWSER_ERRORS). Default none. Scope narrowly via
+   * `test.use({ allowConsoleErrors: [...] })` — never to blanket-ignore errors.
+   */
+  allowConsoleErrors: RegExp[];
+  blockExternalRequests: void;
+  noBrowserErrors: void;
+};
+
+/**
+ * `test` extended with two foundational auto fixtures that apply to EVERY E2E
+ * test:
+ *
+ * 1. `blockExternalRequests` — enforces the no-external-network contract. Every
+ *    HTTP(S) request outside the local E2E origin is aborted and recorded, and
+ *    external WebSocket connections are detected and recorded (the local
+ *    Next.js dev/HMR socket is allowed). The test fails, listing the offending
+ *    URLs, if any external connection was attempted. This proves hermeticity
+ *    directly rather than inferring it from the absence of console errors.
+ * 2. `noBrowserErrors` — fails the test on any uncaught page error, hydration
+ *    error, or unexpected `console.error` (minus IGNORED_BROWSER_ERRORS and the
+ *    per-test `allowConsoleErrors`).
+ */
+export const test = base.extend<E2EFixtures>({
+  allowConsoleErrors: [[], { option: true }],
+
+  blockExternalRequests: [
     async ({ page }, use) => {
+      const external: string[] = [];
+
+      await page.route("**/*", (route) => {
+        const url = route.request().url();
+        if (isAllowedUrl(url)) return route.continue();
+        external.push(`${route.request().method()} ${url}`);
+        return route.abort();
+      });
+
+      page.on("websocket", (ws) => {
+        if (!isAllowedUrl(ws.url())) external.push(`WEBSOCKET ${ws.url()}`);
+      });
+
+      await use();
+
+      expect(
+        external,
+        `unexpected EXTERNAL (non-localhost) network activity during the test:\n${
+          external.join("\n") || "(none)"
+        }`,
+      ).toEqual([]);
+    },
+    { auto: true },
+  ],
+
+  noBrowserErrors: [
+    async ({ page, allowConsoleErrors }, use) => {
       const errors: string[] = [];
       page.on("pageerror", (err) => errors.push(`pageerror: ${err.message}`));
       page.on("console", (msg) => {
         if (msg.type() !== "error") return;
         const text = msg.text();
         if (IGNORED_BROWSER_ERRORS.some((re) => re.test(text))) return;
+        if (allowConsoleErrors.some((re) => re.test(text))) return;
         errors.push(`console.error: ${text}`);
       });
       await use();
