@@ -31,8 +31,9 @@ Hard gates this runbook enforces:
   users, companies, jobs, applications, messages, or reports** (§6).
 - `draft`, `pending`, `rejected`, `paused`, and `expired` jobs must never be
   publicly visible — only `approved` jobs are (§9).
-- Service-role usage stays restricted to trusted server flows — since Slice 23
-  de-scoped payments, **no app code path uses the service-role client** (§3).
+- Service-role usage stays restricted to trusted server flows — its only app
+  consumer is the Slice 28 rate limiter's private `consume_rate_limit` RPC,
+  never OTP send/verify and never a business mutation (§3).
 - Payments and paid boosts are out of the MVP (de-scoped in Slice 23; §8).
 - Browser E2E automation remains **deferred** (§15); the role smoke tests
   below are the manual compensation.
@@ -62,15 +63,15 @@ per-variable reference) using the Vercel procedure in
 - [ ] Every **Required** variable is set in Vercel **Production** scope;
       deferred ones left unset/empty.
 - [ ] No value still contains a placeholder fragment (`your-project`,
-      `your-anon-key`, `example`, `xxx`, `placeholder`) — the app treats those
-      as unconfigured.
-- [ ] No secret has a `NEXT_PUBLIC_` name. The service-role key is server-only,
-      and no app code path uses the service-role client (its presence is only
-      reported by `/api/health`).
+      `your-anon-key`, `example`, `xxx`, `placeholder`,
+      `generate-with-openssl`) — the app treats those as unconfigured.
+- [ ] No secret has a `NEXT_PUBLIC_` name. The service-role key is server-only;
+      its only app consumer is the Slice 28 rate limiter (private
+      `consume_rate_limit` RPC), and `/api/health` reports its presence.
 - [ ] Redeployed after the last env change (edits do not apply to the running
       deployment).
 - [ ] `GET /api/health` on the production URL returns 200 with
-      `siteUrl`/`supabase` = `configured` and `email`/`analytics` =
+      `siteUrl`/`supabase`/`rateLimit` = `configured` and `email`/`analytics` =
       `deferred` (statuses reference:
       [`OPERATIONAL_HEALTH.md §2`](OPERATIONAL_HEALTH.md#2-get-apihealth-reference)).
       Any `missing`/`partial` = this section is not done.
@@ -97,7 +98,7 @@ Migrations are verified separately in §5.
 
 ## 5. Migration verification
 
-The 12-migration order table lives in
+The 13-migration order table lives in
 [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project). Verify in the
 Supabase SQL editor:
 
@@ -105,7 +106,7 @@ Supabase SQL editor:
 select version from supabase_migrations.schema_migrations order by version;
 ```
 
-Expected: 12 rows, `20260621000000` through `20260714000000`, in order.
+Expected: 13 rows, `20260621000000` through `20260714010000`, in order.
 
 If migrations were applied by pasting files into the SQL editor (no CLI), that
 table may be empty — fall back to object checks; all three must hold:
@@ -359,7 +360,7 @@ the sign-off of record; this one is the execution summary feeding it.
 | CI green + `npm run verify:beta` pass on the release commit | §2 | ☐ | Hard |
 | Required env vars set and valid, no placeholder fragments | §3 | ☐ | Hard |
 | Supabase configured (auth URLs, backups) | §4 | ☐ | Hard |
-| All 12 migrations verified (incl. explicit API-role grants) | §5 | ☐ | Hard |
+| All 13 migrations verified (incl. explicit API-role grants) | §5 | ☐ | Hard |
 | Zero seed/demo data (users, companies, jobs, applications, messages, reports) | §6 | ☐ | Hard |
 | Founding admin verified; no unintended admins | §7 | ☐ | Hard |
 | Public visibility invariant (approved-only) proven | §9 | ☐ | Hard |

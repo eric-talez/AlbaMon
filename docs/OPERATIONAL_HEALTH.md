@@ -28,6 +28,7 @@ Expected on a launch-ready production deployment:
   "checks": {
     "siteUrl": "configured",
     "supabase": "configured",
+    "rateLimit": "configured",
     "email": "deferred",
     "analytics": "deferred"
   }
@@ -85,7 +86,8 @@ What each check covers:
 | Check | Covers | Expected (prod beta) |
 |---|---|---|
 | `siteUrl` | `NEXT_PUBLIC_SITE_URL` present and parseable as a URL. Presence only — a stale localhost value in production still reports `configured`; correctness is [`LAUNCH_CHECKLIST.md §1`](LAUNCH_CHECKLIST.md#1-environment-variables). | `configured` |
-| `supabase` | Anon auth pair (`NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`) **and** the server-only `SUPABASE_SERVICE_ROLE_KEY` (reserved for trusted server-side workflows; no app code path uses it). `partial` = one side absent. | `configured` |
+| `supabase` | Anon auth pair (`NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`) **and** the server-only `SUPABASE_SERVICE_ROLE_KEY` — the latter is the durable rate limiter's path to its private `consume_rate_limit` counter (never OTP or business writes). `partial` = one side absent. | `configured` |
+| `rateLimit` | `RATE_LIMIT_HMAC_SECRET` present and valid (exactly 64 hex → 32 bytes), checked via the same predicate the limiter uses. A separate signal from `supabase`. `missing` = absent/placeholder/malformed/wrong-length; in production/preview that makes the rate-limited actions (phone OTP, high-risk writes) **fail closed**. | `configured` |
 | `email` | `deferred` while `EMAIL_PROVIDER` is `dev`/unset (the accepted beta state). A real provider (`resend`/`sendgrid`) without its API key reports `partial`. | `deferred` |
 | `analytics` | `NEXT_PUBLIC_POSTHOG_KEY` presence. The provider is **not initialized in this build** — `configured` means the env is staged for a later slice, not that analytics is running. | `deferred` |
 
@@ -117,7 +119,8 @@ from outside. Verified behaviors:
 |---|---|---|
 | Supabase auth pair (production) | `supabase: missing`/`partial` | Auth **throws** instead of silently enabling the forgeable dev role-picker: Vercel logs show `Auth is misconfigured: production requires real Supabase credentials` (`src/lib/supabase/config.ts`). Public pages may still render; sign-in/role flows fail loudly. |
 | Supabase auth pair (local/preview) | same | Dev role-picker mode — intended for development only. |
-| `SUPABASE_SERVICE_ROLE_KEY` only | `supabase: partial` | Auth works. No app code path uses the service-role client, so nothing else degrades — the status simply flags the incomplete Supabase credential set. |
+| `SUPABASE_SERVICE_ROLE_KEY` missing (auth pair present) | `supabase: partial` | Auth works (anon pair present), but the service-role key is the rate limiter's only path to its `consume_rate_limit` counter — without it, in production/preview the rate-limited actions (phone OTP, high-risk writes) **fail closed** (deny). |
+| `RATE_LIMIT_HMAC_SECRET` | `rateLimit: missing` | The durable rate limiter can't derive subject hashes. In production/preview every rate-limited action (phone OTP; application, report, message, employer-access, job, and company writes) **fails closed** (deny); local dev/test fails open so the app stays usable without the secret. |
 | `NEXT_PUBLIC_SITE_URL` | `siteUrl: missing` | Silent fallback to `http://localhost:3000` for canonical/OG/sitemap URLs — pages render but links are wrong. This is the one silent failure the health check exists to surface. |
 | Email provider | `email: deferred` | Expected: **no email is ever sent in the beta.** Notification events log as `[notification:dev]` outside production and are silently skipped in production (`src/lib/notifications/dev.ts`). |
 | Analytics | `analytics: deferred` | Nothing — no analytics code runs in this build. |
@@ -137,7 +140,8 @@ By symptom:
 |---|---|---|
 | Site down / all pages erroring | `/api/health`, Vercel → Deployments (did a deploy or env edit just precede it?) | Roll back per §6; Vercel function logs for the crash. |
 | Sign-in / signup failing | `checks.supabase` | Vercel logs for `Auth is misconfigured` (fail-closed config) → Supabase Dashboard → Logs → Auth (provider/email issues, rate limits). If sign-in completes but immediately bounces back to `/login`: look for `permission denied for table profiles` (42501) — the project is missing the `20260707…` explicit-grants migration ([`BETA_READINESS.md §5`](BETA_READINESS.md#5-migration-verification)). |
-| Applications, messaging, or reports failing | Vercel logs for `[db]` | Supabase Dashboard → Logs → Postgres. Permission-denied errors here usually mean an RLS policy blocked a write the UI allowed — treat as a bug, cross-check [`LAUNCH_CHECKLIST.md §7`](LAUNCH_CHECKLIST.md#7-rls--security-review). Exception: 42501 across many tables right after a deploy means missing **table grants**, not RLS — verify all 12 migrations incl. `20260707…` are applied ([`BETA_READINESS.md §5`](BETA_READINESS.md#5-migration-verification)). |
+| Applications, messaging, or reports failing | Vercel logs for `[db]` | Supabase Dashboard → Logs → Postgres. Permission-denied errors here usually mean an RLS policy blocked a write the UI allowed — treat as a bug, cross-check [`LAUNCH_CHECKLIST.md §7`](LAUNCH_CHECKLIST.md#7-rls--security-review). Exception: 42501 across many tables right after a deploy means missing **table grants**, not RLS — verify all 13 migrations incl. `20260707…` are applied ([`BETA_READINESS.md §5`](BETA_READINESS.md#5-migration-verification)). |
+| Protected actions all denied ("Too many attempts") right after deploy | `checks.rateLimit` | `rateLimit: missing` means the durable limiter is failing closed. Set a valid `RATE_LIMIT_HMAC_SECRET` (64 hex, `openssl rand -hex 32`) on **Production + Preview** and redeploy; it also needs `SUPABASE_SERVICE_ROLE_KEY` (see `checks.supabase`). |
 | "I never got an email" | `checks.email` | Expected during beta (`deferred`) — no email is sent; support replies come via the human channel in [`LAUNCH_CHECKLIST.md §8`](LAUNCH_CHECKLIST.md#8-monitoring--operations). |
 
 ## 6. Incident response (private-beta minimum)

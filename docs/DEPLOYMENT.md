@@ -68,9 +68,10 @@ Companion docs:
    - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon` `public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `service_role` key → `SUPABASE_SERVICE_ROLE_KEY` — **server-only**: never
-     expose it to the browser or commit it anywhere. No app code path currently
-     uses it (reserved for trusted server-side workflows; `/api/health` reports
-     its presence).
+     expose it to the browser or commit it anywhere. Its sole app consumer is
+     the Slice 28 durable rate limiter, which calls the private
+     `consume_rate_limit` RPC and nothing else — never OTP send/verify, never a
+     business mutation; `/api/health` reports its presence.
 
 ### Post-migration smoke
 
