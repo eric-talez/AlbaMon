@@ -1,5 +1,7 @@
 import { test as base, expect, type Page } from "@playwright/test";
 
+import { isAllowedE2EUrl } from "./network-policy";
+
 /**
  * Browser errors that are benign under `next dev` and must not fail a test.
  * Keep this list tight — real hydration/app errors must still surface. Tests
@@ -9,22 +11,6 @@ import { test as base, expect, type Page } from "@playwright/test";
 const IGNORED_BROWSER_ERRORS: RegExp[] = [
   /favicon\.ico/i, // no favicon asset shipped → benign 404 in dev
 ];
-
-/** Hosts that count as the local E2E origin (any port). */
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
-
-/**
- * True for the local E2E origin and for inert, non-network browser URLs
- * (`about:`, `data:`, `blob:`). Everything else is an external request.
- */
-function isAllowedUrl(rawUrl: string): boolean {
-  if (/^(?:about|data|blob|chrome|chrome-extension):/i.test(rawUrl)) return true;
-  try {
-    return LOCAL_HOSTS.has(new URL(rawUrl).hostname);
-  } catch {
-    return true; // unparseable → inert, do not block
-  }
-}
 
 type E2EFixtures = {
   /**
@@ -55,25 +41,32 @@ export const test = base.extend<E2EFixtures>({
   allowConsoleErrors: [[], { option: true }],
 
   blockExternalRequests: [
-    async ({ page }, use) => {
+    async ({ page, baseURL }, use) => {
+      if (!baseURL) {
+        throw new Error(
+          "E2E network guard requires a configured baseURL (see playwright.config.ts).",
+        );
+      }
       const external: string[] = [];
 
       await page.route("**/*", (route) => {
         const url = route.request().url();
-        if (isAllowedUrl(url)) return route.continue();
+        if (isAllowedE2EUrl(url, baseURL)) return route.continue();
         external.push(`${route.request().method()} ${url}`);
         return route.abort();
       });
 
       page.on("websocket", (ws) => {
-        if (!isAllowedUrl(ws.url())) external.push(`WEBSOCKET ${ws.url()}`);
+        if (!isAllowedE2EUrl(ws.url(), baseURL)) {
+          external.push(`WEBSOCKET ${ws.url()}`);
+        }
       });
 
       await use();
 
       expect(
         external,
-        `unexpected EXTERNAL (non-localhost) network activity during the test:\n${
+        `unexpected EXTERNAL network activity (only the E2E origin ${baseURL} is allowed):\n${
           external.join("\n") || "(none)"
         }`,
       ).toEqual([]);
