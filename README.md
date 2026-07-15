@@ -454,10 +454,11 @@ domain (`curl -I`) per [`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md)
 deliberately deferred — it would force every page into dynamic rendering — and
 remains future hardening.
 
-## Operational hardening (Slices 16, 21–25, 27–28)
+## Later product and operational hardening (Slices 16, 21–29)
 
-Beyond the feature slices above, later slices are operational/infra hardening
-rather than new user-facing surfaces; each ships as one reviewable PR:
+Beyond the feature slices above, these deliver targeted product additions
+(employer access requests, the admin operations console) alongside operational
+and security hardening; each ships as one reviewable PR:
 
 - **Slice 16 — CI & release gate:** GitHub Actions runs typecheck → lint → test →
   build on every push ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
@@ -482,10 +483,15 @@ rather than new user-facing surfaces; each ships as one reviewable PR:
   missing/invalid config makes protected actions fail closed in production. This
   is the only app consumer of the service-role client, and `/api/health` reports
   a coarse `rateLimit` status.
+- **Slice 29 — Operational readiness reconciliation:** reconciled post-Slice-28
+  health reporting (the `rateLimit` signal), strengthened the beta/local
+  readiness gates to catch this class of drift, and synchronized the migration,
+  service-role, and env-var documentation. No schema or service-role authority
+  expansion.
 
 ## Development approach
 
-Work is delivered in small, reviewable **slices** (one PR each), Slice 0 → 28.
+Work is delivered in small, reviewable **slices** (one PR each), Slice 0 → 29.
 See the slice table in [`docs/PRODUCT_BRIEF.md`](docs/PRODUCT_BRIEF.md).
 
 ## Compliance

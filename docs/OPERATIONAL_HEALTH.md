@@ -28,6 +28,7 @@ Expected on a launch-ready production deployment:
   "checks": {
     "siteUrl": "configured",
     "supabase": "configured",
+    "rateLimit": "configured",
     "email": "deferred",
     "analytics": "deferred"
   }
@@ -118,7 +119,7 @@ from outside. Verified behaviors:
 |---|---|---|
 | Supabase auth pair (production) | `supabase: missing`/`partial` | Auth **throws** instead of silently enabling the forgeable dev role-picker: Vercel logs show `Auth is misconfigured: production requires real Supabase credentials` (`src/lib/supabase/config.ts`). Public pages may still render; sign-in/role flows fail loudly. |
 | Supabase auth pair (local/preview) | same | Dev role-picker mode — intended for development only. |
-| `SUPABASE_SERVICE_ROLE_KEY` only | `supabase: partial` | Auth works (anon pair present), but the service-role key is the rate limiter's only path to its `consume_rate_limit` counter — without it, in production/preview the rate-limited actions (phone OTP, high-risk writes) **fail closed** (deny). |
+| `SUPABASE_SERVICE_ROLE_KEY` missing (auth pair present) | `supabase: partial` | Auth works (anon pair present), but the service-role key is the rate limiter's only path to its `consume_rate_limit` counter — without it, in production/preview the rate-limited actions (phone OTP, high-risk writes) **fail closed** (deny). |
 | `RATE_LIMIT_HMAC_SECRET` | `rateLimit: missing` | The durable rate limiter can't derive subject hashes. In production/preview every rate-limited action (phone OTP; application, report, message, employer-access, job, and company writes) **fails closed** (deny); local dev/test fails open so the app stays usable without the secret. |
 | `NEXT_PUBLIC_SITE_URL` | `siteUrl: missing` | Silent fallback to `http://localhost:3000` for canonical/OG/sitemap URLs — pages render but links are wrong. This is the one silent failure the health check exists to surface. |
 | Email provider | `email: deferred` | Expected: **no email is ever sent in the beta.** Notification events log as `[notification:dev]` outside production and are silently skipped in production (`src/lib/notifications/dev.ts`). |

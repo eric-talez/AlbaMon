@@ -354,3 +354,13 @@ client-only) and Supabase RLS.
   - This is the **only** app consumer of the service-role client; it calls
     `consume_rate_limit` and nothing else — never OTP send/verify, never a
     business mutation. `/api/health` adds a coarse `rateLimit` presence check.
+- **Slice 29 — Operational readiness reconciliation:** docs + gates only.
+  - Reconciled post-Slice-28 drift: a coarse `rateLimit` presence signal on
+    `/api/health`, strengthened `verify:beta` / `verify:local-supabase` to catch
+    missing rate-limit env, undocumented migrations, and stale service-role
+    "no consumer" claims, and synchronized the migration count (13),
+    service-role, and `RATE_LIMIT_HMAC_SECRET` documentation across the operator
+    docs.
+  - Adds no migration, provider, product feature, or broader service-role
+    authority; the service-role client's sole consumer remains the Slice 28
+    limiter's `consume_rate_limit` call.
