@@ -16,14 +16,19 @@
 --        -v ON_ERROR_STOP=1 -f supabase/tests/slice-31-expired-job-visibility.sql
 --
 -- Self-verifying: each check RAISEs on failure (psql exits non-zero) and emits
--- `PASS <case>` on success. All job mutation and every check run inside ONE
--- transaction that is rolled back, so the seed is left unmutated; only the one
--- throwaway seeker principal provisioned up front persists. Role is simulated
--- via SET LOCAL ROLE + the request.jwt.claims GUC that auth.uid() reads.
--- Depends on supabase/seed.sql (approved job bbbb..0001 owned by employer
--- 1111..; approved job bbbb..0002 owned by employer 2222..).
+-- `PASS <case>` on success. EVERYTHING runs inside ONE transaction that is
+-- rolled back — provisioning the throwaway seeker (the auth.users insert plus
+-- its trigger-created profiles row), expiring the job, the application inserts,
+-- and every A–E check. On rollback the database is left completely unmutated:
+-- no test user, profile, application, or job change persists, and NO persistent
+-- test principal is left behind. Role is simulated via SET LOCAL ROLE + the
+-- request.jwt.claims GUC that auth.uid() reads. Depends on supabase/seed.sql
+-- (approved job bbbb..0001 owned by employer 1111..; approved job bbbb..0002
+-- owned by employer 2222..).
 
--- --- Provision a throwaway seeker principal ----------------------------------
+begin;
+
+-- --- Provision a throwaway seeker principal (inside the rolled-back tx) -------
 insert into auth.users (
   instance_id, id, aud, role, email,
   encrypted_password, email_confirmed_at,
@@ -35,9 +40,8 @@ insert into auth.users (
    crypt('x', gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}', '{}', now(), now())
 on conflict (id) do nothing;
--- The on_auth_user_created trigger inserts it as 'seeker' — exactly what we need.
-
-begin;
+-- The on_auth_user_created trigger inserts it as 'seeker' — exactly what we need;
+-- this user and its trigger-created profile vanish on the final rollback.
 
 -- Expire an approved seed job as the table owner (privileged; auth.uid() null).
 update public.jobs

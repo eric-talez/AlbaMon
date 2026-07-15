@@ -372,7 +372,7 @@ the sign-off of record; this one is the execution summary feeding it.
 | All 14 migrations verified (incl. explicit API-role grants) | §5 | ☐ | Hard |
 | Zero seed/demo data (users, companies, jobs, applications, messages, reports) | §6 | ☐ | Hard |
 | Founding admin verified; no unintended admins | §7 | ☐ | Hard |
-| Public visibility invariant (approved-only) proven | §9 | ☐ | Hard |
+| Public visibility invariant (approved and unexpired) proven | §9 | ☐ | Hard |
 | Role guards hold for all roles | §10–§13 | ☐ | Hard |
 | Mobile/desktop QA passed | §14 | ☐ | Hard |
 | Attorney review of legal copy | §15 | ☐ | Conditional — accepted-pending for private beta; hard blocker for public launch |
