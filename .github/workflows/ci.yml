@@ -61,3 +61,47 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # Separate browser-E2E gate (Slice 30). Runs only after the unit/build job
+  # succeeds, and — like it — needs no secrets: the Playwright webServer runs
+  # `next dev` in dev-auth mode with placeholder Supabase env (mock jobs, no
+  # database, no network services). See playwright.config.ts.
+  e2e:
+    name: Browser E2E (Playwright, Chromium)
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Only the Chromium build pinned to @playwright/test (package-lock.json),
+      # plus its OS dependencies — no other browsers are downloaded.
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser E2E
+        run: npm run test:e2e
+
+      # Report + traces are retained on failure only (see playwright.config.ts).
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore

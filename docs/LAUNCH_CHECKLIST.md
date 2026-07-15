@@ -215,14 +215,18 @@ Automated (all must pass on the release commit):
 - [ ] `git diff --check` (no whitespace/conflict markers)
 - [ ] `npm run typecheck`
 - [ ] `npm run lint`
-- [ ] `npm test` (unit + server-render smoke tests; 39 files)
+- [ ] `npm test` (unit + server-render smoke tests; Playwright specs excluded)
 - [ ] `npm run build`
 - [ ] `npm run verify:beta` (readiness docs gate: required docs + CI workflow
       present, checklist topics intact, placeholder-only secret hygiene)
+- [ ] `npm run test:e2e` (Chromium browser E2E — public shell, filters,
+      dev-auth guards, responsive nav, `/api/health`; hermetic, no credentials)
 
-> **Browser E2E is deferred.** There is no Playwright/Cypress setup; automated
-> coverage is Vitest server-render smoke tests (`tests/smoke-public-pages.test.ts`)
-> plus action/DB-layer tests. The manual script below covers real-browser flows.
+> **Browser E2E covers the credential-free Chromium/dev-auth surface** (Slice 30:
+> `npm run test:e2e` — public shell + hydration, filters, dev-auth role guards,
+> responsive nav, `/api/health`, against mock data with placeholder Supabase).
+> It does **not** touch real Supabase, OAuth/SMS providers, or Safari. The manual
+> script below covers those real-service and cross-browser flows.
 
 Manual smoke script — run at **390px (mobile)** and **1440px (desktop)**, in
 Chrome + Safari, on the production URL:
@@ -250,7 +254,7 @@ Chrome + Safari, on the production URL:
 | No seed/demo data in production (§3 counts are 0) | ☐ |
 | Founding admin verified (§4) | ☐ |
 | RLS spot-checks passed (§7) | ☐ |
-| Team accepts open placeholders: attorney review pending, no error tracking, dev-stub email, browser E2E deferred | ☐ |
+| Team accepts open placeholders: attorney review pending, no error tracking, dev-stub email, browser E2E limited to the Chromium/dev-auth surface (real-Supabase, provider, and Safari flows manual) | ☐ |
 | Social/phone auth providers verified per §12 — or their flags stay `false` | ☐ |
 
 **Go** = every row checked. Any unchecked row = **no-go**; fix or explicitly
@@ -292,7 +296,8 @@ every method ships behind a default-`false` flag and renders as
 - Attorney-reviewed legal copy (placeholder pages ship with review notice)
 - Real email/SMS delivery (dev stub only)
 - Error tracking & product analytics providers
-- Browser E2E automation (Playwright/Cypress)
+- Cross-browser (Safari) and real-Supabase/provider browser E2E — the Chromium
+  dev-auth surface is automated in Slice 30; these broader flows stay manual
 - Per-job URLs in the sitemap (build-time sitemap would go stale; jobs are
   crawlable via `/jobs`)
 - Open Graph/social preview image (text metadata only)

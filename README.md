@@ -339,9 +339,9 @@ filters, posting form, and dev auth form; `aria-live` on form error alerts;
 Smoke tests (`tests/smoke-public-pages.test.ts`, `tests/seo.test.ts`) render
 every public page end-to-end on the deterministic mock path, assert guards fire
 with correct redirect targets, non-approved job ids 404, and the sitemap/robots
-expose no private routes. **Browser E2E (Playwright/Cypress) remains deferred**
-— see the launch checklist. This slice adds no product features, schema
-changes, or new dependencies.
+expose no private routes. Core browser E2E (Chromium, dev-auth mode) arrived in
+Slice 30 — see "Later product and operational hardening" below. This slice adds
+no product features, schema changes, or new dependencies.
 
 ## Production beta readiness (Slice 17)
 
@@ -454,7 +454,7 @@ domain (`curl -I`) per [`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md)
 deliberately deferred — it would force every page into dynamic rendering — and
 remains future hardening.
 
-## Later product and operational hardening (Slices 16, 21–29)
+## Later product and operational hardening (Slices 16, 21–30)
 
 Beyond the feature slices above, these deliver targeted product additions
 (employer access requests, the admin operations console) alongside operational
@@ -488,10 +488,17 @@ and security hardening; each ships as one reviewable PR:
   readiness gates to catch this class of drift, and synchronized the migration,
   service-role, and env-var documentation. No schema or service-role authority
   expansion.
+- **Slice 30 — Core browser E2E (Playwright, Chromium):** hermetic dev-auth
+  browser tests over the public shell + hydration, job-discovery filters, the
+  dev-auth role-guard matrix, responsive nav, and `/api/health` — all against
+  mock data with placeholder Supabase, no credentials or database. A separate
+  CI job runs them after the unit/build gate. Real-Supabase writes, OAuth/SMS
+  provider callbacks, Safari, responsive visual review, and keyboard/VoiceOver
+  stay manual (`docs/BETA_READINESS.md`).
 
 ## Development approach
 
-Work is delivered in small, reviewable **slices** (one PR each), Slice 0 → 29.
+Work is delivered in small, reviewable **slices** (one PR each), Slice 0 → 30.
 See the slice table in [`docs/PRODUCT_BRIEF.md`](docs/PRODUCT_BRIEF.md).
 
 ## Compliance
