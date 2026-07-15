@@ -147,8 +147,8 @@ supabase db reset   # apply migrations/ + seed.sql to a local DB (CLI + Docker)
 in development, tests, or `next build`, they return deterministic mock data. A
 production runtime never substitutes mock listings for missing configuration or
 a DB outage; those errors are surfaced instead. Configured reads use the
-approved-only `public_job_listings` view, which exposes safe company identity
-without making the rest of an unverified company profile public.
+approved-and-unexpired `public_job_listings` view, which exposes safe company
+identity without making the rest of an unverified company profile public.
 
 ## Browse, search & roles (Slice 4)
 
@@ -157,8 +157,9 @@ params. [`src/components/JobFilters.tsx`](src/components/JobFilters.tsx) is a pl
 **GET form** (works without JavaScript) that submits `q`, `city`, `category`,
 `jobType`, `languageRequirement`, `payMin`, and `sort` (`newest` | `pay_high` |
 `pay_low`). `searchApprovedJobs()` applies these filters against the DB when
-Supabase is configured and against the mock data otherwise — always approved-only,
-so pending/draft/rejected jobs are never exposed. Invalid query values are ignored
+Supabase is configured and against the mock data otherwise — always
+approved-and-unexpired, so pending/draft/rejected and expired jobs are never
+exposed. Invalid query values are ignored
 safely (`parseJobSearchParams`), and a **필터 초기화 / Reset** link clears them.
 
 **Runtime role source is now `profiles.role`.** When Supabase is configured,
@@ -178,7 +179,7 @@ access even if the old company ownership row remains.
 
 Approved job details link to `/jobs/[id]/apply`. Authenticated seekers can submit
 one optional cover note (maximum 1,000 characters); the server action rechecks
-the runtime profile role and approved job status, while RLS and the unique
+the runtime profile role and approved, unexpired job status, while RLS and the unique
 `(job_id, seeker_id)` constraint remain the final authorization and duplicate
 gates. Employer/admin accounts are blocked. Without Supabase, public mock jobs
 remain browsable but application writes are unavailable and are never mocked.
@@ -338,7 +339,7 @@ filters, posting form, and dev auth form; `aria-live` on form error alerts;
 
 Smoke tests (`tests/smoke-public-pages.test.ts`, `tests/seo.test.ts`) render
 every public page end-to-end on the deterministic mock path, assert guards fire
-with correct redirect targets, non-approved job ids 404, and the sitemap/robots
+with correct redirect targets, non-approved and expired job ids 404, and the sitemap/robots
 expose no private routes. Core browser E2E (Chromium, dev-auth mode) arrived in
 Slice 30 — see "Later product and operational hardening" below. This slice adds
 no product features, schema changes, or new dependencies.
@@ -454,6 +455,29 @@ domain (`curl -I`) per [`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md)
 deliberately deferred — it would force every page into dynamic rendering — and
 remains future hardening.
 
+## Expired job visibility (Slice 31)
+
+Job expiration is a complete, database-backed public-visibility invariant. A job
+is publicly active only while it is `approved` **and unexpired**:
+
+```
+moderation_status = 'approved' AND (expires_at IS NULL OR expires_at > now())
+```
+
+`20260715000000_expired_job_visibility.sql` applies that identical predicate in
+three places — the `jobs_select_public_approved` RLS policy, the
+`public_job_listings` view, and the `applications_insert_seeker` RLS policy — so
+an expired approved job drops off `/jobs` lists and search, **404s** on the
+public detail route, is unreadable through the public/anon jobs policy, and
+**rejects new seeker applications** (including direct PostgREST/RLS writes). The
+job stays `approved` and fully visible to its owner and admins for history;
+`moderation_status` is never mutated on expiry, and owner/admin policies are
+untouched. `expires_at` stays a filter predicate — it is never exposed as a view
+column. The mock/dev path mirrors the rule with a pure, clock-injectable
+`isJobPubliclyActive` helper ([`src/lib/mock/jobs.ts`](src/lib/mock/jobs.ts)) and
+fixed-date fixtures (null, far-future, past, and malformed expiry), so tests are
+deterministic and never depend on the current date.
+
 ## Later product and operational hardening (Slices 16, 21–30)
 
 Beyond the feature slices above, these deliver targeted product additions
@@ -498,7 +522,7 @@ and security hardening; each ships as one reviewable PR:
 
 ## Development approach
 
-Work is delivered in small, reviewable **slices** (one PR each), Slice 0 → 30.
+Work is delivered in small, reviewable **slices** (one PR each), Slice 0 → 31.
 See the slice table in [`docs/PRODUCT_BRIEF.md`](docs/PRODUCT_BRIEF.md).
 
 ## Compliance

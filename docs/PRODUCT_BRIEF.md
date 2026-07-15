@@ -128,7 +128,8 @@ client-only) and Supabase RLS.
   - Configured reads use an approved-only public view with safe company identity;
     local/test/build use deterministic approved-only mocks.
   - Original roadmap items still deferred: schedule filter, featured-first sort,
-    pagination/load-more, expiry filtering, and a dedicated loading state.
+    pagination/load-more, and a dedicated loading state. (Expiry filtering
+    shipped in Slice 31.)
 - **Slice 5 — Job detail & apply:** scoped implementation done.
   - Approved job details link to a guarded application route.
   - Seekers may submit one optional 1,000-character cover note per job.
@@ -376,3 +377,22 @@ client-only) and Supabase RLS.
     OAuth/SMS provider callbacks, Safari, responsive *visual* review, and
     keyboard/VoiceOver stay manually verified. Adds no migration, provider,
     product feature, or broader service-role authority.
+- **Slice 31 — Expired job visibility & application cutoff:** scoped
+  implementation done.
+  - Job expiration is now a complete, database-backed public-visibility
+    invariant. A job is publicly active only while `moderation_status =
+    'approved' and (expires_at is null or expires_at > now())`; the
+    `20260715000000_expired_job_visibility.sql` migration applies that identical
+    predicate to the `jobs_select_public_approved` policy, the
+    `public_job_listings` view, and the `applications_insert_seeker` policy.
+  - An expired approved job drops off public lists/search, 404s on the public
+    detail route, is unreadable through the public/anon jobs policy, and rejects
+    new seeker applications (including direct PostgREST/RLS writes) — while
+    staying `approved` and fully manageable in employer/admin history.
+    `moderation_status` is never mutated on expiry; owner/admin policies are
+    untouched. The mock layer mirrors the rule via a pure, clock-injectable
+    `isJobPubliclyActive` helper, with fixed-date fixtures (null, far-future,
+    past, and malformed expiry) so tests never depend on the current date.
+  - No cron job, background task, service-role consumer, index, schedule filter,
+    pagination, job editing, or automatic status transition is added; expiry is
+    a read-time time comparison, not a status transition.

@@ -43,7 +43,7 @@ Per-variable reference (exposure, validation, placeholders):
       migrations + seed + auth mode + admin promotion verified against a
       disposable local stack **before** touching the hosted project
 - [ ] Hosted project created; region appropriate for LA/OC
-- [ ] All 13 migrations applied **in filename order** via `supabase db push`
+- [ ] All 14 migrations applied **in filename order** via `supabase db push`
       (order table in [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project)),
       after `supabase login` + `supabase link --project-ref <project-ref>`
 - [ ] **Never `supabase db reset` against the hosted project** — it wipes the
@@ -150,18 +150,20 @@ assert the policy files; live-DB verification needs the Supabase CLI + Docker
 | Public companies read dropped, anon SELECT revoked (view-only identity) | `20260713…_restrict_company_public_reads.sql` | `tests/db-schema.test.ts` |
 | Transactional admin audit logs + append-only guard | `20260714…_transactional_admin_audit_logs.sql` | `tests/admin-audit-migration.test.ts` |
 | Private rate-limit counter + `consume_rate_limit` RPC (service_role-only) | `20260714010000_server_rate_limiting.sql` | `tests/db-rate-limit.test.ts` |
+| Expired jobs hidden from public view/search/detail + application cutoff (approved AND unexpired) | `20260715000000_expired_job_visibility.sql` | `tests/db-schema.test.ts`, `tests/smoke-public-pages.test.ts` |
 
 - [ ] Role guards remain server-side (`src/lib/auth/guards.ts`; every
       `/admin`, `/employer`, `/dashboard` page calls them — no client-only gating)
 - [ ] Service-role client used only by the Slice 28 rate limiter
       (`src/lib/supabase/service.ts` → private `consume_rate_limit` RPC; never OTP
       send/verify or business writes; the health check reports the key's presence)
-- [ ] Public job surfaces read approved listings only (`public_job_listings`
-      view; `tests/smoke-public-pages.test.ts` asserts non-approved ids 404)
+- [ ] Public job surfaces read approved, **unexpired** listings only
+      (`public_job_listings` view; `tests/smoke-public-pages.test.ts` asserts
+      non-approved **and expired** ids 404)
 - [ ] Sitemap/robots expose no private routes and no per-job URLs
       (`tests/seo.test.ts`)
 - [ ] Spot-check in prod: signed-out user cannot fetch `/admin`, `/employer`,
-      `/dashboard` (redirects), and a pending job's URL 404s
+      `/dashboard` (redirects), and a pending or expired job's URL 404s
 - [ ] Production security headers present on every response (Slice 26):
       `Content-Security-Policy`, `Strict-Transport-Security`,
       `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,

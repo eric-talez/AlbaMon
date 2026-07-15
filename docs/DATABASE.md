@@ -32,16 +32,19 @@ its values.
 | --- | --- | --- |
 | `profiles` | One row per `auth.users` user; DB-level source of truth for role. | Auto-created by the `on_auth_user_created` trigger (defaults to `seeker`). |
 | `companies` | Employer companies. | `owner_id → profiles`; `is_verified` gates public visibility. |
-| `jobs` | Job postings. | `company_id → companies`; `moderation_status` gates public visibility; `address_display_mode` is `full`/`city_only`. |
+| `jobs` | Job postings. | `company_id → companies`; `moderation_status` and `expires_at` gate public visibility (approved AND unexpired); `address_display_mode` is `full`/`city_only`. |
 | `applications` | Seeker applications. | `unique(job_id, seeker_id)` blocks duplicates; optional `cover_note` is limited to 1,000 characters; `status` is constrained to the Slice 10 workflow values. |
 | `messages` | Application-centered seeker/employer conversations. | `application_id → applications`; body is nonblank and limited to 2,000 characters. |
 | `reports` | Abuse/quality reports. | Job reports filed by signed-in users; reason/status/details are constrained by Slice 11. |
 | `employer_access_requests` | Seeker requests for the employer role (Slice 21). | `requester_id → profiles`; status is `pending`/`approved`/`rejected`; a partial unique index allows **one pending request per requester**; decided rows carry `reviewed_by`/`reviewed_at`. |
 | `audit_logs` | Append-only audit trail of admin moderation decisions (Slice 27). | No `updated_at`; rows are written only by the admin-only `security definer` review functions, atomically with each decision; an append-only trigger rejects `UPDATE`/`DELETE` from the ordinary API roles. |
 
-`public_job_listings` is a read-only, approved-only view used by public job
-pages. It includes job fields plus `company_name` / `company_is_verified`, but
-does not expose private company profile columns. Since Slice 25 it is the
+`public_job_listings` is a read-only, approved-and-unexpired view used by public
+job pages: its `WHERE` requires `moderation_status = 'approved' and (expires_at
+is null or expires_at > now())` (Slice 31). It includes job fields plus
+`company_name` / `company_is_verified`, but does not expose private company
+profile columns — nor `expires_at`, which stays a filter predicate, never a
+returned column. Since Slice 25 it is the
 **only** public path to company identity: `anon` and ordinary seeker callers
 cannot read the `companies` base table at all (no anon grant, no public SELECT
 policy), so private columns such as `phone`, `address_display`, `website`, and
@@ -110,8 +113,8 @@ roles see zero rows and hold no privileges; it is reached only through the
 | --- | --- | --- |
 | `profiles` | self; admin all | self-update only, and **role cannot change** (RLS pins it + a `before update of role` trigger hard-blocks non-admins); admin all |
 | `companies` | current-role owner; admin (**no public/seeker base-table read** — Slice 25 dropped `companies_select_public_verified`; the public sees company identity only through `public_job_listings`) | owner insert/update own — **requires employer or admin role**; admin all |
-| `jobs` | **`approved` only (public)**; current-role owner; admin | employer/admin owner insert **forced to `pending`**; owner update cannot set `approved`; admin all |
-| `applications` | own (seeker); current-role employer for owned jobs; admin | insert only by a **`seeker`-role profile**, as self, for `approved` jobs with initial status `submitted`; current-role owning employers may update status only; admin update |
+| `jobs` | **`approved` AND unexpired (public)**; current-role owner; admin (owner/admin reads ignore expiry, so expired jobs stay manageable) | employer/admin owner insert **forced to `pending`**; owner update cannot set `approved`; admin all |
+| `applications` | own (seeker); current-role employer for owned jobs; admin | insert only by a **`seeker`-role profile**, as self, for **`approved`, unexpired** jobs with initial status `submitted`; current-role owning employers may update status only; admin update |
 | `messages` | applicant; current-role owning employer; admin | applicant/owning employer insert only as `auth.uid()`; no update/delete |
 | `reports` | own (reporter); admin | authenticated reporter insert for approved jobs only; admin status update |
 | `employer_access_requests` | own (requester); admin all | requester insert only as self while runtime role is **`seeker`**, initial `pending` state with empty review fields; **no update/delete policy** — decisions go only through `review_employer_access_request()` |
@@ -206,8 +209,9 @@ applicant's `display_name` and `email`. Default execution is revoked before
   data from `src/lib/mock/jobs.ts`.
 - **Production runtime without Supabase, or with a DB failure** → throws instead
   of silently presenting fictional listings.
-- **Configured** → queries `public_job_listings`, filters approved rows again as
-  defense in depth, and maps rows to the camelCase `Job` type.
+- **Configured** → queries `public_job_listings` (already approved **and
+  unexpired**), filters approved rows again as defense in depth, and maps rows to
+  the camelCase `Job` type.
 
 Employer company and job writes use the caller's cookie-authenticated Supabase
 client through `src/lib/db/companies.ts` and `src/lib/db/employer-jobs.ts`.
@@ -249,8 +253,8 @@ The thread-context RPC exposes only application/job/company display fields.
 Report submission and the admin report queue use
 [`src/lib/db/reports.ts`](../src/lib/db/reports.ts). Users can file reports only
 through their caller-authenticated Supabase session. The app verifies the job via
-the approved-only `public_job_listings` view before inserting, and Slice 11 RLS
-keeps approved jobs as the final insert gate. Reports are constrained to the
+the approved-and-unexpired `public_job_listings` view before inserting, and
+Slice 11 RLS keeps approved jobs as the final insert gate. Reports are constrained to the
 reason set `discriminatory_language`, `visa_status_preference`,
 `illegal_cash_pay`, `misleading_or_suspicious`, `spam`, and `other`; status is
 constrained to `open`, `reviewed`, or `dismissed`; details are capped at 1,000
@@ -280,7 +284,7 @@ so approval (request status + `profiles.role` promotion to `employer` + the
 `audit_logs` entry since Slice 27) is atomic, rejection changes no role, and
 requesters can never approve themselves. Approval does **not** create a company: the new employer still
 registers company details and submits jobs through the existing flow, and
-public job visibility remains approved-only. K-Work US does not verify or
+public job visibility remains approved-and-unexpired. K-Work US does not verify or
 guarantee business registration, legal status, or work authorization as part
 of this review.
 

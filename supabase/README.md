@@ -21,6 +21,7 @@ supabase/
     20260713000000_restrict_company_public_reads.sql # drop public companies read + revoke anon SELECT (view-only company identity)
     20260714000000_transactional_admin_audit_logs.sql # admin review functions write audit_logs atomically + append-only guard
     20260714010000_server_rate_limiting.sql # private rate_limit_buckets + atomic consume_rate_limit RPC (service_role-only)
+    20260715000000_expired_job_visibility.sql # public reads/search/detail + seeker apply require approved AND unexpired (expires_at gate)
   seed.sql                            # LA/OC demo companies + jobs
   tests/                              # live psql verification scripts (disposable local stacks only)
 ```
@@ -59,7 +60,9 @@ After setting the project URL + anon key in `.env.local` (see `.env.example`),
 the app automatically switches from mock data to live DB reads — see
 [`docs/DATABASE.md`](../docs/DATABASE.md).
 
-Public job pages query the approved-only `public_job_listings` view. The view
+Public job pages query the approved-and-unexpired `public_job_listings` view (its
+`WHERE` requires `moderation_status = 'approved' and (expires_at is null or
+expires_at > now())` since Slice 31). The view
 includes only the company name and verification flag needed by public listings,
 including for an unverified company, without exposing the rest of that company
 row. Since Slice 25 (`20260713000000_restrict_company_public_reads.sql`) this
@@ -90,7 +93,7 @@ trigger paths to approve or reject pending jobs and change only company
 verification status. Since Slice 27 (`20260714000000`) those decisions run
 through admin-only `security definer` functions that also record the decision
 in `audit_logs` atomically. Public job reads remain constrained by the
-approved-only view; no service-role client is used for these user-facing
+approved-and-unexpired view; no service-role client is used for these user-facing
 actions.
 
 Slice 9 adds `messages` and application-thread access helpers. RLS derives the

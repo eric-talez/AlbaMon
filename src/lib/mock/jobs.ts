@@ -267,6 +267,9 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["식사 제공", "주차 지원"],
     moderationStatus: "approved",
     postedAt: "2026-06-19",
+    // Fixed far-future cutoff: still publicly active. Proves future-expiry jobs
+    // stay visible through the real data layer (getMockJobs / search).
+    expiresAt: "2099-01-01T00:00:00.000Z",
   },
   {
     // Pending — must NOT appear on public pages until an admin approves it.
@@ -320,14 +323,89 @@ export const MOCK_JOBS: Job[] = [
     moderationStatus: "draft",
     postedAt: "2026-06-20",
   },
+  {
+    // Approved but EXPIRED — kept for employer/admin history, never public.
+    // Fixed past cutoff so the exclusion is deterministic regardless of run date.
+    id: "kw-011",
+    title: "마감된 물류 창고 야간 근무 (지원 종료)",
+    companyName: "Vernon Logistics Co.",
+    employerVerified: false,
+    category: "logistics_warehouse",
+    jobType: "full_time",
+    city: "Vernon",
+    state: "CA",
+    addressDisplay: "Vernon, CA",
+    addressDisplayMode: "city_only",
+    payMin: 19,
+    payMax: 23,
+    payUnit: "hour",
+    tipsAvailable: false,
+    scheduleDays: "주 5일",
+    scheduleTimeRange: "10:00 PM – 6:00 AM",
+    languageRequirement: "korean_helpful",
+    description: "이미 마감된 공고입니다. 히스토리 확인용으로만 남아 있습니다.",
+    responsibilities: ["입출고 처리", "재고 정리"],
+    requirements: ["야간 근무 가능"],
+    benefits: ["야간 수당"],
+    moderationStatus: "approved",
+    postedAt: "2026-05-01",
+    expiresAt: "2020-01-01T00:00:00.000Z",
+  },
+  {
+    // Approved with a MALFORMED expiresAt — must fail closed (excluded from all
+    // public reads), never crash or leak.
+    id: "kw-012",
+    title: "잘못된 만료일 데이터 공고 (테스트)",
+    companyName: "Torrance Office Partners",
+    employerVerified: false,
+    category: "office_admin",
+    jobType: "part_time",
+    city: "Torrance",
+    state: "CA",
+    addressDisplay: "Torrance, CA",
+    addressDisplayMode: "city_only",
+    payMin: 20,
+    payMax: 22,
+    payUnit: "hour",
+    tipsAvailable: false,
+    scheduleDays: "주 3일",
+    scheduleTimeRange: "9:00 AM – 2:00 PM",
+    languageRequirement: "bilingual_preferred",
+    description: "만료일 데이터가 손상된 경우의 안전 동작을 검증하기 위한 공고입니다.",
+    responsibilities: ["서류 정리"],
+    requirements: ["기본 사무 능력"],
+    benefits: ["주말 휴무"],
+    moderationStatus: "approved",
+    postedAt: "2026-05-02",
+    expiresAt: "not-a-real-date",
+  },
 ];
 
+/**
+ * Public-visibility rule for a job, mirroring the production
+ * `public_job_listings` view / `jobs_select_public_approved` policy exactly:
+ *
+ *     approved AND (expiresAt is null/undefined OR expiresAt > now)
+ *
+ * `now` is injectable (epoch ms) so unit tests are deterministic and never
+ * depend on dates close to today. The comparison is strict `>`, so a job whose
+ * `expiresAt` equals `now` is already expired (matches SQL `expires_at > now()`).
+ * A present-but-unparseable `expiresAt` fails closed (treated as expired).
+ */
+export function isJobPubliclyActive(
+  job: Pick<Job, "moderationStatus" | "expiresAt">,
+  now: number = Date.now(),
+): boolean {
+  if (job.moderationStatus !== "approved") return false;
+  if (job.expiresAt == null) return true;
+  const expiry = Date.parse(job.expiresAt);
+  return Number.isNaN(expiry) ? false : expiry > now;
+}
+
 export function getMockJobs(): Job[] {
-  return MOCK_JOBS.filter((j) => j.moderationStatus === "approved");
+  return MOCK_JOBS.filter((j) => isJobPubliclyActive(j));
 }
 
 export function getMockJobById(id: string): Job | undefined {
-  return MOCK_JOBS.find(
-    (j) => j.id === id && j.moderationStatus === "approved",
-  );
+  return MOCK_JOBS.find((j) => j.id === id && isJobPubliclyActive(j));
 }
