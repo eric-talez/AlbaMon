@@ -8,6 +8,14 @@ const releaseEnv = {
   NEXT_PUBLIC_AUTH_GOOGLE_ENABLED: "true",
 };
 
+const maxDnsLabel = "a".repeat(63);
+const maxDnsHostname = [
+  "a".repeat(63),
+  "b".repeat(63),
+  "c".repeat(63),
+  "d".repeat(61),
+].join(".");
+
 function checkReleaseEnv(overrides: Record<string, string> = {}) {
   return spawnSync(process.execPath, ["scripts/check-release-env.mjs"], {
     cwd: process.cwd(),
@@ -46,6 +54,17 @@ describe("release environment gate", () => {
     ["localhost subdomain", "https://jobs.localhost"],
     ["localhost subdomain trailing dot", "https://jobs.localhost."],
     ["single-label hostname", "https://intranet"],
+    ["repeated terminal dot", "https://localhost.."],
+    ["empty middle label", "https://foo..com"],
+    ["leading empty label", "https://.foo.com"],
+    ["underscore in label", "https://foo_bar.com"],
+    ["leading label hyphen", "https://-foo.com"],
+    ["trailing label hyphen", "https://foo-.com"],
+    ["64-character label", `https://${"a".repeat(64)}.com`],
+    [
+      "overlong hostname",
+      `https://${["a".repeat(63), "b".repeat(63), "c".repeat(63), "d".repeat(62)].join(".")}`,
+    ],
   ])("rejects a non-public site origin: %s", (_case, siteUrl) => {
     const result = checkReleaseEnv({ NEXT_PUBLIC_SITE_URL: siteUrl });
     expect(result.status).not.toBe(0);
@@ -62,10 +81,14 @@ describe("release environment gate", () => {
     );
   });
 
-  it("accepts a public HTTPS DNS hostname", () => {
-    const result = checkReleaseEnv({
-      NEXT_PUBLIC_SITE_URL: "https://jobs.k-work.us",
-    });
+  it.each([
+    ["ordinary hostname", "https://jobs.k-work.us"],
+    ["punycode hostname", "https://xn--bcher-kva.de"],
+    ["one terminal root dot", "https://jobs.k-work.us."],
+    ["63-character label", `https://${maxDnsLabel}.com`],
+    ["253-character hostname", `https://${maxDnsHostname}`],
+  ])("accepts a public HTTPS DNS hostname: %s", (_case, siteUrl) => {
+    const result = checkReleaseEnv({ NEXT_PUBLIC_SITE_URL: siteUrl });
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
   });

@@ -22,9 +22,18 @@ for (const name of required) {
 const origin = new URL(process.env.NEXT_PUBLIC_SITE_URL);
 const hostname = origin.hostname.replace(/\.$/, "");
 const address = hostname.startsWith("[") ? hostname.slice(1, -1) : hostname;
+const labels = hostname.split(".");
+const isDnsHostname =
+  hostname.length <= 253 &&
+  labels.length >= 2 &&
+  labels.every(
+    (label) =>
+      label.length <= 63 &&
+      /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(label),
+  );
 if (
   origin.protocol !== "https:" ||
-  !hostname.includes(".") ||
+  !isDnsHostname ||
   hostname === "localhost" ||
   hostname.endsWith(".localhost") ||
   isIP(address) !== 0
