@@ -1,6 +1,6 @@
 # Deployment — Vercel + Supabase
 
-How to deploy K-Work US for the private beta. The app is a standard Next.js 16
+How to deploy K-Work US for the California public launch. The app is a standard Next.js 16
 App Router project: **Vercel** hosts the app and **hosted Supabase** provides
 Auth + Postgres (with RLS). Nothing in this guide contains real credentials —
 every value shown is a placeholder.
@@ -73,7 +73,9 @@ Companion docs:
 
 Run in order after the first Vercel deploy (§4), against the production URL:
 
-1. `GET /api/health` returns 200 with `supabase: "configured"`.
+1. `GET /api/health` returns 200 and `GET /api/ready` returns
+   `200 {"status":"ok"}`. Health proves the process is live; readiness proves
+   the public database is reachable with the anon client.
 2. First real sign-up creates a `public.profiles` row with role `seeker`.
    All auth flags default to `false`, so enable **one** provider for this —
    its smoke ([`BETA_READINESS.md §17`](BETA_READINESS.md#17-social--phone-auth-verification))
@@ -101,8 +103,10 @@ stay stable.
 
 ## 4. Vercel
 
-1. Import the Git repository into Vercel. Framework preset **Next.js**, default
-   build settings (`npm run build`). No custom output config is required.
+1. Import the Git repository into Vercel. Framework preset **Next.js**, build
+   command `npm run build:release`. The release command rejects missing or
+   placeholder public settings, non-public HTTP origins, and Google auth that
+   has not been explicitly enabled after testing.
 2. Set environment variables (Project → Settings → Environment Variables). Use
    Production values only on Production; test-mode values on Preview.
 
@@ -111,15 +115,16 @@ stay stable.
    | `NEXT_PUBLIC_SITE_URL` | `https://<your-domain>` | client | Canonical/OG/sitemap base; falls back to localhost if unset |
    | `NEXT_PUBLIC_SUPABASE_URL` | `https://<project-ref>.supabase.co` | client | |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `<anon-public-key>` | client | RLS is the authorization gate |
+   | `NEXT_PUBLIC_AUTH_GOOGLE_ENABLED` | `true` | client | Required only after the hosted Google sign-in flow passes its smoke test |
    | `SUPABASE_SERVICE_ROLE_KEY` | `<service-role-key>` | server-only | Reserved for trusted server-side workflows; no app code path uses it |
    | `EMAIL_PROVIDER` | `dev` | server-only | Real delivery (`resend`/`sendgrid`) is deferred; `dev` logs stubs |
    | `EMAIL_FROM` | `K-Work US <no-reply@your-domain>` | server-only | Unused while `EMAIL_PROVIDER=dev` |
    | `RESEND_API_KEY` / `SENDGRID_API_KEY` | *(empty)* | server-only | Only when a real provider is enabled |
    | `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST` | *(empty)* | client | Referenced but not initialized; leave empty for beta |
 
-   The production build **fails closed**: with `NODE_ENV=production` and
-   missing/placeholder Supabase credentials, auth throws instead of silently
-   enabling the forgeable dev role-picker.
+   `npm run build` remains available for credential-free CI checks. It does not
+   prerender mock job details. Only `npm run build:release` may create a
+   deployable artifact.
 
 3. Deploy. Then complete the
    [post-deploy verification](LAUNCH_CHECKLIST.md#10-qa--verification) —

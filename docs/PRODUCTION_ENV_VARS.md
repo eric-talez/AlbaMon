@@ -10,7 +10,9 @@ values in Vercel; [`LAUNCH_CHECKLIST.md §1`](LAUNCH_CHECKLIST.md#1-environment-
 is the launch sign-off. This page adds what those do not: required/optional
 status, exposure semantics, and validation/failure behavior with code pointers.
 After deploying, `GET /api/health` reports whether these variables are present
-(as coarse statuses only, never values) —
+(as coarse statuses only, never values), while `GET /api/ready` performs a
+two-second, cookie-free anon read from `public_job_listings` and returns only
+`ok` or `unavailable` —
 [`OPERATIONAL_HEALTH.md`](OPERATIONAL_HEALTH.md) is the reference.
 
 ## How to read this page
@@ -30,6 +32,7 @@ After deploying, `GET /api/health` reports whether these variables are present
 | `NEXT_PUBLIC_SITE_URL` | client | Vercel (Production scope) | `https://<your-domain>` | Parsed with `new URL()` in `src/lib/site.ts`; malformed/unset falls back to `http://localhost:3000`. A wrong value silently breaks canonical/OG/sitemap URLs. |
 | `NEXT_PUBLIC_SUPABASE_URL` | client | Vercel; value from Supabase → Project Settings → API | `https://<project-ref>.supabase.co` | Placeholder fragments (`your-project`, `example.com`) are treated as *unconfigured* (`src/lib/supabase/config.ts`). In production the app then **fails closed**: auth throws instead of enabling the forgeable dev role-picker. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | client | Vercel; same Supabase page | `<anon-public-key>` | Safe to expose **only** because RLS is the authorization gate. The `your-anon-key` fragment counts as unconfigured (same fail-closed behavior). Never commit the real JWT-shaped value — `tests/security.test.ts` blocks it. |
+| `NEXT_PUBLIC_AUTH_GOOGLE_ENABLED` | client | Vercel (Production scope) | `true` | `npm run build:release` requires exactly `true`; enable it only after the hosted Google authentication flow has passed its smoke test. |
 | `SUPABASE_SERVICE_ROLE_KEY` | **server-only** | Vercel; same Supabase page | `<service-role-key>` | Bypasses RLS entirely. No app code path currently uses it — the client in `src/lib/supabase/service.ts` is reserved for trusted server-side workflows, and `/api/health` reports the key's *presence* only. Keep any future usage restricted to trusted server flows. |
 
 > **Stripe variables removed (Slice 23).** Payments and paid boosts were
@@ -66,7 +69,6 @@ unconfigured) shows a "setup required" state — nothing breaks.
 | Variable | Exposure | Status |
 |---|---|---|
 | `NEXT_PUBLIC_AUTH_KAKAO_ENABLED` | client | `true` enables the KakaoTalk button once the Kakao provider is configured in Supabase. |
-| `NEXT_PUBLIC_AUTH_GOOGLE_ENABLED` | client | `true` enables the Google button once the Google provider is configured in Supabase. |
 | `NEXT_PUBLIC_AUTH_NAVER_ENABLED` | client | `true` enables the Naver button — additionally requires a valid `NEXT_PUBLIC_AUTH_NAVER_PROVIDER_ID`. |
 | `NEXT_PUBLIC_AUTH_NAVER_PROVIDER_ID` | client | Slug of the Supabase **custom OIDC provider** registered for Naver (app passes `custom:<slug>`). Lowercase `[a-z0-9_-]`, max 63 chars; invalid values are ignored (Naver stays setup-required). |
 | `NEXT_PUBLIC_AUTH_PHONE_ENABLED` | client | `true` enables the phone OTP form once Supabase Phone Auth + an SMS provider are configured in the Supabase dashboard. |
@@ -75,8 +77,10 @@ unconfigured) shows a "setup required" state — nothing breaks.
 
 CI ([`../.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs with
 **no production secrets by design**: typecheck, lint, tests, and the production
-build all execute in the same "Supabase unconfigured" mode as a fresh
-local checkout. Never add production secrets to CI.
+build all execute in the same "Supabase unconfigured" mode as a fresh local
+checkout. `npm run build` is therefore a CI compile check; `npm run
+build:release` is the deployment gate and must run in the deployment
+environment. Never add production secrets to CI.
 
 Locally, copy `.env.example` to `.env.local` (gitignored) and fill in dev/test
 values. `tests/security.test.ts` enforces that `.env.example` is the only

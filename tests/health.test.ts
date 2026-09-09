@@ -38,7 +38,10 @@ function stubAllConfigured(): void {
   for (const name of HEALTH_ENV_VARS) vi.stubEnv(name, CONFIGURED_ENV[name]);
 }
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
 
 describe("buildHealthReport envelope", () => {
   it("always reports ok / k-work-us with an ISO timestamp", () => {
@@ -184,5 +187,16 @@ describe("GET /api/health", () => {
       },
     });
     expect(Number.isNaN(Date.parse(body.timestamp))).toBe(false);
+  });
+
+  it("stays live without making a database request", async () => {
+    stubAllConfigured();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Promise.reject(new Error("database unavailable"))),
+    );
+
+    expect((await GET()).status).toBe(200);
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

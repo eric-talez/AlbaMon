@@ -1,6 +1,5 @@
 import "server-only";
 
-import { PHASE_PRODUCTION_BUILD } from "next/constants";
 import {
   JOB_CATEGORIES,
   JOB_TYPES,
@@ -11,7 +10,7 @@ import {
   type LanguageRequirement,
 } from "@/lib/types";
 import { getMockJobById, getMockJobs } from "@/lib/mock/jobs";
-import { isProduction, isSupabaseConfigured } from "@/lib/supabase/config";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AddressDisplayMode, PublicJobListingRow } from "@/lib/db/types";
 
@@ -37,25 +36,23 @@ const PUBLIC_JOB_SELECT =
   "posted_at, company_name, company_is_verified";
 
 /**
- * Mock jobs are a local/test/build fixture, never a production-runtime outage
- * fallback. Next sets NEXT_PHASE during `next build`, where deterministic mock
- * data is still required to prerender the mock job detail paths.
+ * Mock jobs are a local/test fixture and are never available in production.
  */
 function assertMockJobsAllowed(operation: string): void {
-  const isBuild = process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD;
-  if (isProduction() && !isBuild) {
+  if (!mayFallbackToMockJobs()) {
     throw new Error(
-      `[db] ${operation} requires Supabase in production runtime; ` +
+      `[db] ${operation} requires Supabase in production; ` +
         "mock job fallback is disabled.",
     );
   }
 }
 
 function mayFallbackToMockJobs(): boolean {
-  return (
-    !isProduction() || process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD
-  );
+  return process.env.NODE_ENV !== "production";
 }
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /** Map a DB row (snake_case + joined company) to the app's `Job` view type. */
 function mapRow(row: PublicJobListingRow): Job {
@@ -115,9 +112,13 @@ export async function getApprovedJobs(): Promise<Job[]> {
 
 /** A single approved job by id, or `undefined` if not found / not approved. */
 export async function getApprovedJobById(id: string): Promise<Job | undefined> {
-  if (!isSupabaseConfigured()) {
-    assertMockJobsAllowed("getApprovedJobById");
+  const configured = isSupabaseConfigured();
+  if (!configured && mayFallbackToMockJobs()) {
     return getMockJobById(id);
+  }
+  if (!UUID_PATTERN.test(id)) return undefined;
+  if (!configured) {
+    assertMockJobsAllowed("getApprovedJobById");
   }
 
   try {

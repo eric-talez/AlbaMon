@@ -1,6 +1,10 @@
 import "server-only";
 
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { createClient } from "@supabase/supabase-js";
+import {
+  getSupabasePublicConfig,
+  isSupabaseConfigured,
+} from "@/lib/supabase/config";
 import { isSupabaseServiceRoleConfigured } from "@/lib/supabase/service";
 
 /**
@@ -105,4 +109,31 @@ export function buildHealthReport(now: Date = new Date()): HealthReport {
       analytics: checkAnalytics(),
     },
   };
+}
+
+/** Cookie-free public DB read used by the readiness endpoint. */
+export async function checkReadiness(
+  fetchImplementation: typeof fetch = fetch,
+): Promise<boolean> {
+  const config = getSupabasePublicConfig();
+  if (!config) return false;
+
+  try {
+    const supabase = createClient(config.url, config.anonKey, {
+      auth: {
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        persistSession: false,
+      },
+      global: { fetch: fetchImplementation },
+    });
+    const result = await supabase
+      .from("public_job_listings")
+      .select("id")
+      .limit(1)
+      .abortSignal(AbortSignal.timeout(2_000));
+    return !result.error;
+  } catch {
+    return false;
+  }
 }

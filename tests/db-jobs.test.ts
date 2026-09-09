@@ -35,4 +35,23 @@ describe("getApprovedJobById (mock fallback)", () => {
       "approved",
     );
   });
+
+  it("keeps development fixture ids available", async () => {
+    setUnconfigured();
+    vi.stubEnv("NODE_ENV", "development");
+    expect((await getApprovedJobById("kw-001"))?.id).toBe("kw-001");
+  });
+});
+
+describe("production mock safety", () => {
+  it("does not return fixtures during a production build", async () => {
+    setUnconfigured();
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PHASE", "phase-production-build");
+
+    await expect(getApprovedJobs()).rejects.toThrow(
+      /mock job fallback is disabled/i,
+    );
+    expect(await getApprovedJobById("kw-001")).toBeUndefined();
+  });
 });

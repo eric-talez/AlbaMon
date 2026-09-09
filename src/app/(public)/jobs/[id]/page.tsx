@@ -7,7 +7,7 @@ import {
   JOB_CATEGORY_LABELS,
   LANGUAGE_REQUIREMENT_LABELS,
 } from "@/lib/types";
-import { getApprovedJobById, getApprovedJobs } from "@/lib/db/jobs";
+import { getApprovedJobById } from "@/lib/db/jobs";
 import {
   Badge,
   CompanyVerificationBadge,
@@ -16,6 +16,8 @@ import {
 import { WorkAuthorizationDisclaimer } from "@/components/WorkAuthorizationDisclaimer";
 
 type Params = { id: string };
+
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -34,11 +36,6 @@ export async function generateMetadata({
     )} · ${job.companyName}`,
     alternates: { canonical: `/jobs/${encodeURIComponent(job.id)}` },
   };
-}
-
-export async function generateStaticParams() {
-  const jobs = await getApprovedJobs();
-  return jobs.map((job) => ({ id: job.id }));
 }
 
 function Section({

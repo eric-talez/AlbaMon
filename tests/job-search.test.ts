@@ -220,16 +220,18 @@ describe("searchApprovedJobs — Supabase configured", () => {
 });
 
 describe("public jobs — production fallback safety", () => {
-  it("keeps deterministic mocks available during a production build", async () => {
+  it("rejects mock fallbacks during a production build", async () => {
     setUnconfigured();
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("NEXT_PHASE", "phase-production-build");
 
-    expect((await getApprovedJobs()).length).toBeGreaterThan(0);
-    expect(await getApprovedJobById("kw-001")).toBeDefined();
-    expect((await searchApprovedJobs({ q: "강남" })).map((job) => job.id)).toEqual([
-      "kw-001",
-    ]);
+    await expect(getApprovedJobs()).rejects.toThrow(/mock job fallback is disabled/i);
+    await expect(
+      getApprovedJobById("11111111-1111-4111-8111-111111111111"),
+    ).rejects.toThrow(/mock job fallback is disabled/i);
+    await expect(searchApprovedJobs({ q: "강남" })).rejects.toThrow(
+      /mock job fallback is disabled/i,
+    );
   });
 
   it("rejects an unconfigured production runtime instead of showing mocks", async () => {
@@ -238,7 +240,9 @@ describe("public jobs — production fallback safety", () => {
     vi.stubEnv("NEXT_PHASE", "phase-production-server");
 
     await expect(getApprovedJobs()).rejects.toThrow(/mock job fallback is disabled/i);
-    await expect(getApprovedJobById("kw-001")).rejects.toThrow(
+    await expect(
+      getApprovedJobById("11111111-1111-4111-8111-111111111111"),
+    ).rejects.toThrow(
       /mock job fallback is disabled/i,
     );
     await expect(searchApprovedJobs({})).rejects.toThrow(
@@ -256,10 +260,20 @@ describe("public jobs — production fallback safety", () => {
     const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     await expect(getApprovedJobs()).rejects.toBe(failure);
-    await expect(getApprovedJobById("kw-001")).rejects.toBe(failure);
+    await expect(
+      getApprovedJobById("11111111-1111-4111-8111-111111111111"),
+    ).rejects.toBe(failure);
     await expect(searchApprovedJobs({})).rejects.toBe(failure);
     expect(errorLog).toHaveBeenCalledTimes(3);
     errorLog.mockRestore();
+  });
+
+  it("does not send malformed ids to Supabase", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", REAL_URL);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", REAL_KEY);
+
+    expect(await getApprovedJobById("not-a-uuid")).toBeUndefined();
+    expect(createSupabaseServerClient).not.toHaveBeenCalled();
   });
 });
 
