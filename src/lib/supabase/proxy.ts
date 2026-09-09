@@ -10,7 +10,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY, isSupabaseConfigured } from "@/lib/sup
  * the app runs without a live project.
  */
 export async function updateSession(request: NextRequest): Promise<NextResponse> {
-  const response = NextResponse.next({ request });
+  let response = NextResponse.next({ request });
 
   if (!isSupabaseConfigured()) {
     return response;
@@ -21,9 +21,16 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
       getAll() {
         return request.cookies.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet, headers) {
+        for (const { name, value } of cookiesToSet) {
+          request.cookies.set(name, value);
+        }
+        response = NextResponse.next({ request });
         for (const { name, value, options } of cookiesToSet) {
           response.cookies.set(name, value, options);
+        }
+        for (const [name, value] of Object.entries(headers)) {
+          response.headers.set(name, value);
         }
       },
     },

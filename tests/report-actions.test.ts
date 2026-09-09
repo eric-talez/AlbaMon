@@ -41,12 +41,14 @@ beforeEach(() => {
     email: "user@example.com",
     role: "seeker",
     isDev: false,
+    aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
   });
   mockRequireRole.mockResolvedValue({
     id: "admin-1",
     email: "admin@example.com",
     role: "admin",
     isDev: false,
+    aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
   });
   mockCreateReport.mockResolvedValue({ status: "submitted", reportId: "report-1" });
   mockUpdateReport.mockResolvedValue({ status: "updated" });

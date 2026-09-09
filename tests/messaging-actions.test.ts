@@ -24,6 +24,7 @@ beforeEach(() => {
     email: `${role}@example.com`,
     role,
     isDev: false,
+    aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
   }));
   mockSend.mockResolvedValue({ status: "sent", messageId: "message-1" });
 });

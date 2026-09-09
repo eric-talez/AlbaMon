@@ -73,6 +73,7 @@ beforeEach(() => {
     email: "employer@example.com",
     role: "employer",
     isDev: false,
+    aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
   });
   mockConfigured.mockReturnValue(true);
   mockCreateCompany.mockResolvedValue({ status: "created", companyId: "company-1" });

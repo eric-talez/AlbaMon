@@ -19,6 +19,12 @@ export default async function DashboardPage() {
       </p>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <Link href="/dashboard/profile" className="rounded-xl border border-border p-5 hover:bg-surface">
+          <h2 className="font-semibold">프로필 / Profile</h2>
+        </Link>
+        <Link href="/account/security" className="rounded-xl border border-border p-5 hover:bg-surface">
+          <h2 className="font-semibold">계정 보안 / Account security</h2>
+        </Link>
         <Link
           href="/jobs"
           className="rounded-xl border border-border p-5 transition-colors hover:bg-surface"

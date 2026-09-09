@@ -53,7 +53,12 @@ export function decodeDevSession(
   try {
     const json: unknown = JSON.parse(Buffer.from(raw, "base64").toString("utf8"));
     if (!isValidPayload(json)) return null;
-    return { id: json.id, email: json.email, role: json.role, isDev: true };
+    return {
+      id: json.id, email: json.email, role: json.role, isDev: true,
+      // Explicit local dev-admin only; the production kill-switch runs above.
+      aal: json.role === "admin" ? "aal2" : "aal1",
+      accountStatus: "active", displayName: null,
+    };
   } catch {
     return null;
   }

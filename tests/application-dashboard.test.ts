@@ -29,6 +29,7 @@ beforeEach(() => {
     email: "user@example.com",
     role: "seeker",
     isDev: false,
+    aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
   });
   mockSeekerApplications.mockResolvedValue({ status: "ok", applications: [] });
   mockEmployerApplications.mockResolvedValue({ status: "ok", applications: [] });

@@ -6,7 +6,7 @@ import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 
 /**
  * The shared /login + /signup card: social provider buttons, the phone OTP
- * flow (or its setup-required note), and — in dev mode only — the dev
+ * flow when enabled, and — in dev mode only — the dev
  * role-picker form.
  *
  * Error codes from the query string map to fixed bilingual messages; the raw
@@ -55,28 +55,12 @@ export function AuthCard({ mode, next, error }: AuthCardProps) {
         <SocialAuthButtons providers={getSocialProviders()} next={next} />
       </div>
 
-      <div
-        className="mt-5 flex items-center gap-3 text-xs text-muted"
-        aria-hidden="true"
-      >
-        <span className="h-px flex-1 bg-border" />
-        또는 (or)
-        <span className="h-px flex-1 bg-border" />
-      </div>
-
-      <section className="mt-5">
-        <h2 className="text-sm font-semibold">
-          휴대폰으로 로그인 (Sign in with phone)
-        </h2>
-        {isPhoneAuthEnabled() ? (
+      {isPhoneAuthEnabled() ? (
+        <section className="mt-5">
+          <h2 className="text-sm font-semibold">휴대폰으로 로그인 (Sign in with phone)</h2>
           <PhoneOtpForm next={next} />
-        ) : (
-          <p className="mt-2 text-xs text-muted">
-            휴대폰 인증은 SMS 설정 후 이용 가능합니다. (Phone verification
-            requires SMS setup.)
-          </p>
-        )}
-      </section>
+        </section>
+      ) : null}
 
       <DevAuthForm mode={mode} next={next} />
 
@@ -84,14 +68,14 @@ export function AuthCard({ mode, next, error }: AuthCardProps) {
         {isLogin ? (
           <>
             계정이 없으신가요?{" "}
-            <Link href="/signup" className="font-medium text-brand">
+            <Link href={next ? `/signup?next=${encodeURIComponent(next)}` : "/signup"} className="font-medium text-brand">
               회원가입
             </Link>
           </>
         ) : (
           <>
             이미 계정이 있으신가요?{" "}
-            <Link href="/login" className="font-medium text-brand">
+            <Link href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"} className="font-medium text-brand">
               로그인
             </Link>
           </>

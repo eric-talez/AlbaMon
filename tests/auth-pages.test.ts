@@ -69,7 +69,7 @@ afterEach(() => {
 });
 
 describe("unconfigured local mode (dev auth)", () => {
-  it("login renders the dev role picker plus setup-required social/phone states", async () => {
+  it("login renders the dev picker and hides disabled providers", async () => {
     setEnv({ configured: false });
     const html = await renderLogin();
 
@@ -78,14 +78,14 @@ describe("unconfigured local mode (dev auth)", () => {
     expect(html).toContain("개발 모드 로그인 (Dev mode)");
     expect(html).toContain('name="role"');
 
-    // All three social providers are visible but setup-required.
-    expect(html).toContain("카카오톡으로 계속하기");
-    expect(html).toContain("Google로 계속하기");
-    expect(html).toContain("네이버로 계속하기");
-    expect(html).toContain("아직 설정되지 않은 로그인 방식입니다");
+    // Unconfigured providers are hidden from the public auth surface.
+    expect(html).not.toContain("카카오톡으로 계속하기");
+    expect(html).not.toContain("Google로 계속하기");
+    expect(html).not.toContain("네이버로 계속하기");
+    expect(html).not.toContain("아직 설정되지 않은 로그인 방식입니다");
 
-    // Phone OTP shows the setup note, not the form.
-    expect(html).toContain("SMS 설정 후");
+    // Disabled phone has no public setup prompt.
+    expect(html).not.toContain("SMS 설정 후");
     expect(html).not.toContain('id="phone-otp-number"');
 
     // The retired "coming soon" notice is gone; cross-link is present.
@@ -98,8 +98,8 @@ describe("unconfigured local mode (dev auth)", () => {
     const html = await renderSignup();
     expect(html).toContain("회원가입");
     expect(html).toContain("개발 모드 로그인 (Dev mode)");
-    expect(html).toContain("카카오톡으로 계속하기");
-    expect(html).toContain("SMS 설정 후");
+    expect(html).not.toContain("카카오톡으로 계속하기");
+    expect(html).not.toContain("SMS 설정 후");
     expect(html).toContain('href="/login"');
   });
 
@@ -146,8 +146,8 @@ describe("configured mode with all providers enabled", () => {
       },
     });
     const html = await renderLogin();
-    expect(html).toContain("아직 설정되지 않은 로그인 방식입니다");
-    expect(html).toContain("SMS 설정 후");
+    expect(html).not.toContain("아직 설정되지 않은 로그인 방식입니다");
+    expect(html).not.toContain("SMS 설정 후");
   });
 });
 
@@ -167,7 +167,7 @@ describe("error notices", () => {
 });
 
 describe("SocialAuthButtons rendering states", () => {
-  it("renders enabled buttons clickable and setup-required buttons disabled", () => {
+  it("renders only enabled providers", () => {
     const html = renderToStaticMarkup(
       createElement(SocialAuthButtons, {
         providers: [
@@ -178,10 +178,9 @@ describe("SocialAuthButtons rendering states", () => {
       }),
     );
     const buttons = html.split("<button");
-    expect(buttons).toHaveLength(3);
+    expect(buttons).toHaveLength(2);
     expect(buttons[1]).toContain("카카오톡으로 계속하기");
     expect(buttons[1]).not.toContain('disabled=""');
-    expect(buttons[2]).toContain("네이버로 계속하기");
-    expect(buttons[2]).toContain('disabled=""');
+    expect(html).not.toContain("네이버로 계속하기");
   });
 });

@@ -25,6 +25,7 @@ beforeEach(() => {
     email: `${role}@example.com`,
     role,
     isDev: false,
+    aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
   }));
   mockUpdate.mockResolvedValue({
     status: "updated",

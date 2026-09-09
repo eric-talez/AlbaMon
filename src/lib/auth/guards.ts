@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import type { AuthUser } from "@/lib/auth/types";
 import type { Role } from "@/lib/types";
 import { getCurrentUser } from "@/lib/auth/session";
-import { evaluateAccess, type Area } from "@/lib/auth/access";
+import { canUseAdmin, evaluateAccess, type Area } from "@/lib/auth/access";
 
 /**
  * Server-side route guards. Call these at the top of a protected layout/page.
@@ -29,6 +29,8 @@ export async function requireArea(area: Area, next?: string): Promise<AuthUser> 
 
   if (result === "unauthenticated") redirect(loginUrl(next));
   if (result === "forbidden") redirect("/forbidden");
+
+  if (area === "admin" && user) requireAdminSession(user);
 
   // result === "ok" implies an authenticated user for any non-public area.
   return user as AuthUser;
@@ -59,9 +61,15 @@ export async function requireRole(
   const user = await getCurrentUser();
   if (!user) redirect(loginUrl(next));
   if (user.role !== role) redirect("/forbidden");
+  if (role === "admin") requireAdminSession(user);
   return user;
 }
 
 function loginUrl(next?: string): string {
   return next ? `/login?next=${encodeURIComponent(next)}` : "/login";
+}
+
+function requireAdminSession(user: AuthUser): void {
+  if (user.accountStatus !== "active") redirect("/forbidden");
+  if (!canUseAdmin(user)) redirect("/account/security");
 }

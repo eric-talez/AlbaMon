@@ -5,6 +5,9 @@ export interface AuthUser {
   id: string;
   email: string;
   role: Role;
+  aal: "aal1" | "aal2";
+  accountStatus: "active" | "suspended";
+  displayName: string | null;
   /** True when this identity came from the dev-mode cookie, not Supabase. */
   isDev: boolean;
 }

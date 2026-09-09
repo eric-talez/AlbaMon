@@ -86,6 +86,7 @@ beforeEach(() => {
     email: "admin@example.com",
     role: "admin",
     isDev: false,
+    aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
   });
   mockCounts.mockResolvedValue(queueCounts());
   mockPendingCount.mockResolvedValue({ status: "ok", count: 4 });

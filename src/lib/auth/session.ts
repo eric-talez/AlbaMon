@@ -2,7 +2,7 @@ import "server-only";
 import type { AuthUser } from "@/lib/auth/types";
 import { isSupabaseConfigured, isDevAuthEnabled } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getProfileRoleForUser } from "@/lib/db/profiles";
+import { getAuthProfileForUser } from "@/lib/db/profiles";
 import { readDevSession } from "@/lib/auth/dev-session";
 
 /**
@@ -26,13 +26,18 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
     // Role comes ONLY from `profiles.role` — never from `user.user_metadata`,
     // which is client-influenced and must not drive authorization.
-    const role = await getProfileRoleForUser(user.id);
+    const profile = await getAuthProfileForUser(user.id);
     // Fail closed: a Supabase-authenticated user without a usable profile row is
     // treated as unauthenticated until their profile exists. We do not grant
     // even baseline `seeker` access, so provisioning/seed bugs surface early.
-    if (role === null) return null;
+    if (profile === null) return null;
 
-    return { id: user.id, email: user.email ?? "", role, isDev: false };
+    const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    return {
+      id: user.id, email: user.email_confirmed_at ? user.email ?? "" : "",
+      ...profile, isDev: false,
+      aal: !assurance.error && assurance.data?.currentLevel === "aal2" ? "aal2" : "aal1",
+    };
   }
 
   // Not configured. Only dev mode (outside production) may use the dev cookie;

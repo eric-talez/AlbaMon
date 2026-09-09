@@ -37,6 +37,7 @@ export type AddressDisplayMode = "full" | "city_only";
 
 export interface ProfileRow {
   id: string;
+  account_status: "active" | "suspended";
   role: Role;
   email: string | null;
   display_name: string | null;

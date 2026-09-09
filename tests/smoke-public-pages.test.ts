@@ -44,6 +44,7 @@ beforeEach(() => {
     email: "user@example.com",
     role: "seeker",
     isDev: true,
+    aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
   });
 });
 
@@ -135,6 +136,7 @@ describe("apply flow guard", () => {
       email: "employer@example.com",
       role: "employer",
       isDev: true,
+      aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
     });
     const html = renderToStaticMarkup(
       await ApplyPage({ params: Promise.resolve({ id: approvedJob.id }) }),

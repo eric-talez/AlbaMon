@@ -1,0 +1,46 @@
+"use client";
+
+import { useState } from "react";
+import { sanitizeNextPath } from "@/lib/auth/redirect";
+import { updateOwnProfile } from "./actions";
+
+export function ProfileForm({ displayName, city, next }: {
+  displayName: string | null; city: string | null; next: string;
+}) {
+  const [message, setMessage] = useState("");
+  const [pending, setPending] = useState(false);
+  async function save(formData: FormData) {
+    setPending(true);
+    setMessage("");
+    try {
+      const result = await updateOwnProfile(formData);
+      setMessage(result.message);
+      if (result.status === "success") {
+        window.location.assign(sanitizeNextPath(formData.get("next")));
+      }
+    } catch {
+      setMessage("저장 중 문제가 발생했습니다. 다시 로그인해 주세요. (Please sign in and try again.)");
+    } finally {
+      setPending(false);
+    }
+  }
+  return (
+    <form action={save} className="mt-6 space-y-4">
+      <input type="hidden" name="next" value={sanitizeNextPath(next)} />
+      <label className="block text-sm font-medium">
+        표시 이름 / Display name
+        <input name="displayName" required maxLength={80} defaultValue={displayName ?? ""}
+          autoComplete="nickname" className="mt-1 block w-full rounded-lg border border-border p-3" />
+      </label>
+      <label className="block text-sm font-medium">
+        도시 (선택) / City (optional)
+        <input name="city" defaultValue={city ?? ""} autoComplete="address-level2"
+          className="mt-1 block w-full rounded-lg border border-border p-3" />
+      </label>
+      {message ? <p role="status" className="text-sm">{message}</p> : null}
+      <button disabled={pending} className="rounded-lg bg-brand px-4 py-3 font-medium text-brand-foreground disabled:opacity-60">
+        {pending ? "저장 중… (Saving…)" : "저장하고 계속 / Save and continue"}
+      </button>
+    </form>
+  );
+}

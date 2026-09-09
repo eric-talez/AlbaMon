@@ -5,9 +5,6 @@ import type { SocialProviderInfo } from "@/lib/auth/providers";
 import { startOAuthSignIn } from "@/lib/auth/social";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
-const SETUP_REQUIRED_HINT =
-  "아직 설정되지 않은 로그인 방식입니다. (This login method is not configured yet.)";
-
 interface SocialAuthButtonsProps {
   providers: SocialProviderInfo[];
   next?: string;
@@ -43,14 +40,9 @@ export function SocialAuthButtons({ providers, next }: SocialAuthButtonsProps) {
     // On success the browser is navigating to the provider; stay pending.
   }
 
-  const anySetupRequired = providers.some(
-    (provider) => provider.status === "setup_required",
-  );
-
   return (
     <div className="flex flex-col gap-2">
-      {providers.map((provider) =>
-        provider.status === "enabled" ? (
+      {providers.filter((provider) => provider.status === "enabled").map((provider) => (
           <button
             key={provider.key}
             type="button"
@@ -62,21 +54,8 @@ export function SocialAuthButtons({ providers, next }: SocialAuthButtonsProps) {
               ? "이동 중… (Redirecting…)"
               : provider.label}
           </button>
-        ) : (
-          <button
-            key={provider.key}
-            type="button"
-            disabled
-            title={SETUP_REQUIRED_HINT}
-            className="h-11 w-full cursor-not-allowed rounded-lg border border-border bg-surface text-sm font-medium text-muted"
-          >
-            {provider.label}
-          </button>
         ),
       )}
-      {anySetupRequired ? (
-        <p className="text-xs text-muted">{SETUP_REQUIRED_HINT}</p>
-      ) : null}
       {error ? (
         <p
           role="alert"

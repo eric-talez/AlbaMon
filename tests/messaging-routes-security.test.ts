@@ -24,6 +24,7 @@ beforeEach(() => {
     email: `${role}@example.com`,
     role,
     isDev: false,
+    aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
   }));
   mockThread.mockResolvedValue({
     status: "ok",
@@ -110,7 +111,7 @@ describe("message migration security", () => {
   });
 
   it("limits thread access to applicant, owning employer, or admin", () => {
-    const access = sql.match(
+    const access = read("supabase/migrations/20260909000100_profile_and_admin_security.sql").match(
       /function\s+public\.can_access_application_thread[\s\S]*?\$\$;/i,
     )?.[0];
     expect(access).toBeTruthy();
@@ -118,7 +119,8 @@ describe("message migration security", () => {
     expect(access).toMatch(/set\s+search_path\s*=\s*''/i);
     expect(access).toMatch(/a\.seeker_id\s*=\s*auth\.uid\(\)/i);
     expect(access).toMatch(/c\.owner_id\s*=\s*auth\.uid\(\)/i);
-    expect(access).toMatch(/current_profile_role\(\)\s*=\s*'admin'/i);
+    expect(access).toMatch(/public\.is_admin\(\)/i);
+    expect(access).not.toMatch(/current_profile_role\(\)\s*=\s*'admin'/i);
   });
 
   it("allows only seeker/employer participants to send as themselves", () => {

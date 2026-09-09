@@ -107,6 +107,7 @@ describe("dev cookie cannot authenticate in production", () => {
       email: "admin@dev.local",
       role: "admin",
       isDev: true,
+      aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
     });
   });
 
@@ -120,4 +121,11 @@ describe("dev cookie cannot authenticate in production", () => {
     });
     expect(decodeDevSession(badRole, true)).toBeNull();
   });
+});
+
+it("non-admin dev sessions do not synthesize aal2", () => {
+  for (const role of ["seeker", "employer"] as const) {
+    expect(decodeDevSession(encodeDevSession({ id: `dev-${role}`, email: `${role}@dev.local`, role }), true))
+      .toMatchObject({ aal: "aal1", accountStatus: "active", displayName: null });
+  }
 });
