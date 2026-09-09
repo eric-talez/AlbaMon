@@ -1,4 +1,5 @@
 import nextEnv from "@next/env";
+import { isIP } from "node:net";
 
 const { loadEnvConfig } = nextEnv;
 
@@ -19,9 +20,14 @@ for (const name of required) {
 }
 
 const origin = new URL(process.env.NEXT_PUBLIC_SITE_URL);
+const hostname = origin.hostname.replace(/\.$/, "");
+const address = hostname.startsWith("[") ? hostname.slice(1, -1) : hostname;
 if (
   origin.protocol !== "https:" ||
-  /^(localhost|127\.0\.0\.1)$/.test(origin.hostname)
+  !hostname.includes(".") ||
+  hostname === "localhost" ||
+  hostname.endsWith(".localhost") ||
+  isIP(address) !== 0
 ) {
   throw new Error("Release requires a public HTTPS origin");
 }

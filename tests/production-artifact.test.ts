@@ -36,10 +36,18 @@ describe("release environment gate", () => {
     expect(result.stderr).toContain(`Missing release setting: ${name}`);
   });
 
-  it("rejects a non-public site origin", () => {
-    const result = checkReleaseEnv({
-      NEXT_PUBLIC_SITE_URL: "http://localhost:3000",
-    });
+  it.each([
+    ["HTTP localhost", "http://localhost:3000"],
+    ["IPv6 loopback", "https://[::1]"],
+    ["private IPv4", "https://10.0.0.1"],
+    ["other IPv4 literal", "https://203.0.113.10"],
+    ["other IPv6 literal", "https://[2001:db8::1]"],
+    ["localhost trailing dot", "https://localhost."],
+    ["localhost subdomain", "https://jobs.localhost"],
+    ["localhost subdomain trailing dot", "https://jobs.localhost."],
+    ["single-label hostname", "https://intranet"],
+  ])("rejects a non-public site origin: %s", (_case, siteUrl) => {
+    const result = checkReleaseEnv({ NEXT_PUBLIC_SITE_URL: siteUrl });
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("Release requires a public HTTPS origin");
   });
@@ -54,8 +62,10 @@ describe("release environment gate", () => {
     );
   });
 
-  it("accepts a complete release environment", () => {
-    const result = checkReleaseEnv();
+  it("accepts a public HTTPS DNS hostname", () => {
+    const result = checkReleaseEnv({
+      NEXT_PUBLIC_SITE_URL: "https://jobs.k-work.us",
+    });
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
   });
