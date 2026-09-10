@@ -28,7 +28,7 @@ Expected on a launch-ready production deployment:
   "checks": {
     "siteUrl": "configured",
     "supabase": "configured",
-    "email": "deferred",
+    "email": "configured",
     "analytics": "deferred"
   }
 }
@@ -69,15 +69,15 @@ Endpoint properties (safe for public, unauthenticated uptime checks):
 | `configured` | Everything the check covers is present. Placeholder fragments from `.env.example` (`your-`, `xxx`, `example`, `placeholder`) count as absent, matching the app's own fail-closed detection. |
 | `partial` | Some but not all values present — almost always a misconfiguration; find the missing variable in [`PRODUCTION_ENV_VARS.md`](PRODUCTION_ENV_VARS.md). |
 | `missing` | Nothing present. Expected in CI and fresh checkouts; a defect in production. |
-| `deferred` | Deliberately not wired for the beta (email delivery, analytics). Not an error. |
+| `deferred` | Disabled/unselected integrations (email dev mode, analytics). |
 
 What each check covers:
 
 | Check | Covers | Expected (prod beta) |
 |---|---|---|
 | `siteUrl` | `NEXT_PUBLIC_SITE_URL` present and parseable as a URL. Presence only — a stale localhost value in production still reports `configured`; correctness is [`LAUNCH_CHECKLIST.md §1`](LAUNCH_CHECKLIST.md#1-environment-variables). | `configured` |
-| `supabase` | Anon auth pair (`NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`) **and** the server-only `SUPABASE_SERVICE_ROLE_KEY` (reserved for trusted server-side workflows; no app code path uses it). `partial` = one side absent. | `configured` |
-| `email` | `deferred` while `EMAIL_PROVIDER` is `dev`/unset (the accepted beta state). A real provider (`resend`/`sendgrid`) without its API key reports `partial`. | `deferred` |
+| `supabase` | Anon auth pair (`NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`) **and** the server-only `SUPABASE_SERVICE_ROLE_KEY` (used only by the notification worker and signed webhook). `partial` = one side absent. | `configured` |
+| `email` | `deferred` for `dev`/unset. A key alone is `partial`; `configured` requires enabled Resend delivery, origin/from, webhook/cron settings, environment/allowlist and trusted Supabase configuration. See the [activation evidence](PRODUCTION_ENV_VARS.md#provider-activation-evidence--unverified). | `configured` |
 | `analytics` | `NEXT_PUBLIC_POSTHOG_KEY` presence. The provider is **not initialized in this build** — `configured` means the env is staged for a later slice, not that analytics is running. | `deferred` |
 
 What the endpoint deliberately does **not** tell you: whether Supabase is
@@ -108,9 +108,9 @@ from outside. Verified behaviors:
 |---|---|---|
 | Supabase auth pair (production) | `supabase: missing`/`partial` | Auth **throws** instead of silently enabling the forgeable dev role-picker: Vercel logs show `Auth is misconfigured: production requires real Supabase credentials` (`src/lib/supabase/config.ts`). Public pages may still render; sign-in/role flows fail loudly. |
 | Supabase auth pair (local/preview) | same | Dev role-picker mode — intended for development only. |
-| `SUPABASE_SERVICE_ROLE_KEY` only | `supabase: partial` | Auth works. No app code path uses the service-role client, so nothing else degrades — the status simply flags the incomplete Supabase credential set. |
+| `SUPABASE_SERVICE_ROLE_KEY` only | `supabase: partial` | Auth works; notification claims and signed suppression cannot reach the trusted DB and return 503. Restore the server-only key without exposing it to app/browser clients. |
 | `NEXT_PUBLIC_SITE_URL` | `siteUrl: missing` | Silent fallback to `http://localhost:3000` for canonical/OG/sitemap URLs — pages render but links are wrong. This is the one silent failure the health check exists to surface. |
-| Email provider | `email: deferred` | Expected: **no email is ever sent in the beta.** Notification events log as `[notification:dev]` outside production and are silently skipped in production (`src/lib/notifications/dev.ts`). |
+| Email provider | `email: deferred` | Delivery is disabled. Business transactions still enqueue durable events; development logs remain separate and never send. Restore the required settings before enabling the worker. |
 | Analytics | `analytics: deferred` | Nothing — no analytics code runs in this build. |
 
 ## 5. Log triage — where to look when a flow fails
@@ -129,7 +129,7 @@ By symptom:
 | Site down / all pages erroring | `/api/health`, Vercel → Deployments (did a deploy or env edit just precede it?) | Roll back per §6; Vercel function logs for the crash. |
 | Sign-in / signup failing | `checks.supabase` | Vercel logs for `Auth is misconfigured` (fail-closed config) → Supabase Dashboard → Logs → Auth (provider/email issues, rate limits). If sign-in completes but immediately bounces back to `/login`: look for `permission denied for table profiles` (42501) — the project is missing the `20260707…` explicit-grants migration ([`BETA_READINESS.md §5`](BETA_READINESS.md#5-migration-verification)). |
 | Applications, messaging, or reports failing | Vercel logs for `[db]` | Supabase Dashboard → Logs → Postgres. Permission-denied errors here usually mean an RLS policy blocked a write the UI allowed — treat as a bug, cross-check [`LAUNCH_CHECKLIST.md §7`](LAUNCH_CHECKLIST.md#7-rls--security-review). Exception: 42501 across many tables right after a deploy means missing **table grants**, not RLS — verify all 10 migrations incl. `20260707…` are applied ([`BETA_READINESS.md §5`](BETA_READINESS.md#5-migration-verification)). |
-| "I never got an email" | `checks.email` | Expected during beta (`deferred`) — no email is sent; support replies come via the human channel in [`LAUNCH_CHECKLIST.md §8`](LAUNCH_CHECKLIST.md#8-monitoring--operations). |
+| "I never got an email" | `checks.email` | Check the AAL2 admin email queue card, cron/provider logs, current confirmed Auth address and preference/suppression. A key alone is partial configuration; actual provider/DNS/inbox evidence is separate. |
 
 ## 6. Incident response (private-beta minimum)
 

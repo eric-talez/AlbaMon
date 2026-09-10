@@ -70,6 +70,9 @@ jobs:
       - name: Live database authorization matrix
         run: npm run test:db
 
+      - name: Local transactional email provider double and signed webhook
+        run: npm run test:notifications:local
+
       - name: Set local public test environment
         run: |
           node --input-type=module <<'NODE'

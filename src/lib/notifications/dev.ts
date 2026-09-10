@@ -41,8 +41,7 @@ export function notifyApplicationSubmitted(
   });
 }
 
-// Development-only status-change notification stub; real email delivery remains
-// deferred.
+// Development logs only. Real delivery is enqueued by DB transaction triggers.
 export function notifyApplicationStatusChanged(
   applicationId: string,
   previousStatus: string,

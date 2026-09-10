@@ -27,6 +27,9 @@ export function createSupabaseServiceRoleClient() {
   }
 
   return createClient(url, key, {
+    global: {
+      fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(5_000) }),
+    },
     auth: {
       autoRefreshToken: false,
       persistSession: false,

@@ -12,6 +12,6 @@ export async function proxy(request: NextRequest) {
 export const config = {
   // Skip operational/worker routes, static assets, and image optimization.
   matcher: [
-    "/((?!api/health(?:/|$)|api/ready(?:/|$)|api/internal(?:/|$)|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!api/health(?:/|$)|api/ready(?:/|$)|api/internal(?:/|$)|api/webhooks(?:/|$)|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

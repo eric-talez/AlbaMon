@@ -17,6 +17,7 @@ export async function updateOwnProfile(formData: FormData): Promise<{
     const { data, error } = await supabase.from("profiles")
       .update({ display_name: displayName,
         ...(formData.has("city") ? { city: String(formData.get("city") ?? "").trim() || null } : {}),
+        ...(formData.has("emailNotificationsEnabled") ? { email_notifications_enabled: formData.get("emailNotificationsEnabled") === "true" } : {}),
       }).eq("id", user.id).select("id").maybeSingle();
     if (!error && data) return { status: "success", message: "프로필을 저장했습니다. (Profile saved.)" };
   } catch {

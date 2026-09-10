@@ -28,6 +28,8 @@ async function setup(context?:BrowserContext) {
     return {id,client,cookies};
   }
   async function cleanup() {
+    const notifications=await service.from("notification_outbox").delete().in("entity_id",[...jobIds,...applicationIds]);
+    if(notifications.error) throw new Error("B3 notification cleanup failed");
     const audit=await service.from("audit_logs").delete().in("entity_id",jobIds);
     const jobs=await service.from("jobs").delete().in("id",jobIds);
     const company=await service.from("companies").delete().eq("id",companyId);

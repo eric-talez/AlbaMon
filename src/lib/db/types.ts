@@ -38,6 +38,8 @@ export type AddressDisplayMode = "full" | "city_only";
 export interface ProfileRow {
   id: string;
   account_status: "active" | "suspended";
+  email_notifications_enabled: boolean;
+  suppressed_email: boolean;
   role: Role;
   email: string | null;
   display_name: string | null;

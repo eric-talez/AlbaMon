@@ -12,6 +12,7 @@ import {
   type HealthCheckStatus,
   type HealthChecks,
 } from "@/lib/ops/health";
+import { getNotificationQueueHealth } from "@/lib/db/notifications";
 import { Badge } from "@/components/Badge";
 
 export const metadata: Metadata = { title: "Admin console / 관리자 콘솔" };
@@ -100,10 +101,11 @@ function QueueCard({
 
 export default async function AdminHomePage() {
   await requireRole("admin", "/admin");
-  const [queues, employerRequests, audit] = await Promise.all([
+  const [queues, employerRequests, audit, notifications] = await Promise.all([
     getAdminQueueCounts(),
     getPendingEmployerAccessRequestCount(),
     getRecentAdminAuditLogs(),
+    getNotificationQueueHealth(),
   ]);
   // Presence only, never env values — same report the public /api/health serves.
   const health = buildHealthReport();
@@ -265,6 +267,15 @@ export default async function AdminHomePage() {
             <p className="mt-3 text-sm font-medium text-brand">View metrics</p>
           </Link>
         </div>
+      </section>
+
+      <section className="mt-8 rounded-xl border border-border bg-surface p-5">
+        <h2 className="text-lg font-semibold">Email delivery / 이메일 발송</h2>
+        {notifications ? <>
+          <p className="mt-2">대기 / Pending: {notifications.pending} · 실패 / Failed: {notifications.failed}</p>
+          <p className="mt-2 text-sm">가장 오래된 예정 시각 / Oldest available: {notifications.oldest_available_at ?? "—"}</p>
+          {notifications.overdue ? <p role="alert" className="mt-2 text-danger">이메일 큐가 10분 이상 지연되었습니다. / Email queue delayed over 10 minutes.</p> : null}
+        </> : <p className="mt-2 text-sm">발송 현황을 불러올 수 없습니다. / Email queue unavailable.</p>}
       </section>
 
       <section className="mt-8">

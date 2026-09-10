@@ -13,10 +13,12 @@ vi.mock("@/lib/db/employer-access-requests", () => ({
 vi.mock("@/lib/db/audit-logs", () => ({
   getRecentAdminAuditLogs: vi.fn(),
 }));
+vi.mock("@/lib/db/notifications", () => ({ getNotificationQueueHealth: vi.fn(async () => null) }));
 vi.mock("@/lib/ops/health", () => ({
   buildHealthReport: vi.fn(),
 }));
 
+import { getNotificationQueueHealth } from "@/lib/db/notifications";
 import { requireRole } from "@/lib/auth/guards";
 import {
   getAdminQueueCounts,
@@ -242,3 +244,12 @@ describe("admin dashboard static security boundaries", () => {
 function read(path: string): string {
   return readFileSync(join(process.cwd(), ...path.split("/")), "utf8");
 }
+
+it("shows aggregate email backlog, failures and the ten-minute warning", async () => {
+  vi.mocked(getNotificationQueueHealth).mockResolvedValueOnce({ pending: 7, failed: 5, oldest_available_at: "2026-09-09T01:00:00Z", overdue: true });
+  const html = renderToStaticMarkup(await AdminHomePage());
+  expect(html).toContain("Pending: 7");
+  expect(html).toContain("Failed: 5");
+  expect(html).toContain("2026-09-09T01:00:00Z");
+  expect(html).toContain("Email queue delayed over 10 minutes");
+});

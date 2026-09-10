@@ -30,6 +30,8 @@ async function setup(context?: BrowserContext) {
   if(login.error) throw new Error("Lifecycle login failed");
   if(context) await context.addCookies([...cookies].map(([name,value])=>({name,value,domain:"127.0.0.1",path:"/"})));
   return {service,owner,ownerId,jobId,companyId,async cleanup(){
+    const notifications=await service.from("notification_outbox").delete().eq("entity_id",jobId);
+    if(notifications.error) throw new Error("Lifecycle notification cleanup failed");
     await service.from("audit_logs").delete().eq("entity_id",jobId);
     const jobsDeleted=await service.from("jobs").delete().eq("id",jobId);
     const companyDeleted=await service.from("companies").delete().eq("id",companyId);

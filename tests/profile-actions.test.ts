@@ -35,3 +35,9 @@ test.each([{ data: null, error: { message: "internal detail" } }, { data: null, 
   expect(state.status).toBe("error");
   expect(state.message).not.toContain("internal detail");
 });
+
+test("saves only own notification preference and ignores forged suppression", async () => {
+  expect(await updateOwnProfile(form({ displayName: "Kim", emailNotificationsEnabled: "false", suppressed_email: "false", id: "other" }))).toMatchObject({ status: "success" });
+  expect(mocks.update).toHaveBeenCalledWith({ display_name: "Kim", email_notifications_enabled: false });
+  expect(mocks.eq).toHaveBeenCalledWith("id", "self");
+});

@@ -115,10 +115,11 @@ test("local profile save returns to apply, preserves identity, and refreshes an 
       }
       await page.getByLabel("표시 이름 / Display name").fill("Same display name");
       await page.getByLabel("도시 (선택) / City (optional)").fill("Los Angeles");
+      await page.getByLabel("이메일 알림 / Email notifications").selectOption("false");
       await page.getByRole("button", { name: "저장하고 계속 / Save and continue" }).click();
       await expect(page).toHaveURL(new RegExp(`${destination}$`));
-      const profile = await admin.from("profiles").select("display_name, role, city").eq("id", data.user.id).single();
-      expect(profile.data).toEqual({ display_name: "Same display name", role: "seeker", city: "Los Angeles" });
+      const profile = await admin.from("profiles").select("display_name, role, city, email_notifications_enabled").eq("id", data.user.id).single();
+      expect(profile.data).toEqual({ display_name: "Same display name", role: "seeker", city: "Los Angeles", email_notifications_enabled: false });
     }
     expect(new Set(users).size).toBe(2);
     await page.goto("/dashboard/profile?next=//evil.example");

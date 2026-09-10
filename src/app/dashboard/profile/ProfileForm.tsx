@@ -4,8 +4,8 @@ import { useState } from "react";
 import { sanitizeNextPath } from "@/lib/auth/redirect";
 import { updateOwnProfile } from "./actions";
 
-export function ProfileForm({ displayName, city, next }: {
-  displayName: string | null; city: string | null; next: string;
+export function ProfileForm({ displayName, city, next, emailNotificationsEnabled }: {
+  displayName: string | null; city: string | null; next: string; emailNotificationsEnabled: boolean;
 }) {
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
@@ -36,6 +36,14 @@ export function ProfileForm({ displayName, city, next }: {
         도시 (선택) / City (optional)
         <input name="city" defaultValue={city ?? ""} autoComplete="address-level2"
           className="mt-1 block w-full rounded-lg border border-border p-3" />
+      </label>
+      <label className="block text-sm font-medium">
+        이메일 알림 / Email notifications
+        <select name="emailNotificationsEnabled" defaultValue={String(emailNotificationsEnabled)}
+          className="mt-1 block w-full rounded-lg border border-border p-3">
+          <option value="true">받기 / Enabled</option>
+          <option value="false">받지 않기 / Disabled</option>
+        </select>
       </label>
       {message ? <p role="status" className="text-sm">{message}</p> : null}
       <button disabled={pending} className="rounded-lg bg-brand px-4 py-3 font-medium text-brand-foreground disabled:opacity-60">

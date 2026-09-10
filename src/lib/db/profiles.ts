@@ -23,7 +23,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  */
 
 const PROFILE_SELECT =
-  "id, role, account_status, email, display_name, phone, city, state, created_at, updated_at";
+  "id, role, account_status, email_notifications_enabled, suppressed_email, email, display_name, phone, city, state, created_at, updated_at";
 
 function coerceRole(value: unknown): Role | null {
   return (ROLES as readonly string[]).includes(value as string)

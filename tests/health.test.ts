@@ -12,6 +12,7 @@ const HEALTH_ENV_VARS = [
   "EMAIL_PROVIDER",
   "RESEND_API_KEY",
   "SENDGRID_API_KEY",
+  "EMAIL_NOTIFICATIONS_ENABLED", "EMAIL_ENVIRONMENT", "EMAIL_FROM", "EMAIL_STAGING_ALLOWLIST", "RESEND_WEBHOOK_SECRET", "CRON_SECRET",
   "NEXT_PUBLIC_POSTHOG_KEY",
 ] as const;
 
@@ -25,6 +26,7 @@ const CONFIGURED_ENV: Record<(typeof HEALTH_ENV_VARS)[number], string> = {
   NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key-for-health-tests",
   SUPABASE_SERVICE_ROLE_KEY: "service-role-for-health-tests",
   EMAIL_PROVIDER: "resend",
+  EMAIL_NOTIFICATIONS_ENABLED: "true", EMAIL_ENVIRONMENT: "production", EMAIL_FROM: "sender@health.test", EMAIL_STAGING_ALLOWLIST: "", RESEND_WEBHOOK_SECRET: "whsec_health", CRON_SECRET: "cron-health",
   RESEND_API_KEY: "re_health",
   SENDGRID_API_KEY: "",
   NEXT_PUBLIC_POSTHOG_KEY: "phc_health",
@@ -125,15 +127,15 @@ describe("email check", () => {
     vi.stubEnv("EMAIL_PROVIDER", "resend");
     expect(buildHealthReport().checks.email).toBe("partial");
     vi.stubEnv("RESEND_API_KEY", "re_health");
-    expect(buildHealthReport().checks.email).toBe("configured");
+    expect(buildHealthReport().checks.email).toBe("partial");
   });
 
-  it("supports sendgrid with its own key", () => {
+  it("never implies unsupported SendGrid delivery is active", () => {
     stubAllUnset();
     vi.stubEnv("EMAIL_PROVIDER", "sendgrid");
     expect(buildHealthReport().checks.email).toBe("partial");
     vi.stubEnv("SENDGRID_API_KEY", "sg_health");
-    expect(buildHealthReport().checks.email).toBe("configured");
+    expect(buildHealthReport().checks.email).toBe("partial");
   });
 });
 
@@ -199,4 +201,9 @@ describe("GET /api/health", () => {
     expect((await GET()).status).toBe(200);
     expect(fetch).not.toHaveBeenCalled();
   });
+});
+it("missing fixed HTTPS email origin keeps delivery health partial", () => {
+  stubAllConfigured();
+  vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
+  expect(buildHealthReport().checks.email).toBe("partial");
 });

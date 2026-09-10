@@ -56,6 +56,8 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
+  const notifications = await adminClient().from("notification_outbox").delete().in("entity_id", fixtureIds);
+  if (notifications.error) throw new Error("Pagination notification cleanup failed");
   const { error } = await adminClient().from("jobs").delete().in("id", fixtureIds);
   if (error) throw new Error("Disposable pagination cleanup failed");
 });

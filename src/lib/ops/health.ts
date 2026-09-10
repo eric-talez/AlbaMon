@@ -1,5 +1,6 @@
 import "server-only";
 
+import { emailDeliveryConfigured } from "@/lib/notifications/email";
 import { createClient } from "@supabase/supabase-js";
 import {
   getSupabasePublicConfig,
@@ -29,7 +30,7 @@ export type HealthCheckStatus =
   | "partial"
   /** None of the values this check covers are present. */
   | "missing"
-  /** Deliberately not wired for the beta (email provider, analytics). */
+  /** Disabled/unselected integrations (email dev mode, analytics). */
   | "deferred";
 
 export interface HealthChecks {
@@ -76,17 +77,12 @@ function checkSupabase(): HealthCheckStatus {
   return "missing";
 }
 
-/** `EMAIL_PROVIDER=dev` (or unset) is the accepted beta state → "deferred".
- * A real provider without its API key is a misconfiguration → "partial". */
+/** A key alone is partial. Configured means the delivery path is enabled with
+ * worker/webhook settings; it does not claim DNS or inbox delivery was verified. */
 function checkEmail(): HealthCheckStatus {
   const provider = process.env.EMAIL_PROVIDER?.trim().toLowerCase();
-  if (provider === "resend") {
-    return hasValue(process.env.RESEND_API_KEY) ? "configured" : "partial";
-  }
-  if (provider === "sendgrid") {
-    return hasValue(process.env.SENDGRID_API_KEY) ? "configured" : "partial";
-  }
-  return "deferred";
+  if (!provider || provider === "dev") return "deferred";
+  return emailDeliveryConfigured() && isSupabaseServiceRoleConfigured() ? "configured" : "partial";
 }
 
 /** Analytics is not initialized in this build; a present key still reports

@@ -6,6 +6,9 @@ const releaseEnv = {
   NEXT_PUBLIC_SUPABASE_URL: "https://abcdefghijklmnop.supabase.co",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_release_test_key",
   NEXT_PUBLIC_AUTH_GOOGLE_ENABLED: "true",
+  SUPABASE_SERVICE_ROLE_KEY: "service-release-test",
+  EMAIL_PROVIDER: "resend", EMAIL_NOTIFICATIONS_ENABLED: "true", EMAIL_ENVIRONMENT: "production",
+  EMAIL_FROM: "K-Work US <sender@k-work.test>", RESEND_API_KEY: "re_release_test", RESEND_WEBHOOK_SECRET: "whsec_release_test", CRON_SECRET: "cron-release-test-with-length",
 };
 
 const maxDnsLabel = "a".repeat(63);
@@ -38,6 +41,7 @@ describe("release environment gate", () => {
     ["NEXT_PUBLIC_SITE_URL", "https://example.com"],
     ["NEXT_PUBLIC_SUPABASE_URL", "https://your-project.supabase.co"],
     ["NEXT_PUBLIC_SUPABASE_ANON_KEY", "your-anon-key"],
+    ["SUPABASE_SERVICE_ROLE_KEY", "your-service-role-key"],
   ])("rejects a placeholder release setting: %s", (name, value) => {
     const result = checkReleaseEnv({ [name]: value });
     expect(result.status).not.toBe(0);
@@ -92,4 +96,14 @@ describe("release environment gate", () => {
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
   });
+});
+
+it("release rejects disabled delivery and staging without controlled recipient allowlist", () => {
+  expect(checkReleaseEnv({ EMAIL_NOTIFICATIONS_ENABLED: "false" }).status).not.toBe(0);
+  expect(checkReleaseEnv({ EMAIL_ENVIRONMENT: "staging", EMAIL_STAGING_ALLOWLIST: "" }).status).not.toBe(0);
+  expect(checkReleaseEnv({ EMAIL_ENVIRONMENT: "staging", EMAIL_STAGING_ALLOWLIST: "*@example.invalid" }).status).not.toBe(0);
+  expect(checkReleaseEnv({ EMAIL_ENVIRONMENT: "staging", EMAIL_STAGING_ALLOWLIST: "controlled@example.invalid" }).status).toBe(0);
+});
+it.each(["https://jobs.k-work.test/path", "https://user:pass@jobs.k-work.test", "https://jobs.k-work.test?x=1"])("release origin %s cannot produce a mismatched email link", (origin) => {
+  expect(checkReleaseEnv({ NEXT_PUBLIC_SITE_URL: origin }).status).not.toBe(0);
 });

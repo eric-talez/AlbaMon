@@ -33,7 +33,7 @@ two-second, cookie-free anon read from `public_job_listings` and returns only
 | `NEXT_PUBLIC_SUPABASE_URL` | client | Vercel; value from Supabase → Project Settings → API | `https://<project-ref>.supabase.co` | Placeholder fragments (`your-project`, `example.com`) are treated as *unconfigured* (`src/lib/supabase/config.ts`). In production the app then **fails closed**: auth throws instead of enabling the forgeable dev role-picker. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | client | Vercel; same Supabase page | `<anon-public-key>` | Safe to expose **only** because RLS is the authorization gate. The `your-anon-key` fragment counts as unconfigured (same fail-closed behavior). Never commit the real JWT-shaped value — `tests/security.test.ts` blocks it. |
 | `NEXT_PUBLIC_AUTH_GOOGLE_ENABLED` | client | Vercel (Production scope) | `true` | `npm run build:release` requires exactly `true`; enable it only after the hosted Google authentication flow has passed its smoke test. |
-| `SUPABASE_SERVICE_ROLE_KEY` | **server-only** | Vercel; same Supabase page | `<service-role-key>` | Bypasses RLS entirely. No app code path currently uses it — the client in `src/lib/supabase/service.ts` is reserved for trusted server-side workflows, and `/api/health` reports the key's *presence* only. Keep any future usage restricted to trusted server flows. |
+| `SUPABASE_SERVICE_ROLE_KEY` | **server-only** | Vercel; same Supabase page | `<service-role-key>` | Bypasses RLS entirely. Used only by the authorized notification worker and signed email webhook. User forms and admin queue reads use session clients/RLS; never expose this key to the browser. |
 
 > **Stripe variables removed (Slice 23).** Payments and paid boosts were
 > de-scoped from the MVP in Slice 23, so `STRIPE_SECRET_KEY`,
@@ -41,20 +41,79 @@ two-second, cookie-free anon read from `public_job_listings` and returns only
 > `STRIPE_URGENT_PRICE_ID`, and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` are no
 > longer read by any code and must not be configured. Revisit post-beta.
 
-## Optional / deferred variables
+## Transactional email (required for release)
 
-Declared in `.env.example` but **not used by any product feature in this
-build**. Leave them unset or empty for the beta. (The only code that looks at
-them is the ops health module, `src/lib/ops/health.ts`, which reports their
-*presence* as a coarse status on the public `GET /api/health` endpoint — never
-their values. See [`OPERATIONAL_HEALTH.md`](OPERATIONAL_HEALTH.md).)
-
-| Variable | Exposure | Status |
+| Variable | Exposure | Validation / behavior |
 |---|---|---|
-| `EMAIL_PROVIDER` | server-only | Keep `dev` for the beta (server-side logging stub). Real `resend` / `sendgrid` delivery is deferred. |
-| `EMAIL_FROM` | server-only | Unused while `EMAIL_PROVIDER=dev`. |
-| `RESEND_API_KEY`, `SENDGRID_API_KEY` | server-only | Only needed once a real email provider is enabled (deferred). |
-| `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | client | Analytics provider is not initialized in this build; leave empty. DB-backed admin analytics works without them. |
+| `EMAIL_PROVIDER` | server-only | Exactly `resend` for release. `dev` keeps development logs only; it never sends email. SendGrid is unsupported. |
+| `EMAIL_NOTIFICATIONS_ENABLED` | server-only | Exactly `true` enables the worker. Missing/false fails closed before claiming rows. |
+| `EMAIL_ENVIRONMENT` | server-only | Exactly `staging` or `production`. Set explicitly for each deployment. |
+| `EMAIL_STAGING_ALLOWLIST` | server-only | Required in staging: comma-separated exact controlled mailbox addresses. Empty entries, wildcard entries, and unmatched recipients fail closed; matching does not redirect email. |
+| `EMAIL_FROM` | server-only | One mailbox on the operator's verified sending domain, optionally `K-Work US <mailbox>`. No domain has been selected. |
+| `RESEND_API_KEY` | server-only | Separate staging and production keys. Pinned official SDK `resend@6.26.0` sends only to Resend's official API. |
+| `RESEND_WEBHOOK_SECRET` | server-only | Separate staging and production signing secrets for `/api/webhooks/email`. Subscribe to `email.bounced` and `email.complained`. |
+| `CRON_SECRET` | server-only | At least 16 random characters. Every-minute Vercel GET `/api/internal/notifications` requires its exact Bearer token. |
+
+`NEXT_PUBLIC_SITE_URL` must be a fixed public HTTPS origin without credentials,
+path, query or fragment. Emails contain only a fixed Korean notice and an approved
+internal route on that origin. Applicant text, messages and contact fields never
+become subjects, body text, HTML, or email links. The current confirmed **Auth**
+email supplies the address; `profiles.email` is never routing authority.
+
+`/api/health` reports email `partial` for a provider key alone and `configured`
+only when the delivery settings and trusted Supabase client are available.
+This indicates enabled capability, not proven DNS, provider reachability or inbox
+delivery. `/admin` shows AAL2-protected aggregate pending/failed counts, oldest
+available timestamp and a warning for a queue delayed over ten minutes.
+
+The worker claims at most five rows, sends sequentially, aborts Auth/DB requests
+after five seconds and provider requests after ten seconds, and stops starting
+work before its 105-second deadline (`maxDuration=120`). A five-minute DB lease
+and attempt compare-and-set recover crashes. Retry delays are 1/5/15/60 minutes,
+or a larger provider Retry-After. After five attempts, or an uncertain first send
+older than 23 hours, rows remain failed for operator review. Never clear those
+fields or issue a new event ID blindly: [Resend retains idempotency keys for
+24 hours](https://resend.com/docs/dashboard/emails/idempotency-keys) (rechecked
+2026-09-09). A fingerprint prevents retry with changed recipient/from/origin/body;
+no raw address or message is stored in the outbox. Changed payloads fail closed.
+
+Webhook verification uses the original raw body and all three Svix headers.
+Signed bounce/complaint receipt deduplication and suppression commit together.
+Provider ID is authoritative; a validated outbox tag closes the early-webhook or
+lost-success-write race. Unknown correlations/DB errors return 503 so Resend can
+retry. Users may change their own email preference, but only trusted webhook or
+controlled operations may change bounce suppression.
+
+### Provider activation evidence — UNVERIFIED
+
+No hosted email, Vercel, DNS, domain, or mailbox operation was performed for C1.
+Local tests use a local HTTP provider double, real local Supabase/Auth, the official
+SDK, and genuinely signed fixture webhooks. They do not prove real delivery.
+Before activation, the operator must:
+
+1. Select separate staging/production Resend accounts or credentials and webhook
+   endpoints/secrets; choose the actual domain and `EMAIL_FROM` mailbox.
+2. Verify SPF/DKIM and publish/check DMARC for that sending domain. Keep delivery
+   disabled until configuration and domain verification are complete.
+3. Choose a Vercel plan supporting every-minute cron (Pro or Enterprise; Hobby
+   does not support this schedule), set `CRON_SECRET`, and run `build:release`.
+4. Set staging's exact controlled address allowlist. Confirm a non-allowlisted
+   fixture is suppressed and signed bounce/complaint retries are accepted.
+5. With explicit authorization for the real test address, send one Gmail test;
+   record actual provider ID, inbox/spam result and controlled bounce behavior.
+   Confirm queue completion and subsequent suppression; retain no private body
+   or credentials in evidence. This real test has **not** been sent.
+
+If failures increase or the queue is overdue, inspect trusted provider/cron logs
+and aggregate failures. Disable `EMAIL_NOTIFICATIONS_ENABLED` to pause new claims.
+Keep pending/sending rows intact for lease/idempotency recovery; investigate expired
+uncertain sends with provider records before any manual resend. Never reset or
+seed a hosted database to repair the queue.
+
+## Optional analytics
+
+`NEXT_PUBLIC_POSTHOG_KEY` and `NEXT_PUBLIC_POSTHOG_HOST` remain optional. The
+analytics provider is not initialized; DB-backed admin analytics works without it.
 
 ### Auth provider flags (Slice 19)
 
