@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("@/lib/auth/guards", () => ({ requireUser: vi.fn() }));
+vi.mock("@/lib/auth/guards", async (original) => ({ ...await original<object>(), requireUser: vi.fn() }));
 vi.mock("@/lib/db/messages", () => ({ sendApplicationMessage: vi.fn() }));
 vi.mock("@/lib/notifications/dev", () => ({ notifyNewMessage: vi.fn() }));
 

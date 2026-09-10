@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 
-vi.mock("@/lib/auth/guards", () => ({ requireRole: vi.fn() }));
+vi.mock("@/lib/auth/guards", async (original) => ({ ...await original<object>(), requireRole: vi.fn() }));
 vi.mock("@/lib/db/admin-moderation", () => ({
   getAdminQueueCounts: vi.fn(),
   getAdminJobs: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock("@/lib/db/admin-moderation", () => ({
 vi.mock("@/lib/db/reports", () => ({
   getAdminReports: vi.fn(),
 }));
-vi.mock("@/lib/db/admin-analytics", () => ({
+vi.mock("@/lib/db/admin-analytics", () => ({ getSuspendedAccountCount: vi.fn(async () => ({ status: "ok", count: 0 })),
   getAdminAnalytics: vi.fn(),
 }));
 
@@ -162,7 +162,7 @@ describe("admin moderation routes", () => {
         jobId: "job-1",
         jobTitle: "Server",
         companyName: "K-Work Cafe",
-        jobModerationStatus: "approved",
+        jobModerationStatus: "approved", jobUpdatedAt: "2026-09-09T00:00:00Z", companyIsVerified: false,
         reporterDisplayName: "Reporter",
         reporterEmail: "reporter@example.com",
         submittedAt: "2026-06-21T00:00:00Z",

@@ -1,3 +1,5 @@
+import { normalizePage as adminPage } from "@/lib/pagination";
+import { AdminPagination } from "../AdminPagination";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/guards";
@@ -83,9 +85,13 @@ function RequestCard({ request }: { request: AdminEmployerAccessRequest }) {
   );
 }
 
-export default async function AdminEmployerRequestsPage() {
+export default async function AdminEmployerRequestsPage({ searchParams }: { searchParams?: Promise<{ status?: string; page?: string }> } = {}) {
   await requireRole("admin", "/admin/employer-requests");
-  const result = await getAdminEmployerAccessRequests();
+  const params = await searchParams;
+  const page = adminPage(params?.page);
+  const options = ["all", "pending", "approved", "rejected"] as const;
+  const status = options.find(value => value === params?.status) ?? "pending";
+  const result = await getAdminEmployerAccessRequests(page, status);
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
@@ -99,6 +105,7 @@ export default async function AdminEmployerRequestsPage() {
         회사 정보 등록은 승인 후 요청자가 직접 진행합니다.
       </p>
 
+      <nav aria-label="상태 필터" className="mt-4 flex gap-4">{options.map(value => <Link key={value} href={`/admin/employer-requests?status=${value}`}>{value === "all" ? "전체 / All" : EMPLOYER_ACCESS_REQUEST_STATUS_LABELS[value]}</Link>)}</nav>
       {result.status !== "ok" ? (
         <section className="mt-6 rounded-xl border border-border bg-surface p-5" role="alert">
           <h2 className="font-semibold">요청 큐를 사용할 수 없습니다.</h2>
@@ -112,7 +119,7 @@ export default async function AdminEmployerRequestsPage() {
         <section className="mt-6 rounded-xl border border-dashed border-border p-6 text-center">
           <h2 className="font-semibold">접수된 요청이 없습니다.</h2>
           <p className="mt-2 text-sm text-muted">
-            새 요청이 접수되면 검토 대기 건이 먼저, 최신순으로 표시됩니다.
+            새 요청이 접수되면 검토 대기 건이 먼저, 오래된 접수순으로 표시됩니다.
           </p>
         </section>
       ) : (
@@ -122,6 +129,7 @@ export default async function AdminEmployerRequestsPage() {
           ))}
         </ul>
       )}
+      {result.status === "ok" && <AdminPagination page={page} count={result.requests.length} href={`/admin/employer-requests?status=${status}`} />}
     </main>
   );
 }

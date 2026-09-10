@@ -121,7 +121,7 @@ describe("createJobReport", () => {
 });
 
 describe("getAdminReports", () => {
-  it("maps reports newest-first with narrow job/company/reporter fields", async () => {
+  it("maps the oldest open report page with narrow job/company/reporter fields", async () => {
     const reportOrder = vi.fn().mockResolvedValue({
       data: [{
         id: "report-1",
@@ -153,7 +153,7 @@ describe("getAdminReports", () => {
       error: null,
     });
     const from = vi.fn()
-      .mockReturnValueOnce({ select: vi.fn(() => ({ order: reportOrder })) })
+      .mockReturnValueOnce({ select: vi.fn(() => ({ eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(), range: reportOrder })) })
       .mockReturnValueOnce({ select: vi.fn(() => ({ in: jobIn })) })
       .mockReturnValueOnce({ select: vi.fn(() => ({ in: companyIn })) })
       .mockReturnValueOnce({ select: vi.fn(() => ({ in: profileIn })) });

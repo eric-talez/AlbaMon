@@ -1,6 +1,6 @@
 import { beforeEach, expect, test, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ user: vi.fn(), update: vi.fn(), eq: vi.fn(), single: vi.fn() }));
-vi.mock("@/lib/auth/guards", () => ({ requireUser: mocks.user }));
+vi.mock("@/lib/auth/guards", async (original) => ({ ...await original<object>(), requireUser: mocks.user }));
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: async () => ({ from: () => ({ update: mocks.update }) }) }));
 import { updateOwnProfile } from "@/app/dashboard/profile/actions";
 function form(values: Record<string, string>) {

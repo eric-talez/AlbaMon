@@ -1,3 +1,5 @@
+import { normalizePage as adminPage } from "@/lib/pagination";
+import { AdminPagination } from "../AdminPagination";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/guards";
@@ -105,11 +107,15 @@ function JobCard({ job }: { job: AdminJob }) {
   );
 }
 
-export default async function AdminJobsPage({ searchParams }: { searchParams?: Promise<{ status?: string }> }) {
+export default async function AdminJobsPage({ searchParams }: { searchParams?: Promise<{ status?: string; page?: string; job?: string }> } = {}) {
   await requireRole("admin", "/admin/jobs");
-  const result = await getAdminJobs();
-  const filter = (await searchParams)?.status;
-  const jobs = result.status === "ok" ? result.jobs.filter(job => !filter || !["pending", "approved", "paused"].includes(filter) || job.moderationStatus === filter) : [];
+  const params = await searchParams;
+  const page = adminPage(params?.page);
+  const options = ["all", "pending", "approved", "paused", "draft", "rejected", "expired"] as const;
+  const status = options.find(value => value === params?.status) ?? "pending";
+  const jobId = typeof params?.job === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(params.job) ? params.job : undefined;
+  const result = await getAdminJobs(page, status, jobId);
+  const jobs = result.status === "ok" ? result.jobs : [];
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
@@ -117,7 +123,7 @@ export default async function AdminJobsPage({ searchParams }: { searchParams?: P
       <h1 className="mt-4 text-2xl font-bold">공고 검토</h1>
       <p className="mt-2 text-sm text-muted">대기 중인 공고를 먼저 검토하고 승인 또는 반려합니다.</p>
 
-      <nav aria-label="공고 상태 필터" className="mt-4 flex gap-4"><Link href="/admin/jobs">전체</Link>{["pending", "approved", "paused"].map(status => <Link key={status} href={`/admin/jobs?status=${status}`}>{MODERATION_STATUS_LABELS[status as "pending" | "approved" | "paused"]}</Link>)}</nav>
+      <nav aria-label="공고 상태 필터" className="mt-4 flex gap-4"><Link href="/admin/jobs?status=all">전체</Link>{["pending", "approved", "paused"].map(status => <Link key={status} href={`/admin/jobs?status=${status}${jobId ? `&job=${jobId}` : ""}`}>{MODERATION_STATUS_LABELS[status as "pending" | "approved" | "paused"]}</Link>)}</nav>
       {result.status !== "ok" ? (
         <section className="mt-6 rounded-xl border border-border bg-surface p-5" role="alert">
           <h2 className="font-semibold">공고 목록을 사용할 수 없습니다.</h2>
@@ -137,6 +143,7 @@ export default async function AdminJobsPage({ searchParams }: { searchParams?: P
           {jobs.map((job) => <JobCard key={job.id} job={job} />)}
         </ul>
       )}
+      {result.status === "ok" && <AdminPagination page={page} count={result.jobs.length} href={`/admin/jobs?status=${status}${jobId ? `&job=${jobId}` : ""}`} />}
     </main>
   );
 }

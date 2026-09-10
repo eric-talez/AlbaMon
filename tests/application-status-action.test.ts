@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("@/lib/auth/guards", () => ({ requireRole: vi.fn() }));
+vi.mock("@/lib/auth/guards", async (original) => ({ ...await original<object>(), requireRole: vi.fn() }));
 vi.mock("@/lib/db/applications", () => ({ updateApplicationStatus: vi.fn() }));
 vi.mock("@/lib/notifications/dev", () => ({
   notifyApplicationStatusChanged: vi.fn(),

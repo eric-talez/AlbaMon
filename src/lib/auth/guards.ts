@@ -1,3 +1,4 @@
+import { SUSPENDED_WRITE_MESSAGE } from "@/lib/db/write-errors";
 import "server-only";
 import { redirect } from "next/navigation";
 import type { AuthUser } from "@/lib/auth/types";
@@ -72,4 +73,9 @@ function loginUrl(next?: string): string {
 function requireAdminSession(user: AuthUser): void {
   if (user.accountStatus !== "active") redirect("/forbidden");
   if (!canUseAdmin(user)) redirect("/account/security");
+}
+
+/** Only writes call this; suspended users retain their read/history routes. */
+export function activeWriterError(user: AuthUser): { status: "error"; message: string } | null {
+  return user.accountStatus === "suspended" ? { status: "error", message: SUSPENDED_WRITE_MESSAGE } : null;
 }

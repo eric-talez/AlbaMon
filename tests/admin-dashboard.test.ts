@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 
-vi.mock("@/lib/auth/guards", () => ({ requireRole: vi.fn() }));
+vi.mock("@/lib/auth/guards", async (original) => ({ ...await original<object>(), requireRole: vi.fn() }));
 vi.mock("@/lib/db/admin-moderation", () => ({
   getAdminQueueCounts: vi.fn(),
 }));
@@ -13,6 +13,7 @@ vi.mock("@/lib/db/employer-access-requests", () => ({
 vi.mock("@/lib/db/audit-logs", () => ({
   getRecentAdminAuditLogs: vi.fn(),
 }));
+vi.mock("@/lib/db/admin-analytics", () => ({ getSuspendedAccountCount: vi.fn(async () => ({ status: "ok", count: 0 })) }));
 vi.mock("@/lib/db/notifications", () => ({ getNotificationQueueHealth: vi.fn(async () => null) }));
 vi.mock("@/lib/ops/health", () => ({
   buildHealthReport: vi.fn(),

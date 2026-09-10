@@ -1,3 +1,4 @@
+import { writeFailure } from "@/lib/db/write-errors";
 import "server-only";
 
 import { normalizePage } from "@/lib/pagination";
@@ -33,7 +34,7 @@ export type ApplicationThreadResult =
 
 export type SendMessageResult =
   | { status: "sent"; messageId: string; recipientId: string; recipientSide: "applicant" | "employer" }
-  | { status: "not_allowed" | "unavailable" | "error" };
+  | { status: "not_allowed" | "rate_limited" | "suspended" | "unavailable" | "error" };
 
 const MESSAGE_SELECT = "id, application_id, sender_id, body, created_at";
 const NOT_ALLOWED_CODES = new Set(["23503", "23514", "42501"]);
@@ -114,6 +115,8 @@ export async function sendApplicationMessage(
     if (!error) return { status: "sent", messageId: data.id as string,
       recipientId: context.recipient_id,
       recipientSide: context.participant_side === "applicant" ? "employer" : "applicant" };
+    const failure = writeFailure(error);
+    if (failure) return { status: failure };
     if (NOT_ALLOWED_CODES.has(error.code)) return { status: "not_allowed" };
     throw error;
   } catch {

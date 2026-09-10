@@ -73,8 +73,7 @@ with changed as (update public.jobs set moderation_status = 'approved' where id 
 select is((select count(*) from changed), 1::bigint, 'active admin aal2 moderation update');
 with changed as (update public.companies set is_verified = true where id = 'aaaaaaaa-0000-0000-0000-000000000001' returning id)
 select is((select count(*) from changed), 1::bigint, 'active admin aal2 verification update');
-with changed as (update public.profiles set account_status = 'suspended' where id = '99999999-9999-4999-8999-999999999999' returning id)
-select is((select count(*) from changed), 1::bigint, 'active admin aal2 suspend another profile');
+select lives_ok($$select public.suspend_account('99999999-9999-4999-8999-999999999999','AAL2 moderation test')$$, 'active admin aal2 suspend another profile through atomic RPC');
 select is(public.review_employer_access_request('eeeeeeee-1111-4111-8111-000000000001', 'rejected'), 'rejected', 'active admin aal2 review RPC');
 
 reset role;

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/auth/guards", () => ({
+vi.mock("@/lib/auth/guards", async (original) => ({ ...await original<object>(),
   requireUser: vi.fn(),
   requireRole: vi.fn(),
 }));

@@ -1,7 +1,9 @@
+import { WRITE_RETRY_MESSAGE, SUSPENDED_WRITE_MESSAGE } from "@/lib/db/write-errors";
+
 import "server-only";
 
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth/guards";
+import { activeWriterError, requireUser } from "@/lib/auth/guards";
 import { sendApplicationMessage } from "@/lib/db/messages";
 import { notifyNewMessage } from "@/lib/notifications/dev";
 
@@ -18,6 +20,8 @@ export async function sendMessageForParticipant(
 ): Promise<MessageFormState> {
   const applicationId = formData.get("applicationId");
   const user = await requireUser("/dashboard/applications");
+  const writerError = activeWriterError(user);
+  if (writerError) return writerError;
 
   const bodyValue = formData.get("body");
   if (typeof applicationId !== "string" || !UUID_PATTERN.test(applicationId)) {
@@ -35,6 +39,8 @@ export async function sendMessageForParticipant(
   }
 
   const result = await sendApplicationMessage(applicationId, user.id, body);
+  if (result.status === "rate_limited") return { status: "error", message: WRITE_RETRY_MESSAGE };
+  if (result.status === "suspended") return { status: "error", message: SUSPENDED_WRITE_MESSAGE };
   if (result.status === "sent") {
     // Best-effort dev notification: a notify failure must never turn a
     // successfully sent message into an error for the user.

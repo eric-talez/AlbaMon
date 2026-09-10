@@ -1,7 +1,7 @@
 import { expect, it, vi } from "vitest";
 import * as actions from "@/lib/applications/status-action";
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("@/lib/auth/guards", () => ({ requireRole: vi.fn(), requireUser: vi.fn() }));
+vi.mock("@/lib/auth/guards", async (original) => ({ ...await original<object>(), requireRole: vi.fn(), requireUser: vi.fn() }));
 vi.mock("@/lib/db/applications", () => ({ updateApplicationStatus: vi.fn(), withdrawApplication: vi.fn() }));
 it("employer UI cannot claim applicant withdrawal", () => {
   expect(actions.EMPLOYER_APPLICATION_STATUSES).toBeDefined();
@@ -11,11 +11,12 @@ it("withdrawal is terminal for employer edits", () => {
   expect(actions.canEmployerChangeStatus?.("withdrawn", "reviewing")).toBe(false);
 });
 
-import { afterEach } from "vitest";
+import { afterEach, beforeEach } from "vitest";
 import { requireUser } from "@/lib/auth/guards";
 import { withdrawApplication } from "@/lib/db/applications";
 import { revalidatePath } from "next/cache";
 import { normalizePage } from "@/lib/pagination";
+beforeEach(() => vi.mocked(requireUser).mockResolvedValue({ id: "applicant", role: "seeker", accountStatus: "active", aal: "aal1", email: "applicant@example.invalid", displayName: null, isDev: false }));
 afterEach(()=>vi.clearAllMocks());
 
 function withdrawalForm() {

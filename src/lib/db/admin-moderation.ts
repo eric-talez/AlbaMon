@@ -1,3 +1,4 @@
+import { normalizePage as adminPage, ADMIN_PAGE_SIZE } from "@/lib/pagination";
 import "server-only";
 
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -146,26 +147,23 @@ export async function getAdminQueueCounts(): Promise<AdminQueueCounts> {
   }
 }
 
-export async function getAdminJobs(): Promise<AdminJobsResult> {
+export async function getAdminJobs(page = 1, status: ModerationStatus | "all" = "pending", jobId?: string): Promise<AdminJobsResult> {
   if (!isSupabaseConfigured()) return { status: "unavailable" };
   try {
     const supabase = await createSupabaseServerClient();
-    const { data: companies, error: companyError } = await supabase
-      .from("companies")
-      .select("id, name");
-    if (companyError) throw companyError;
-
-    const companyNames = new Map(
-      ((companies ?? []) as unknown as CompanyIdentityRow[]).map((company) => [
-        company.id,
-        company.name,
-      ]),
-    );
-    const { data, error } = await supabase
-      .from("jobs")
-      .select(ADMIN_JOB_SELECT)
-      .order("created_at", { ascending: false });
+    let query = supabase.from("jobs").select(ADMIN_JOB_SELECT);
+    if (status !== "all") query = query.eq("moderation_status", status);
+    if (jobId) query = query.eq("id", jobId);
+    const start = (adminPage(page) - 1) * ADMIN_PAGE_SIZE;
+    const { data, error } = await query.order("created_at", { ascending: true }).order("id", { ascending: true }).range(start, start + ADMIN_PAGE_SIZE - 1);
     if (error) throw error;
+    const companyIds = [...new Set(((data ?? []) as unknown as JobRow[]).map(job => job.company_id))];
+    const companyNames = new Map<string, string>();
+    if (companyIds.length) {
+      const { data: companies, error: companyError } = await supabase.from("companies").select("id, name").in("id", companyIds);
+      if (companyError) throw companyError;
+      for (const company of (companies ?? []) as unknown as CompanyIdentityRow[]) companyNames.set(company.id, company.name);
+    }
 
     const jobs = ((data ?? []) as unknown as JobRow[])
       .map((job): AdminJob => ({
@@ -199,13 +197,7 @@ export async function getAdminJobs(): Promise<AdminJobsResult> {
         ].join("\n")),
         createdAt: job.created_at,
         updatedAt: job.updated_at,
-      }))
-      .sort((a, b) => {
-        const pendingDifference =
-          Number(b.moderationStatus === "pending") -
-          Number(a.moderationStatus === "pending");
-        return pendingDifference || b.createdAt.localeCompare(a.createdAt);
-      });
+      }));
     return { status: "ok", jobs };
   } catch {
     console.error("[db] getAdminJobs failed");
@@ -213,14 +205,14 @@ export async function getAdminJobs(): Promise<AdminJobsResult> {
   }
 }
 
-export async function getAdminCompanies(): Promise<AdminCompaniesResult> {
+export async function getAdminCompanies(page = 1, verified: boolean | "all" = false): Promise<AdminCompaniesResult> {
   if (!isSupabaseConfigured()) return { status: "unavailable" };
   try {
     const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("companies")
-      .select(ADMIN_COMPANY_SELECT)
-      .order("created_at", { ascending: false });
+    let query = supabase.from("companies").select(ADMIN_COMPANY_SELECT);
+    if (verified !== "all") query = query.eq("is_verified", verified);
+    const start = (adminPage(page) - 1) * ADMIN_PAGE_SIZE;
+    const { data, error } = await query.order("created_at", { ascending: true }).order("id", { ascending: true }).range(start, start + ADMIN_PAGE_SIZE - 1);
     if (error) throw error;
 
     const companyRows = (data ?? []) as unknown as CompanyRow[];
@@ -254,11 +246,6 @@ export async function getAdminCompanies(): Promise<AdminCompaniesResult> {
           ownerEmail: owner?.email ?? null,
           createdAt: company.created_at,
         };
-      })
-      .sort((a, b) => {
-        const verificationDifference =
-          Number(a.isVerified) - Number(b.isVerified);
-        return verificationDifference || b.createdAt.localeCompare(a.createdAt);
       });
     return { status: "ok", companies };
   } catch {
@@ -307,4 +294,39 @@ export async function setCompanyVerification(
     console.error("[db] setCompanyVerification failed");
     return { status: "error" };
   }
+}
+
+export async function changeAccountStatus(userId: string, command: "suspend_account" | "restore_account", reason: string): Promise<AdminMutationResult> {
+  if (!isSupabaseConfigured()) return { status: "unavailable" };
+  try {
+    const client = await createSupabaseServerClient();
+    const { error } = await client.rpc(command, { target_user_id: userId, reason });
+    if (error) return { status: error.code === "40001" ? "conflict" : error.code === "42501" ? "not_allowed" : "error" };
+    return { status: "updated" };
+  } catch { return { status: "error" }; }
+}
+
+export type AdminAccount = Pick<ProfileRow, "id" | "display_name" | "email" | "role" | "account_status" | "created_at">;
+export async function getAdminAccounts(page = 1, status: "active" | "suspended" = "active"): Promise<{ status: "ok"; accounts: AdminAccount[] } | { status: "error" | "unavailable" }> {
+  if (!isSupabaseConfigured()) return { status: "unavailable" };
+  try {
+    const client = await createSupabaseServerClient();
+    const start = (adminPage(page) - 1) * ADMIN_PAGE_SIZE;
+    const { data, error } = await client.from("profiles").select("id, display_name, email, role, account_status, created_at")
+      .eq("account_status", status).order("created_at", { ascending: true }).order("id", { ascending: true }).range(start, start + ADMIN_PAGE_SIZE - 1);
+    if (error) return { status: "error" };
+    return { status: "ok", accounts: (data ?? []) as AdminAccount[] };
+  } catch { return { status: "error" }; }
+}
+
+export interface AccountAuditEntry { id: string; actor_id: string | null; entity_id: string; action: string; created_at: string; reason: string | null }
+export async function getAccountAudit(userIds: string[]): Promise<AccountAuditEntry[] | null> {
+  if (!userIds.length) return [];
+  try {
+    const client = await createSupabaseServerClient();
+    const { data, error } = await client.from("audit_logs").select("id, actor_id, entity_id, action, created_at, reason:metadata->>reason")
+      .eq("entity_type", "profile").in("entity_id", userIds.slice(0,20)).in("action", ["account.suspended", "account.restored"])
+      .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(20);
+    return error ? null : data as AccountAuditEntry[];
+  } catch { return null; }
 }

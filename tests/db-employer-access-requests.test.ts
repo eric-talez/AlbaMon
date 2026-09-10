@@ -158,16 +158,10 @@ describe("getLatestEmployerAccessRequest", () => {
 });
 
 describe("getAdminEmployerAccessRequests", () => {
-  it("sorts pending requests first (newest first) and joins requester identity", async () => {
+  it("preserves database oldest-pending order and joins requester identity", async () => {
     const rows = [
-      requestRow({
-        id: "req-approved",
-        status: "approved",
-        reviewed_at: "2026-07-05T00:00:00Z",
-        created_at: "2026-07-05T00:00:00Z",
-      }),
-      requestRow({ id: "req-new-pending", created_at: "2026-07-04T00:00:00Z" }),
       requestRow({ id: "req-old-pending", created_at: "2026-07-01T00:00:00Z" }),
+      requestRow({ id: "req-new-pending", created_at: "2026-07-04T00:00:00Z" }),
     ];
     const order = vi.fn().mockResolvedValue({ data: rows, error: null });
     const inFilter = vi.fn().mockResolvedValue({
@@ -178,7 +172,7 @@ describe("getAdminEmployerAccessRequests", () => {
     });
     const from = vi.fn((table: string) =>
       table === "employer_access_requests"
-        ? { select: vi.fn(() => ({ order })) }
+        ? { select: vi.fn(() => ({ eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(), range: order })) }
         : { select: vi.fn(() => ({ in: inFilter })) },
     );
     mockClient.mockResolvedValue({ from } as never);
@@ -187,9 +181,8 @@ describe("getAdminEmployerAccessRequests", () => {
     expect(result.status).toBe("ok");
     if (result.status !== "ok") return;
     expect(result.requests.map((request) => request.id)).toEqual([
-      "req-new-pending",
       "req-old-pending",
-      "req-approved",
+      "req-new-pending",
     ]);
     expect(result.requests[0].requesterEmail).toBe("seeker@example.com");
     expect(result.requests[0].requesterDisplayName).toBe("Eric");

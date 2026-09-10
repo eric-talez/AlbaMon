@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-vi.mock("@/lib/auth/guards", () => ({ requireUser: vi.fn() }));
+vi.mock("@/lib/auth/guards", async (original) => ({ ...await original<object>(), requireUser: vi.fn() }));
 vi.mock("@/lib/db/jobs", () => ({ getApprovedJobById: vi.fn() }));
 vi.mock("@/lib/db/applications", () => ({ createApplication: vi.fn() }));
 vi.mock("@/lib/supabase/config", () => ({ isSupabaseConfigured: vi.fn() }));

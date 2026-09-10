@@ -1,7 +1,7 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
-import { requireRole, requireUser } from "@/lib/auth/guards";
+import { activeWriterError, requireRole, requireUser } from "@/lib/auth/guards";
 import { updateApplicationStatus, withdrawApplication } from "@/lib/db/applications";
 import { notifyApplicationStatusChanged } from "@/lib/notifications/dev";
 import {
@@ -39,7 +39,9 @@ function isApplicationStatus(value: unknown): value is ApplicationStatus {
 export async function updateApplicationStatusForEmployer(
   formData: FormData,
 ): Promise<ApplicationStatusFormState> {
-  await requireRole("employer", "/employer/applications");
+  const user = await requireRole("employer", "/employer/applications");
+  const writerError = activeWriterError(user);
+  if (writerError) return writerError;
 
   const applicationId = formData.get("applicationId");
   const nextStatus = formData.get("status");
@@ -99,7 +101,9 @@ export async function updateApplicationStatusForEmployer(
 }
 
 export async function withdrawApplicationForApplicant(formData: FormData): Promise<ApplicationStatusFormState> {
-  await requireUser("/dashboard/applications");
+  const user = await requireUser("/dashboard/applications");
+  const writerError = activeWriterError(user);
+  if (writerError) return writerError;
   const applicationId = formData.get("applicationId");
   const expectedUpdatedAt = formData.get("expectedUpdatedAt");
   if (typeof applicationId !== "string" || !UUID_PATTERN.test(applicationId) ||

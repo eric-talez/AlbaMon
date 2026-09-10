@@ -1,6 +1,6 @@
 "use server";
 
-import { requireUser } from "@/lib/auth/guards";
+import { activeWriterError, requireUser } from "@/lib/auth/guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function updateOwnProfile(formData: FormData): Promise<{
@@ -11,6 +11,8 @@ export async function updateOwnProfile(formData: FormData): Promise<{
     return { status: "error", message: "표시 이름은 1~80자로 입력해 주세요." };
   }
   const user = await requireUser("/dashboard/profile");
+  const writerError = activeWriterError(user);
+  if (writerError) return writerError;
   if (user.isDev) return { status: "error", message: "프로필 저장은 연결된 계정에서 이용해 주세요. (A connected account is required.)" };
   try {
     const supabase = await createSupabaseServerClient();

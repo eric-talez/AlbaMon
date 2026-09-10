@@ -64,27 +64,32 @@ describe("admin moderation reads", () => {
     });
   });
 
-  it("maps jobs and prioritizes pending before newest non-pending jobs", async () => {
+  it("maps the database ordered page and requests the pending filter and 20-row range", async () => {
     const companySelect = vi.fn().mockResolvedValue({
       data: [{ id: "company-1", name: "K-Work Cafe" }],
       error: null,
     });
     const order = vi.fn().mockResolvedValue({
       data: [
-        jobRow({ id: "approved", moderation_status: "approved", created_at: "2026-06-22T00:00:00Z" }),
         jobRow({ id: "pending", moderation_status: "pending", created_at: "2026-06-21T00:00:00Z" }),
+        jobRow({ id: "pending2", moderation_status: "pending", created_at: "2026-06-22T00:00:00Z" }),
       ],
       error: null,
     });
+    const queue = { eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(), range: order };
     const from = vi.fn()
-      .mockReturnValueOnce({ select: companySelect })
-      .mockReturnValueOnce({ select: vi.fn(() => ({ order })) });
+      .mockReturnValueOnce({ select: vi.fn(() => queue) })
+      .mockReturnValueOnce({ select: vi.fn(() => ({ in: companySelect })) });
     mockClient.mockResolvedValue({ from } as never);
 
     const result = await getAdminJobs();
+    expect(queue.eq).toHaveBeenCalledWith("moderation_status", "pending");
+    expect(queue.order).toHaveBeenNthCalledWith(1, "created_at", { ascending: true });
+    expect(queue.order).toHaveBeenNthCalledWith(2, "id", { ascending: true });
+    expect(queue.range).toHaveBeenCalledWith(0, 19);
     expect(result).toMatchObject({
       status: "ok",
-      jobs: [{ id: "pending" }, { id: "approved" }],
+      jobs: [{ id: "pending" }, { id: "pending2" }],
     });
   });
 
@@ -103,9 +108,10 @@ describe("admin moderation reads", () => {
       ],
       error: null,
     });
+    const queue = { eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(), range: order };
     const from = vi.fn()
-      .mockReturnValueOnce({ select: companySelect })
-      .mockReturnValueOnce({ select: vi.fn(() => ({ order })) });
+      .mockReturnValueOnce({ select: vi.fn(() => queue) })
+      .mockReturnValueOnce({ select: vi.fn(() => ({ in: companySelect })) });
     mockClient.mockResolvedValue({ from } as never);
 
     await expect(getAdminJobs()).resolves.toMatchObject({
@@ -144,7 +150,7 @@ describe("admin moderation reads", () => {
     });
     const profileSelect = vi.fn(() => ({ in: profileIn }));
     const from = vi.fn()
-      .mockReturnValueOnce({ select: vi.fn(() => ({ order: companyOrder })) })
+      .mockReturnValueOnce({ select: vi.fn(() => ({ eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(), range: companyOrder })) })
       .mockReturnValueOnce({ select: profileSelect });
     mockClient.mockResolvedValue({ from } as never);
 

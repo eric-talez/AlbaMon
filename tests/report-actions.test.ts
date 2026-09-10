@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("@/lib/auth/guards", () => ({ requireUser: vi.fn(), requireRole: vi.fn() }));
+vi.mock("@/lib/auth/guards", async (original) => ({ ...await original<object>(), requireUser: vi.fn(), requireRole: vi.fn() }));
 vi.mock("@/lib/db/reports", () => ({
   createJobReport: vi.fn(),
   updateReportStatus: vi.fn(),
@@ -108,7 +108,7 @@ describe("admin report review action", () => {
     const result = await reviewReport(idle, reviewForm("reviewed"));
 
     expect(mockRequireRole).toHaveBeenCalledWith("admin", "/admin/reports");
-    expect(result).toEqual({ status: "success", message: "신고를 검토 완료로 표시했습니다." });
+    expect(result).toEqual({ status: "success", message: "신고를 검토 완료로 표시했습니다. 이 처리만으로 공고는 중지되지 않습니다." });
     expect(mockUpdateReport).toHaveBeenCalledWith(reportId, "reviewed");
     expect(revalidatePath).toHaveBeenCalledWith("/admin");
     expect(revalidatePath).toHaveBeenCalledWith("/admin/reports");

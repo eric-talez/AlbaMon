@@ -50,7 +50,7 @@ select set_config('request.jwt.claims','{"sub":"11111111-1111-1111-1111-11111111
 set local role authenticated;
 insert into public.jobs(id,company_id,title,category,job_type,city,pay_min,pay_max,pay_unit,schedule_days,schedule_time_range,language_requirement,description,created_at)
 values('b2000000-0000-4000-8000-000000000001','aaaaaaaa-0000-0000-0000-000000000001','New pending','other','part_time','Oakland',20,25,'hour','Mon','9-5','english_required','New posting','1900-01-01');
-select ok((select posted_at is null and expires_at is null and created_at=now() from public.jobs where id='b2000000-0000-4000-8000-000000000001'),'new pending publication is null and creation time is server controlled');
+select ok((select posted_at is null and expires_at is null and created_at>=now() from public.jobs where id='b2000000-0000-4000-8000-000000000001'),'new pending publication is null and creation time is server controlled');
 select throws_ok($$update public.jobs set created_at='1900-01-01' where id='b2000000-0000-4000-8000-000000000001'$$,'42501',null,'owner cannot backdate creation');
 reset role;
 select set_config('request.jwt.claims','{}',true);

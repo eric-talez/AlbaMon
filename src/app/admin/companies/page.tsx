@@ -1,3 +1,5 @@
+import { normalizePage as adminPage } from "@/lib/pagination";
+import { AdminPagination } from "../AdminPagination";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/guards";
@@ -13,9 +15,13 @@ function formatDate(value: string): string {
     : new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium" }).format(date);
 }
 
-export default async function AdminCompaniesPage() {
+export default async function AdminCompaniesPage({ searchParams }: { searchParams?: Promise<{ status?: string; page?: string }> } = {}) {
   await requireRole("admin", "/admin/companies");
-  const result = await getAdminCompanies();
+  const params = await searchParams;
+  const page = adminPage(params?.page);
+  const options = ["all", "unverified", "verified"] as const;
+  const status = options.find(value => value === params?.status) ?? "unverified";
+  const result = await getAdminCompanies(page, status === "all" ? "all" : status === "verified");
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
@@ -27,6 +33,7 @@ export default async function AdminCompaniesPage() {
         quality, safety, or legal compliance.
       </p>
 
+      <nav aria-label="상태 필터" className="mt-4 flex gap-4">{options.map(value => <Link key={value} href={`/admin/companies?status=${value}`}>{({ all: "전체 / All", unverified: "미확인 / Unverified", verified: "확인됨 / Verified" })[value]}</Link>)}</nav>
       {result.status !== "ok" ? (
         <section className="mt-6 rounded-xl border border-border bg-surface p-5" role="alert">
           <h2 className="font-semibold">회사 목록을 사용할 수 없습니다.</h2>
@@ -72,6 +79,7 @@ export default async function AdminCompaniesPage() {
           ))}
         </ul>
       )}
+      {result.status === "ok" && <AdminPagination page={page} count={result.companies.length} href={`/admin/companies?status=${status}`} />}
     </main>
   );
 }

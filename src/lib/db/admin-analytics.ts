@@ -228,3 +228,13 @@ async function countByValues<T extends string>(
 function daysAgoIso(referenceDate: Date, days: number): string {
   return new Date(referenceDate.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
 }
+
+/** Operational account count, without profile or audit metadata. */
+export async function getSuspendedAccountCount(): Promise<{ status: "ok"; count: number } | { status: "error" | "unavailable" }> {
+  if (!isSupabaseConfigured()) return { status: "unavailable" };
+  try {
+    const client = await createSupabaseServerClient();
+    const { count, error } = await client.from("profiles").select("id", { count: "exact", head: true }).eq("account_status", "suspended");
+    return error ? { status: "error" } : { status: "ok", count: count ?? 0 };
+  } catch { return { status: "error" }; }
+}

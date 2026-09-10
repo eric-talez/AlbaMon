@@ -1,7 +1,9 @@
+import { WRITE_RETRY_MESSAGE, SUSPENDED_WRITE_MESSAGE } from "@/lib/db/write-errors";
+
 import "server-only";
 
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth/guards";
+import { activeWriterError, requireUser } from "@/lib/auth/guards";
 import { createEmployerAccessRequest } from "@/lib/db/employer-access-requests";
 import { parseEmployerAccessRequestForm } from "@/lib/employer-access/validation";
 
@@ -19,6 +21,8 @@ export async function submitEmployerAccessRequestForUser(
   formData: FormData,
 ): Promise<EmployerAccessRequestFormState> {
   const user = await requireUser("/employer/request-access");
+  const writerError = activeWriterError(user);
+  if (writerError) return writerError;
   if (user.role !== "seeker") {
     return {
       status: "error",
@@ -31,6 +35,8 @@ export async function submitEmployerAccessRequestForUser(
 
   const result = await createEmployerAccessRequest(user.id, parsed.value);
 
+  if (result.status === "rate_limited") return { status: "error", message: WRITE_RETRY_MESSAGE };
+  if (result.status === "suspended") return { status: "error", message: SUSPENDED_WRITE_MESSAGE };
   if (result.status === "ok") {
     revalidatePath("/admin");
     revalidatePath("/admin/employer-requests");

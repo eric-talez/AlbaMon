@@ -1,7 +1,9 @@
 "use server";
 
+import { WRITE_RETRY_MESSAGE, SUSPENDED_WRITE_MESSAGE } from "@/lib/db/write-errors";
+
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth/guards";
+import { activeWriterError, requireRole } from "@/lib/auth/guards";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createEmployerJob } from "@/lib/db/employer-jobs";
 import { parseEmployerJobForm } from "@/lib/employer/validation";
@@ -17,6 +19,8 @@ export async function submitEmployerJob(
   formData: FormData,
 ): Promise<JobFormState> {
   const user = await requireRole("employer", "/employer/jobs/new");
+  const writerError = activeWriterError(user);
+  if (writerError) return writerError;
   if (!isSupabaseConfigured()) {
     return { status: "error", message: "공고 등록은 Supabase가 연결된 환경에서 사용할 수 있습니다." };
   }
@@ -29,6 +33,8 @@ export async function submitEmployerJob(
   if (!parsed.ok) return { status: "error", message: parsed.message };
 
   const result = await createEmployerJob(user.id, rawCompanyId.trim(), parsed.value);
+  if (result.status === "rate_limited") return { status: "error", message: WRITE_RETRY_MESSAGE };
+  if (result.status === "suspended") return { status: "error", message: SUSPENDED_WRITE_MESSAGE };
   if (result.status === "created") {
     revalidatePath("/employer");
     revalidatePath("/employer/jobs");

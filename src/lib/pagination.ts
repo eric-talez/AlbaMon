@@ -4,3 +4,5 @@ export function normalizePage(value: unknown): number {
   const page = Number(value);
   return Number.isSafeInteger(page) && page >= 1 && page <= 1_000_000 ? page : 1;
 }
+
+export const ADMIN_PAGE_SIZE = 20;

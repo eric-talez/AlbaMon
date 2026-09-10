@@ -1,8 +1,10 @@
 "use server";
 
+import { WRITE_RETRY_MESSAGE, SUSPENDED_WRITE_MESSAGE } from "@/lib/db/write-errors";
+
 import { getApprovedJobById } from "@/lib/db/jobs";
 import { createApplication } from "@/lib/db/applications";
-import { requireUser } from "@/lib/auth/guards";
+import { activeWriterError, requireUser } from "@/lib/auth/guards";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { notifyApplicationSubmitted } from "@/lib/notifications/dev";
 
@@ -18,6 +20,8 @@ export async function submitApplication(
 ): Promise<ApplicationFormState> {
   const applyPath = `/jobs/${encodeURIComponent(jobId)}/apply`;
   const user = await requireUser(applyPath);
+  const writerError = activeWriterError(user);
+  if (writerError) return writerError;
 
   if (user.role !== "seeker") {
     return {
@@ -67,6 +71,8 @@ export async function submitApplication(
     trimmedCoverNote || null,
   );
 
+  if (result.status === "rate_limited") return { status: "error", message: WRITE_RETRY_MESSAGE };
+  if (result.status === "suspended") return { status: "error", message: SUSPENDED_WRITE_MESSAGE };
   switch (result.status) {
     case "created":
       // Best-effort dev notification: a notify failure must never turn a

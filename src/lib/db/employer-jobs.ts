@@ -1,3 +1,4 @@
+import { writeFailure } from "@/lib/db/write-errors";
 import "server-only";
 
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -22,7 +23,7 @@ export type EmployerJobListResult =
 
 export type EmployerJobWriteResult =
   | { status: "created"; jobId: string }
-  | { status: "not_allowed" | "unavailable" | "error" };
+  | { status: "not_allowed" | "rate_limited" | "suspended" | "unavailable" | "error" };
 
 type CompanyIdentityRow = { id: string; name: string };
 
@@ -96,6 +97,8 @@ export async function createEmployerJob(
       .select("id")
       .single();
     if (error) {
+      const failure = writeFailure(error);
+      if (failure) return { status: failure };
       if (["23503", "23514", "42501"].includes(error.code)) {
         return { status: "not_allowed" };
       }

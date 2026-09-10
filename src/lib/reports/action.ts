@@ -1,7 +1,9 @@
+import { WRITE_RETRY_MESSAGE, SUSPENDED_WRITE_MESSAGE } from "@/lib/db/write-errors";
+
 import "server-only";
 
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth/guards";
+import { activeWriterError, requireUser } from "@/lib/auth/guards";
 import { createJobReport } from "@/lib/db/reports";
 import { parseReportForm } from "@/lib/reports/validation";
 
@@ -15,6 +17,8 @@ export async function submitJobReportForUser(
   formData: FormData,
 ): Promise<ReportJobFormState> {
   const user = await requireUser(`/jobs/${encodeURIComponent(jobId)}/report`);
+  const writerError = activeWriterError(user);
+  if (writerError) return writerError;
   const parsed = parseReportForm(formData);
   if (!parsed.ok) return { status: "error", message: parsed.message };
 
@@ -25,6 +29,8 @@ export async function submitJobReportForUser(
     parsed.value.details,
   );
 
+  if (result.status === "rate_limited") return { status: "error", message: WRITE_RETRY_MESSAGE };
+  if (result.status === "suspended") return { status: "error", message: SUSPENDED_WRITE_MESSAGE };
   if (result.status === "submitted") {
     revalidatePath("/admin");
     revalidatePath("/admin/reports");

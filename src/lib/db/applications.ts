@@ -1,3 +1,4 @@
+import { writeFailure } from "@/lib/db/write-errors";
 import "server-only";
 
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -12,7 +13,7 @@ import type {
 
 export type CreateApplicationResult =
   | { status: "created"; applicationId: string }
-  | { status: "duplicate" | "not_allowed" | "unavailable" | "error" };
+  | { status: "duplicate" | "not_allowed" | "rate_limited" | "suspended" | "unavailable" | "error" };
 
 export type UpdateApplicationStatusResult =
   | {
@@ -83,6 +84,8 @@ export async function createApplication(
 
     if (!error) return { status: "created", applicationId: data.id as string };
     if (error.code === "23505") return { status: "duplicate" };
+    const failure = writeFailure(error);
+    if (failure) return { status: failure };
     if (NOT_ALLOWED_CODES.has(error.code)) return { status: "not_allowed" };
 
     console.error("[db] createApplication failed:", error);

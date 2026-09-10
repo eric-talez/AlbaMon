@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth/guards";
+import { activeWriterError, requireRole } from "@/lib/auth/guards";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   createEmployerCompany,
@@ -21,6 +21,8 @@ export async function saveEmployerCompany(
   formData: FormData,
 ): Promise<CompanyFormState> {
   const user = await requireRole("employer", "/employer/company");
+  const writerError = activeWriterError(user);
+  if (writerError) return writerError;
   if (!isSupabaseConfigured()) {
     return { status: "error", message: "회사 관리는 Supabase가 연결된 환경에서 사용할 수 있습니다." };
   }
