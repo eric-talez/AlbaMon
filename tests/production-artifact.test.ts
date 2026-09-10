@@ -107,3 +107,7 @@ it("release rejects disabled delivery and staging without controlled recipient a
 it.each(["https://jobs.k-work.test/path", "https://user:pass@jobs.k-work.test", "https://jobs.k-work.test?x=1"])("release origin %s cannot produce a mismatched email link", (origin) => {
   expect(checkReleaseEnv({ NEXT_PUBLIC_SITE_URL: origin }).status).not.toBe(0);
 });
+
+it.each(["development", "test", ""])("standalone release config preflight works before Next sets production runtime: %s", (runtime) => {
+  expect(checkReleaseEnv({ NODE_ENV: runtime }).status).toBe(0);
+});

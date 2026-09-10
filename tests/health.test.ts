@@ -5,6 +5,7 @@ import { GET } from "@/app/api/health/route";
 /** Every env var the health report reads. Tests stub all of them explicitly
  * so ambient shell/CI values can never change an outcome. */
 const HEALTH_ENV_VARS = [
+  "NODE_ENV",
   "NEXT_PUBLIC_SITE_URL",
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
@@ -21,6 +22,7 @@ const HEALTH_ENV_VARS = [
  * credentials, and free of the placeholder fragments the app treats as
  * unconfigured (`your-`, `xxx`, `example`, `placeholder`). */
 const CONFIGURED_ENV: Record<(typeof HEALTH_ENV_VARS)[number], string> = {
+  NODE_ENV: "production",
   NEXT_PUBLIC_SITE_URL: "https://beta-health.test",
   NEXT_PUBLIC_SUPABASE_URL: "https://kwus-health.supabase.co",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key-for-health-tests",
@@ -205,5 +207,11 @@ describe("GET /api/health", () => {
 it("missing fixed HTTPS email origin keeps delivery health partial", () => {
   stubAllConfigured();
   vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
+  expect(buildHealthReport().checks.email).toBe("partial");
+});
+
+it.each(["development", "test"])("%s runtime does not advertise enabled provider delivery", (runtime) => {
+  stubAllConfigured();
+  vi.stubEnv("NODE_ENV", runtime);
   expect(buildHealthReport().checks.email).toBe("partial");
 });

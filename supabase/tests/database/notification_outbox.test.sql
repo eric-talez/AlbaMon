@@ -139,5 +139,14 @@ select set_config('request.jwt.claims','{"sub":"c1000000-0000-4000-8000-00000000
 set local role authenticated;
 select throws_ok($$select * from public.get_notification_queue_health()$$,'42501','Admin AAL2 required','suspended AAL2 admin denied aggregate');
 reset role;
+-- Maintenance is bounded independently of the requested delivery batch.
+insert into public.notification_outbox(event_key,kind,recipient_id,entity_id,status,attempts,available_at)
+select 'c1-recovery-bound-'||n,'application_submitted','c1000000-0000-4000-8000-000000000001',
+  'c1100000-0000-4000-8000-000000000001','pending',5,now() from generate_series(1,6) n;
+select count(*) from public.claim_notification_batch(0);
+select is((select count(*) from public.notification_outbox where event_key like 'c1-recovery-bound-%' and status='failed'),5::bigint,'terminal maintenance processes at most five rows');
+select is((select count(*) from public.notification_outbox where event_key like 'c1-recovery-bound-%' and status='pending'),1::bigint,'excess terminal candidate remains for next sweep');
+select count(*) from public.claim_notification_batch(0);
+select is((select count(*) from public.notification_outbox where event_key like 'c1-recovery-bound-%' and status='failed'),6::bigint,'later sweep completes remaining terminal work');
 select * from finish();
 rollback;

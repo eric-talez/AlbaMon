@@ -9,6 +9,9 @@ export class NotificationEmailError extends Error {
 }
 
 export function emailDeliveryConfigured(): boolean {
+  // The pinned SDK logs raw provider errors outside production. Refuse work
+  // before any client/request rather than trying to redact after its logging.
+  if (process.env.NODE_ENV !== "production") return false;
   const mailbox = /^[^\s<>@*,;]+@[^\s<>@*,;]+\.[^\s<>@*,;]+$/;
   const from = process.env.EMAIL_FROM?.trim() ?? "";
   const address = from.endsWith(">") ? from.slice(from.lastIndexOf("<") + 1, -1) : from;

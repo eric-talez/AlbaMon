@@ -60,7 +60,13 @@ internal route on that origin. Applicant text, messages and contact fields never
 become subjects, body text, HTML, or email links. The current confirmed **Auth**
 email supplies the address; `profiles.email` is never routing authority.
 
-`/api/health` reports email `partial` for a provider key alone and `configured`
+Delivery requires `NODE_ENV=production`: development/test runtimes fail closed
+before provider or worker client work because the pinned SDK logs raw errors in
+those runtimes. The local provider-double test explicitly runs in production
+mode. The standalone `build:release` configuration preflight remains independent
+of runtime mode; Next establishes its production runtime during the build.
+
+`/api/health` reports email `partial` outside production or for a provider key alone and `configured`
 only when the delivery settings and trusted Supabase client are available.
 This indicates enabled capability, not proven DNS, provider reachability or inbox
 delivery. `/admin` shows AAL2-protected aggregate pending/failed counts, oldest

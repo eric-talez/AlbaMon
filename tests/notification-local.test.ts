@@ -159,3 +159,58 @@ run("real concurrent claims, lost success recovery, durable signed webhook race 
     expect(receipts.count).toBe(0);
   }
 }, 60_000);
+
+run.each([
+  ["sending", "exhausted"], ["pending", "exhausted"],
+  ["sending", "old"], ["pending", "old"],
+] as const)("locked %s/%s terminal recovery never blocks an unrelated eligible notification", async (status, reason) => {
+  const config = JSON.parse(execFileSync("supabase", ["status", "-o", "json"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }));
+  if (config.API_URL !== "http://127.0.0.1:55321") throw new Error("Notification test requires owned local stack");
+  const service = createClient(config.API_URL, config.SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  const existing = await service.from("notification_outbox").select("id", { count: "exact", head: true });
+  if (existing.error || existing.count !== 0) throw new Error("Recovery test never claims unrelated queue rows");
+  const created = await service.auth.admin.createUser({ email: `c1-recovery-${randomUUID()}@example.invalid`, email_confirm: true });
+  if (created.error || !created.data.user) throw new Error("Local recovery fixture failed");
+  const recipient = created.data.user.id, terminalId = randomUUID(), eligibleId = randomUUID();
+  const ids = [terminalId, eligibleId];
+  try {
+    const inserted = await service.from("notification_outbox").insert([
+      { id: terminalId, event_key: terminalId, recipient_id: recipient, entity_id: terminalId, kind: "application_submitted", status,
+        attempts: reason === "exhausted" ? 5 : 1, available_at: new Date(0).toISOString(), lease_until: new Date(0).toISOString(),
+        first_attempt_at: reason === "old" ? new Date(0).toISOString() : new Date().toISOString() },
+      { id: eligibleId, event_key: eligibleId, recipient_id: recipient, entity_id: eligibleId, kind: "application_submitted", status: "pending", attempts: 0, lease_until: null, first_attempt_at: null, available_at: new Date(0).toISOString() },
+    ]);
+    if (inserted.error) throw new Error("Local recovery rows failed");
+    const locker = spawn("psql", [config.DB_URL, "-X", "-v", "ON_ERROR_STOP=1", "-At"], { stdio: ["pipe", "pipe", "pipe"] });
+    const locked = new Promise<void>((resolve, reject) => {
+      locker.stdout.on("data", chunk => { if (String(chunk).includes("C1_TERMINAL_LOCKED")) resolve(); });
+      locker.once("error", reject);
+      locker.once("exit", () => reject(new Error("Local terminal lock session exited early")));
+    });
+    locker.stdin.write(`begin; select id from public.notification_outbox where id='${terminalId}' for update; select 'C1_TERMINAL_LOCKED';\n`);
+    try {
+      await locked;
+      const claim = await service.rpc("claim_notification_batch", { batch_size: 1 }).abortSignal(AbortSignal.timeout(2000));
+      // The lock is still held here: progress must not depend on its release.
+      expect(claim.error).toBeNull();
+      expect(claim.data?.map((row: { id: string }) => row.id)).toEqual([eligibleId]);
+      const terminal = await service.from("notification_outbox").select("status").eq("id", terminalId).single();
+      expect(terminal.data?.status).toBe(status);
+    } finally {
+      const exited = once(locker, "exit");
+      locker.stdin.end("rollback;\n");
+      await exited;
+    }
+    const recovery = await service.rpc("claim_notification_batch", { batch_size: 1 });
+    expect(recovery.error).toBeNull();
+    expect(recovery.data).toEqual([]);
+    const terminal = await service.from("notification_outbox").select("status,last_error_code").eq("id", terminalId).single();
+    expect(terminal.data).toEqual({ status: "failed", last_error_code: reason === "exhausted" ? "attempts_exhausted" : "idempotency_window_expired" });
+  } finally {
+    const deleted = await service.from("notification_outbox").delete().in("id", ids);
+    const userDeleted = await service.auth.admin.deleteUser(recipient);
+    const remaining = await service.from("notification_outbox").select("id", { count: "exact", head: true }).in("id", ids);
+    expect([deleted.error, userDeleted.error, remaining.error]).toEqual([null, null, null]);
+    expect(remaining.count).toBe(0);
+  }
+}, 15_000);

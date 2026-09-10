@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { notificationText, sendNotificationEmail } from "@/lib/notifications/email";
+import { emailDeliveryConfigured, notificationText, sendNotificationEmail } from "@/lib/notifications/email";
 import { runNotificationBatch } from "@/lib/notifications/worker";
 
-const mocks = vi.hoisted(() => ({ rpc: vi.fn(), user: vi.fn() }));
-vi.mock("@/lib/supabase/service", () => ({ createSupabaseServiceRoleClient: () => ({ rpc: mocks.rpc, auth: { admin: { getUserById: mocks.user } } }) }));
+const mocks = vi.hoisted(() => ({ rpc: vi.fn(), user: vi.fn(), client: vi.fn() }));
+vi.mock("@/lib/supabase/service", () => ({ createSupabaseServiceRoleClient: () => { mocks.client(); return { rpc: mocks.rpc, auth: { admin: { getUserById: mocks.user } } }; } }));
 const id = "c1000000-0000-4000-8000-000000000001";
 const row = { id, recipient_id: "recipient", attempts: 1, first_attempt_at: new Date().toISOString() };
 let providerPayload: Record<string, unknown>;
@@ -21,6 +21,7 @@ beforeEach(() => {
   vi.stubEnv("RESEND_WEBHOOK_SECRET", "local_double");
   vi.stubEnv("CRON_SECRET", "local-test-secret-not-a-real-credential");
   providerCalls = 0;
+  mocks.client.mockReset();
   vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
     providerCalls++;
     providerPayload = JSON.parse(init.body);
@@ -138,4 +139,20 @@ test("mixed malformed staging allowlist never enables delivery", async () => {
   vi.stubEnv("EMAIL_STAGING_ALLOWLIST", "controlled@example.invalid,*@example.invalid");
   await expect(sendNotificationEmail({ eventId: id, to: "controlled@example.invalid", path: "/dashboard/applications" })).rejects.toMatchObject({ code: "email_configuration" });
   expect(providerCalls).toBe(0);
+});
+
+test.each(["development", "test"])("%s runtime refuses sends and worker clients before SDK private diagnostics", async (runtime) => {
+  vi.stubEnv("NODE_ENV", runtime);
+  const diagnostics: unknown[][] = [];
+  vi.spyOn(console, "error").mockImplementation((...args) => { diagnostics.push(args); });
+  vi.stubGlobal("fetch", async () => {
+    providerCalls++;
+    return Response.json({ name: "validation_error", statusCode: 400, message: "PRIVATE fixture recipient@example.invalid" }, { status: 400 });
+  });
+  const sendError = await sendNotificationEmail({ eventId: id, to: "controlled@example.invalid", path: "/dashboard/applications" }).catch(error => error);
+  const workerError = await runNotificationBatch().catch(error => error);
+  expect({ configured: emailDeliveryConfigured(), sendCode: sendError.code, workerCode: workerError.message,
+    providerCalls, clientCalls: mocks.client.mock.calls.length, diagnostics: diagnostics.length }).toEqual({
+    configured: false, sendCode: "email_configuration", workerCode: "email_configuration", providerCalls: 0, clientCalls: 0, diagnostics: 0,
+  });
 });
