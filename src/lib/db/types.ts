@@ -118,6 +118,8 @@ export interface PublicJobListingRow {
   posted_at: string | null;
   company_name: string;
   company_is_verified: boolean;
+  expires_at: string;
+  updated_at: string;
 }
 
 export interface PublicJobCityRow {

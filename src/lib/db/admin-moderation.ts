@@ -47,6 +47,7 @@ export interface AdminJob {
   moderationStatus: ModerationStatus;
   complianceFlags: ComplianceFlag[];
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface AdminCompany {
@@ -74,7 +75,7 @@ export type AdminCompaniesResult =
 
 export type AdminMutationResult =
   | { status: "updated" }
-  | { status: "conflict" | "unavailable" | "error" };
+  | { status: "conflict" | "not_allowed" | "unavailable" | "error" };
 
 type CompanyIdentityRow = Pick<CompanyRow, "id" | "name">;
 type OwnerProfileRow = Pick<ProfileRow, "id" | "display_name" | "email">;
@@ -83,7 +84,7 @@ const ADMIN_JOB_SELECT =
   "id, company_id, title, category, job_type, city, state, address_display, " +
   "address_display_mode, pay_min, pay_max, pay_unit, tips_available, " +
   "schedule_days, schedule_time_range, language_requirement, description, " +
-  "responsibilities, requirements, benefits, moderation_status, created_at";
+  "responsibilities, requirements, benefits, moderation_status, created_at, updated_at, expires_at";
 
 const ADMIN_COMPANY_SELECT =
   "id, owner_id, name, description, website, phone, city, state, " +
@@ -197,6 +198,7 @@ export async function getAdminJobs(): Promise<AdminJobsResult> {
           ...(job.benefits ?? []),
         ].join("\n")),
         createdAt: job.created_at,
+        updatedAt: job.updated_at,
       }))
       .sort((a, b) => {
         const pendingDifference =
@@ -267,24 +269,19 @@ export async function getAdminCompanies(): Promise<AdminCompaniesResult> {
 
 export async function moderatePendingJob(
   jobId: string,
-  decision: "approve" | "reject",
-  approvedAt: string,
+  decision: "approve" | "reject" | "pause",
+  expectedUpdatedAt: string,
+  reason: string | null = null,
 ): Promise<AdminMutationResult> {
   if (!isSupabaseConfigured()) return { status: "unavailable" };
   try {
     const supabase = await createSupabaseServerClient();
-    const payload = decision === "approve"
-      ? { moderation_status: "approved" as const, posted_at: approvedAt }
-      : { moderation_status: "rejected" as const };
-    const { data, error } = await supabase
-      .from("jobs")
-      .update(payload)
-      .eq("id", jobId)
-      .eq("moderation_status", "pending")
-      .select("id")
-      .maybeSingle();
+    const { data, error } = await supabase.rpc("transition_job", {
+      target_job_id: jobId, command: decision, expected_updated_at: expectedUpdatedAt, reason,
+    });
     if (error) throw error;
-    return data ? { status: "updated" } : { status: "conflict" };
+    const status = data?.[0]?.status;
+    return { status: ["updated", "conflict", "not_allowed"].includes(status) ? status : "error" };
   } catch {
     console.error("[db] moderatePendingJob failed");
     return { status: "error" };

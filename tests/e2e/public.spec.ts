@@ -5,7 +5,8 @@ const pendingJob = "bbbbbbbb-0000-0000-0000-000000000101";
 const draftJob = "bbbbbbbb-0000-0000-0000-000000000102";
 
 test("public jobs show real approved rows and safe company identity", async ({ page }) => {
-  await page.goto("/jobs");
+  // Filter this test's seed company so concurrent pagination fixtures cannot evict it.
+  await page.goto("/jobs?q=Koreatown%20Kitchen%20Collective");
   await expect(page.getByRole("heading", { name: "공고 둘러보기", exact: true })).toBeVisible();
   // Seed UUID links distinguish live DB results from development mock slugs.
   await expect(page.locator(`a[href="/jobs/${approvedJob}"]`)).toBeVisible();

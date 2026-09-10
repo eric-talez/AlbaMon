@@ -116,6 +116,7 @@ export interface Job {
   benefits: string[];
   moderationStatus: ModerationStatus;
   postedAt: string; // ISO timestamp
+  expiresAt: string; // Full ISO timestamp
 }
 
 /* --- Korean-first label maps (bilingual where useful) --- */

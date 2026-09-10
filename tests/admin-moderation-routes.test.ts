@@ -73,7 +73,7 @@ describe("admin moderation routes", () => {
     expect(home).toContain(">1<");
     expect(home).toContain(">3<");
 
-    await AdminJobsPage();
+    await AdminJobsPage({});
     expect(mockRequireRole).toHaveBeenCalledWith("admin", "/admin/jobs");
     await AdminCompaniesPage();
     expect(mockRequireRole).toHaveBeenCalledWith("admin", "/admin/companies");
@@ -91,7 +91,7 @@ describe("admin moderation routes", () => {
     expect(mockAnalytics).not.toHaveBeenCalled();
   });
 
-  it("shows full job content and moderation controls only for pending jobs", async () => {
+  it("shows full job content and approval controls for pending and pause controls for approved jobs", async () => {
     mockJobs.mockResolvedValue({
       status: "ok",
       jobs: [
@@ -99,12 +99,13 @@ describe("admin moderation routes", () => {
         adminJob("22222222-2222-4222-8222-222222222222", "approved", "Approved job"),
       ],
     });
-    const html = renderToStaticMarkup(await AdminJobsPage());
+    const html = renderToStaticMarkup(await AdminJobsPage({}));
     expect(html).toContain("Pending job");
     expect(html).toContain("Approved job");
     expect(html).toContain("Full description");
     expect(html).toContain("Prepare orders");
-    expect(html.match(/name="decision"/g)).toHaveLength(2);
+    expect(html.match(/name="decision"/g)).toHaveLength(3);
+    expect(html).toContain('value="pause"');
   });
 
   it("shows compliance review flags for pending job moderation", async () => {
@@ -119,7 +120,7 @@ describe("admin moderation routes", () => {
         }],
       }],
     });
-    const html = renderToStaticMarkup(await AdminJobsPage());
+    const html = renderToStaticMarkup(await AdminJobsPage({}));
     expect(html).toContain("Compliance review flag");
     expect(html).toContain("cash only");
     expect(html).toContain("not a legal determination");
@@ -186,7 +187,7 @@ describe("admin moderation routes", () => {
   });
 
   it("distinguishes empty, unavailable, and database-error states", async () => {
-    const emptyJobs = renderToStaticMarkup(await AdminJobsPage());
+    const emptyJobs = renderToStaticMarkup(await AdminJobsPage({}));
     expect(emptyJobs).toContain("등록된 공고가 없습니다.");
 
     mockCompanies.mockResolvedValue({ status: "unavailable" });
@@ -220,7 +221,7 @@ describe("admin moderation static security boundaries", () => {
     expect(dbSource).toContain('.select("id, display_name, email")');
     expect(dbSource).not.toMatch(/\.select\("id, display_name, email, phone/i);
     expect(dbSource).not.toMatch(/service.?role/i);
-    expect(dbSource).toContain('.eq("id", jobId)');
+    expect(dbSource).toContain('.rpc("transition_job",');
     expect(dbSource).toContain('.eq("moderation_status", "pending")');
     expect(dbSource).toContain('{ is_verified: isVerified }');
   });
@@ -272,6 +273,7 @@ function adminJob(id: string, status: "pending" | "approved", title: string) {
     moderationStatus: status,
     complianceFlags: [],
     createdAt: "2026-06-21T00:00:00Z",
+    updatedAt: "2026-06-21T00:00:00.000001Z",
   };
 }
 

@@ -40,7 +40,7 @@ select throws_ok($$select * from public.profiles$$, '42501', null, 'anon cannot 
 select throws_ok($$select * from public.messages$$, '42501', null, 'anon cannot read messages');
 select throws_ok($$select * from public.reports$$, '42501', null, 'anon cannot read reports');
 select throws_ok($$select * from public.audit_logs$$, '42501', null, 'anon cannot read audit_logs');
-select columns_are('public', 'public_job_listings', array['id','title','category','job_type','city','state','address_display','address_display_mode','pay_min','pay_max','pay_unit','tips_available','schedule_days','schedule_time_range','language_requirement','description','responsibilities','requirements','benefits','moderation_status','boost','posted_at','company_name','company_is_verified'], 'public view exposes only approved job and safe company identity columns');
+select columns_are('public', 'public_job_listings', array['id','title','category','job_type','city','state','address_display','address_display_mode','pay_min','pay_max','pay_unit','tips_available','schedule_days','schedule_time_range','language_requirement','description','responsibilities','requirements','benefits','moderation_status','boost','posted_at','company_name','company_is_verified','expires_at','updated_at'], 'public view exposes only approved job and safe company identity columns');
 
 -- Seeker: self submission/history, cross-seeker isolation and no escalation.
 reset role;

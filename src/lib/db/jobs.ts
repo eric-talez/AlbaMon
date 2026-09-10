@@ -39,7 +39,7 @@ const PUBLIC_JOB_SELECT =
   "address_display_mode, pay_min, pay_max, pay_unit, tips_available, " +
   "schedule_days, schedule_time_range, language_requirement, description, " +
   "responsibilities, requirements, benefits, moderation_status, " +
-  "posted_at, company_name, company_is_verified";
+  "posted_at, company_name, company_is_verified, expires_at, updated_at";
 
 /**
  * Mock jobs are a local/test fixture and are never available in production.
@@ -86,6 +86,7 @@ function mapRow(row: PublicJobListingRow): Job {
     benefits: row.benefits ?? [],
     moderationStatus: row.moderation_status,
     postedAt: row.posted_at ?? "",
+    expiresAt: row.expires_at,
   };
 }
 

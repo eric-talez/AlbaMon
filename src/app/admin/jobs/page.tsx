@@ -98,16 +98,18 @@ function JobCard({ job }: { job: AdminJob }) {
         </section>
       ) : null}
 
-      {job.moderationStatus === "pending" ? (
-        <JobModerationForm jobId={job.id} />
+      {["pending", "approved"].includes(job.moderationStatus) ? (
+        <JobModerationForm jobId={job.id} updatedAt={job.updatedAt} status={job.moderationStatus} title={job.title} />
       ) : null}
     </li>
   );
 }
 
-export default async function AdminJobsPage() {
+export default async function AdminJobsPage({ searchParams }: { searchParams?: Promise<{ status?: string }> }) {
   await requireRole("admin", "/admin/jobs");
   const result = await getAdminJobs();
+  const filter = (await searchParams)?.status;
+  const jobs = result.status === "ok" ? result.jobs.filter(job => !filter || !["pending", "approved", "paused"].includes(filter) || job.moderationStatus === filter) : [];
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
@@ -115,6 +117,7 @@ export default async function AdminJobsPage() {
       <h1 className="mt-4 text-2xl font-bold">공고 검토</h1>
       <p className="mt-2 text-sm text-muted">대기 중인 공고를 먼저 검토하고 승인 또는 반려합니다.</p>
 
+      <nav aria-label="공고 상태 필터" className="mt-4 flex gap-4"><Link href="/admin/jobs">전체</Link>{["pending", "approved", "paused"].map(status => <Link key={status} href={`/admin/jobs?status=${status}`}>{MODERATION_STATUS_LABELS[status as "pending" | "approved" | "paused"]}</Link>)}</nav>
       {result.status !== "ok" ? (
         <section className="mt-6 rounded-xl border border-border bg-surface p-5" role="alert">
           <h2 className="font-semibold">공고 목록을 사용할 수 없습니다.</h2>
@@ -124,14 +127,14 @@ export default async function AdminJobsPage() {
               : "공고 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."}
           </p>
         </section>
-      ) : result.jobs.length === 0 ? (
+      ) : jobs.length === 0 ? (
         <section className="mt-6 rounded-xl border border-dashed border-border p-6 text-center">
           <h2 className="font-semibold">등록된 공고가 없습니다.</h2>
           <p className="mt-2 text-sm text-muted">새 공고가 제출되면 이곳에 표시됩니다.</p>
         </section>
       ) : (
         <ul className="mt-6 space-y-5">
-          {result.jobs.map((job) => <JobCard key={job.id} job={job} />)}
+          {jobs.map((job) => <JobCard key={job.id} job={job} />)}
         </ul>
       )}
     </main>

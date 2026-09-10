@@ -50,7 +50,7 @@ type ReporterProfileRow = Pick<ProfileRow, "id" | "display_name" | "email">;
 
 /**
  * Create a job report through the caller's authenticated Supabase session.
- * The helper first verifies the job is visible through the approved-only public
+ * The helper first verifies the job is visible through the open-only public
  * view, then relies on reports_insert_authenticated RLS as the final gate.
  */
 export async function createJobReport(
@@ -67,7 +67,6 @@ export async function createJobReport(
       .from("public_job_listings")
       .select("id")
       .eq("id", jobId)
-      .eq("moderation_status", "approved")
       .maybeSingle();
     if (jobError) throw jobError;
     if (!approvedJob) return { status: "not_allowed" };

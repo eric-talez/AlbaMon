@@ -179,37 +179,14 @@ describe("admin moderation reads", () => {
 });
 
 describe("admin moderation writes", () => {
-  it("filters approval by id and pending status and sets only approval fields", async () => {
-    const maybeSingle = vi.fn().mockResolvedValue({ data: { id: "job-1" }, error: null });
-    const select = vi.fn(() => ({ maybeSingle }));
-    const statusEq = vi.fn(() => ({ select }));
-    const idEq = vi.fn(() => ({ eq: statusEq }));
-    const update = vi.fn(() => ({ eq: idEq }));
-    mockClient.mockResolvedValue({ from: vi.fn(() => ({ update })) } as never);
-
-    await expect(
-      moderatePendingJob("job-1", "approve", "2026-06-21T12:00:00.000Z"),
-    ).resolves.toEqual({ status: "updated" });
-    expect(update).toHaveBeenCalledWith({
-      moderation_status: "approved",
-      posted_at: "2026-06-21T12:00:00.000Z",
-    });
-    expect(idEq).toHaveBeenCalledWith("id", "job-1");
-    expect(statusEq).toHaveBeenCalledWith("moderation_status", "pending");
-  });
-
-  it("rejects with only status and treats no updated row as a conflict", async () => {
-    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-    const select = vi.fn(() => ({ maybeSingle }));
-    const statusEq = vi.fn(() => ({ select }));
-    const idEq = vi.fn(() => ({ eq: statusEq }));
-    const update = vi.fn(() => ({ eq: idEq }));
-    mockClient.mockResolvedValue({ from: vi.fn(() => ({ update })) } as never);
-
-    await expect(
-      moderatePendingJob("job-1", "reject", "ignored"),
-    ).resolves.toEqual({ status: "conflict" });
-    expect(update).toHaveBeenCalledWith({ moderation_status: "rejected" });
+  it("sends revision and reason to the database transition boundary", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: [{ status: "updated" }], error: null });
+    mockClient.mockResolvedValue({ rpc } as never);
+    await expect(moderatePendingJob("job-1", "approve", "2026-06-21T12:00:00.123456Z")).resolves.toEqual({ status: "updated" });
+    expect(rpc).toHaveBeenCalledWith("transition_job", {target_job_id:"job-1",command:"approve",expected_updated_at:"2026-06-21T12:00:00.123456Z",reason:null});
+    rpc.mockResolvedValue({ data: [{ status: "conflict" }], error: null });
+    await expect(moderatePendingJob("job-1", "reject", "2026-06-21T12:00:00Z", "Policy review")).resolves.toEqual({ status: "conflict" });
+    expect(rpc).toHaveBeenLastCalledWith("transition_job", {target_job_id:"job-1",command:"reject",expected_updated_at:"2026-06-21T12:00:00Z",reason:"Policy review"});
   });
 
   it("updates only the company verification field", async () => {

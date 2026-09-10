@@ -49,6 +49,7 @@ test.beforeAll(async () => {
     benefits: [],
     moderation_status: "approved",
     posted_at: "2026-09-09T12:00:00Z",
+    expires_at: new Date(Date.now() + 86400000).toISOString(),
   }));
   const { error } = await adminClient().from("jobs").upsert(rows);
   if (error) throw new Error("Disposable pagination setup failed");

@@ -225,3 +225,7 @@ values
    '{"데이터 입력","서류 정리"}', '{"엑셀 기본"}', '{"주말 휴무"}',
    'draft', null, '2026-06-20')
 on conflict (id) do nothing;
+
+-- Disposable local fixtures only. Hosted legacy publication requires operator review.
+update public.jobs set expires_at = now() + interval '30 days'
+where moderation_status = 'approved';

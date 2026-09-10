@@ -27,13 +27,12 @@ afterEach(() => {
 });
 
 describe("createJobReport", () => {
-  it("verifies the job through the approved-only view and inserts trusted report fields", async () => {
+  it("verifies the job through the open-only view and inserts trusted report fields", async () => {
     const jobMaybeSingle = vi.fn().mockResolvedValue({
       data: { id: "job-1" },
       error: null,
     });
-    const jobEqStatus = vi.fn(() => ({ maybeSingle: jobMaybeSingle }));
-    const jobEqId = vi.fn(() => ({ eq: jobEqStatus }));
+    const jobEqId = vi.fn(() => ({ maybeSingle: jobMaybeSingle }));
     const reportSingle = vi.fn().mockResolvedValue({
       data: { id: "report-1" },
       error: null,
@@ -55,7 +54,7 @@ describe("createJobReport", () => {
       ),
     ).resolves.toEqual({ status: "submitted", reportId: "report-1" });
     expect(from).toHaveBeenCalledWith("public_job_listings");
-    expect(jobEqStatus).toHaveBeenCalledWith("moderation_status", "approved");
+    expect(jobEqId).toHaveBeenCalledWith("id", "job-1");
     expect(reportInsert).toHaveBeenCalledWith({
       reporter_id: "user-1",
       job_id: "job-1",
@@ -67,8 +66,7 @@ describe("createJobReport", () => {
 
   it("rejects non-approved or missing jobs before insert", async () => {
     const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-    const eqStatus = vi.fn(() => ({ maybeSingle }));
-    const eqId = vi.fn(() => ({ eq: eqStatus }));
+    const eqId = vi.fn(() => ({ maybeSingle }));
     const insert = vi.fn();
     const from = vi.fn((table: string) => (
       table === "public_job_listings"
@@ -93,8 +91,7 @@ describe("createJobReport", () => {
         data: { id: "job-1" },
         error: null,
       });
-      const jobEqStatus = vi.fn(() => ({ maybeSingle: jobMaybeSingle }));
-      const jobEqId = vi.fn(() => ({ eq: jobEqStatus }));
+      const jobEqId = vi.fn(() => ({ maybeSingle: jobMaybeSingle }));
       const reportSingle = vi.fn().mockResolvedValue({
         data: null,
         error: { code },

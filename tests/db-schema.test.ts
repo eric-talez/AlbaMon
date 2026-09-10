@@ -173,7 +173,7 @@ describe("no unsafe RLS patterns", () => {
     expect(policy).toBeTruthy();
     expect(policy).toMatch(/seeker_id\s*=\s*auth\.uid\(\)/i);
     expect(policy).toMatch(/current_profile_role\(\)\s*=\s*'seeker'/i);
-    expect(policy).toMatch(/moderation_status\s*=\s*'approved'/i);
+    expect(policy).toMatch(/public\.is_job_open\(job_id\)/i);
     expect(policy).toMatch(/status\s*=\s*'submitted'/i);
   });
 

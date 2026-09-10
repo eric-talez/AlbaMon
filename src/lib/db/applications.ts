@@ -55,7 +55,7 @@ export type ApplicationListResult<T> =
 
 /**
  * Create one seeker application through the caller's authenticated Supabase
- * session. RLS remains the final authorization gate; this helper never uses a
+ * session. The database trigger locks the job, binds seeker identity, and checks is_job_open; RLS remains an authorization gate; this helper never uses a
  * service-role client and never substitutes a mock write.
  */
 export async function createApplication(

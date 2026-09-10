@@ -33,6 +33,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["식사 제공", "팁 별도", "유연한 스케줄"],
     moderationStatus: "approved",
     postedAt: "2026-06-18",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-002",
@@ -59,6 +60,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["의료보험", "유급휴가", "주말 휴무"],
     moderationStatus: "approved",
     postedAt: "2026-06-17",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-003",
@@ -85,6 +87,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["초과근무 수당", "성과급"],
     moderationStatus: "approved",
     postedAt: "2026-06-19",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-004",
@@ -111,6 +114,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["팁 별도", "높은 시급", "단골 고객"],
     moderationStatus: "approved",
     postedAt: "2026-06-15",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-005",
@@ -137,6 +141,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["유연한 시간", "강의 경력 인정"],
     moderationStatus: "approved",
     postedAt: "2026-06-14",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-006",
@@ -163,6 +168,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["팁 별도", "음료 제공"],
     moderationStatus: "approved",
     postedAt: "2026-06-16",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-007",
@@ -189,6 +195,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["직원 할인", "유연한 스케줄"],
     moderationStatus: "approved",
     postedAt: "2026-06-13",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-008",
@@ -215,6 +222,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["주말 휴무", "장기 근무 우대"],
     moderationStatus: "approved",
     postedAt: "2026-06-12",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-009",
@@ -241,6 +249,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["팁 별도", "교육 지원"],
     moderationStatus: "approved",
     postedAt: "2026-06-11",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-010",
@@ -267,6 +276,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["식사 제공", "주차 지원"],
     moderationStatus: "approved",
     postedAt: "2026-06-19",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-011",
@@ -293,6 +303,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: [],
     moderationStatus: "approved",
     postedAt: "2026-06-20T08:00:00Z",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-012",
@@ -318,6 +329,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: [],
     moderationStatus: "approved",
     postedAt: "2026-06-20T09:00:00Z",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-013",
@@ -343,6 +355,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: [],
     moderationStatus: "approved",
     postedAt: "2026-06-20T10:00:00Z",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     // Pending — must NOT appear on public pages until an admin approves it.
@@ -369,6 +382,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["제품 할인"],
     moderationStatus: "pending",
     postedAt: "2026-06-20",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     // Draft — employer has not submitted for review yet. Never public.
@@ -395,15 +409,16 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["주말 휴무"],
     moderationStatus: "draft",
     postedAt: "2026-06-20",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
 ];
 
 export function getMockJobs(): Job[] {
-  return MOCK_JOBS.filter((j) => j.moderationStatus === "approved");
+  return MOCK_JOBS.filter((j) => j.moderationStatus === "approved" && j.state === "CA" && new Date(j.expiresAt).getTime() > Date.now());
 }
 
 export function getMockJobById(id: string): Job | undefined {
   return MOCK_JOBS.find(
-    (j) => j.id === id && j.moderationStatus === "approved",
+    (j) => j.id === id && j.moderationStatus === "approved" && j.state === "CA" && new Date(j.expiresAt).getTime() > Date.now(),
   );
 }

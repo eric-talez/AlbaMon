@@ -37,10 +37,12 @@ beforeEach(() => {
 
 afterEach(() => vi.clearAllMocks());
 
-function jobForm(decision: "approve" | "reject", jobId = validJobId) {
+function jobForm(decision: "approve" | "reject" | "pause", jobId = validJobId) {
   const form = new FormData();
   form.set("jobId", jobId);
   form.set("decision", decision);
+  form.set("expectedUpdatedAt", "2026-09-09T00:00:00.123456Z");
+  if (decision !== "approve") form.set("reason", "Policy review");
   form.set("boost", "featured");
   form.set("company_id", "forged-company");
   return form;
@@ -61,7 +63,8 @@ describe("admin job moderation action", () => {
     expect(mockModerateJob).toHaveBeenCalledWith(
       validJobId,
       "approve",
-      expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+      "2026-09-09T00:00:00.123456Z",
+      null,
     );
     expect(result.status).toBe("success");
     for (const path of ["/admin", "/admin/jobs", "/jobs", `/jobs/${validJobId}`]) {
@@ -69,10 +72,10 @@ describe("admin job moderation action", () => {
     }
   });
 
-  it("does not revalidate public routes for rejection", async () => {
+  it("revalidates public routes for rejection", async () => {
     await moderateJob(idle, jobForm("reject"));
     expect(revalidatePath).toHaveBeenCalledWith("/admin/jobs");
-    expect(revalidatePath).not.toHaveBeenCalledWith("/jobs");
+    expect(revalidatePath).toHaveBeenCalledWith("/jobs");
   });
 
   it("treats stale decisions as conflicts and refreshes the queue", async () => {

@@ -46,6 +46,7 @@ insert into public.jobs (
 
 select is((select count(*) from public.public_job_listings where id = 'd0000000-0000-4000-8000-000000000001'), 0::bigint, 'public view excludes legacy non-CA jobs');
 select set_config('request.jwt.claims', '{}', true);
+update public.jobs set expires_at=now()+interval '30 days' where id::text like 'd0000000-%' and moderation_status='approved' and state='CA';
 set local role anon;
 select is((select count(*) from public.jobs where id = 'd0000000-0000-4000-8000-000000000001'), 0::bigint, 'anonymous base-table policy excludes legacy non-CA jobs');
 reset role;
@@ -76,6 +77,7 @@ select throws_ok($$update public.jobs set pay_min = 0 where id = 'd0000000-0000-
 
 insert into public.jobs (company_id,title,category,job_type,city,state,address_display_mode,pay_min,pay_max,pay_unit,tips_available,schedule_days,schedule_time_range,language_requirement,description,moderation_status,posted_at)
 select 'aaaaaaaa-0000-0000-0000-000000000001','B1 page fixture ' || n,'other','part_time','Oakland','CA','city_only',20,20,'hour',false,'월-금','09:00-17:00','english_required','Pagination fixture','approved','2026-09-08T12:00:00Z' from generate_series(1,21) n;
+update public.jobs set expires_at=now()+interval '30 days' where title like 'B1 page fixture %';
 select is((select count(*) from public.search_public_jobs(search_query => 'B1 page fixture', search_page => 1)), 21::bigint, 'first page returns twenty rows plus the next-page sentinel');
 select is((select count(*) from public.search_public_jobs(search_query => 'B1 page fixture', search_page => 2)), 1::bigint, 'second page starts at row twenty-one');
 
