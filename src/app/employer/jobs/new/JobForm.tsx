@@ -69,8 +69,8 @@ export function JobForm({ companies }: { companies: EmployerCompany[] }) {
             {JOB_TYPES.map((value) => <option key={value} value={value}>{JOB_TYPE_LABELS[value]}</option>)}
           </select>
         </label>
-        <label className="block text-sm font-medium" htmlFor="job-city">도시<input className={inputClass} id="job-city" name="city" required maxLength={100} /></label>
-        <label className="block text-sm font-medium" htmlFor="job-state">주(State)<input className={inputClass} id="job-state" name="state" required maxLength={2} defaultValue="CA" /></label>
+        <label className="block text-sm font-medium" htmlFor="job-city">도시<input className={inputClass} id="job-city" name="city" required maxLength={100} placeholder="예: Los Angeles" /></label>
+        <label className="block text-sm font-medium" htmlFor="job-state">주(State)<input className={inputClass} id="job-state" name="state" required readOnly value="CA" /></label>
         <label className="block text-sm font-medium" htmlFor="job-addressDisplayMode">
           주소 공개 방식
           <select className={inputClass} id="job-addressDisplayMode" name="addressDisplayMode" required defaultValue="city_only">
@@ -79,8 +79,8 @@ export function JobForm({ companies }: { companies: EmployerCompany[] }) {
           </select>
         </label>
         <label className="block text-sm font-medium" htmlFor="job-addressDisplay">표시 주소 <span className="font-normal text-muted">(전체 공개 선택 시 필수)</span><input className={inputClass} id="job-addressDisplay" name="addressDisplay" maxLength={200} /></label>
-        <label className="block text-sm font-medium" htmlFor="job-payMin">최소 급여<input className={inputClass} id="job-payMin" name="payMin" required inputMode="decimal" /></label>
-        <label className="block text-sm font-medium" htmlFor="job-payMax">최대 급여<input className={inputClass} id="job-payMax" name="payMax" required inputMode="decimal" /></label>
+        <label className="block text-sm font-medium" htmlFor="job-payMin">최소 급여<input className={inputClass} id="job-payMin" name="payMin" required type="number" min="0.01" step="0.01" inputMode="decimal" /></label>
+        <label className="block text-sm font-medium" htmlFor="job-payMax">최대 급여<input className={inputClass} id="job-payMax" name="payMax" required type="number" min="0.01" step="0.01" inputMode="decimal" /></label>
         <label className="block text-sm font-medium" htmlFor="job-payUnit">
           급여 단위
           <select className={inputClass} id="job-payUnit" name="payUnit" required defaultValue="hour">

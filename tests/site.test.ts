@@ -5,7 +5,6 @@ import {
   SITE_TAGLINE,
   SITE_DESCRIPTION,
   LAUNCH_MARKET,
-  LAUNCH_CITIES,
 } from "@/lib/site";
 
 describe("site config", () => {
@@ -23,7 +22,6 @@ describe("site config", () => {
       SITE_TAGLINE,
       SITE_DESCRIPTION,
       LAUNCH_MARKET,
-      ...LAUNCH_CITIES,
     ];
     for (const value of configStrings) {
       const lower = value.toLowerCase();
@@ -33,9 +31,8 @@ describe("site config", () => {
     }
   });
 
-  it("seeds LA/OC launch cities", () => {
-    expect(LAUNCH_CITIES.length).toBeGreaterThanOrEqual(5);
-    expect(LAUNCH_CITIES).toContain("Irvine");
+  it("launches publicly across California", () => {
+    expect(LAUNCH_MARKET).toBe("California");
   });
 });
 

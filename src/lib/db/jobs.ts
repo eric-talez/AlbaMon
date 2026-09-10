@@ -4,15 +4,21 @@ import {
   JOB_CATEGORIES,
   JOB_TYPES,
   LANGUAGE_REQUIREMENTS,
+  PAY_UNITS,
   type Job,
   type JobCategory,
   type JobType,
   type LanguageRequirement,
+  type PayUnit,
 } from "@/lib/types";
 import { getMockJobById, getMockJobs } from "@/lib/mock/jobs";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { AddressDisplayMode, PublicJobListingRow } from "@/lib/db/types";
+import type {
+  AddressDisplayMode,
+  PublicJobCityRow,
+  PublicJobListingRow,
+} from "@/lib/db/types";
 
 /**
  * Public job reads for K-Work US.
@@ -79,8 +85,7 @@ function mapRow(row: PublicJobListingRow): Job {
     requirements: row.requirements ?? [],
     benefits: row.benefits ?? [],
     moderationStatus: row.moderation_status,
-    // Job.postedAt is an ISO date (YYYY-MM-DD); posted_at is a timestamptz.
-    postedAt: row.posted_at ? row.posted_at.slice(0, 10) : "",
+    postedAt: row.posted_at ?? "",
   };
 }
 
@@ -155,8 +160,16 @@ export interface JobSearchParams {
   category?: JobCategory;
   jobType?: JobType;
   languageRequirement?: LanguageRequirement;
+  payUnit?: PayUnit;
   payMin?: number;
   sort?: JobSort;
+  page?: number;
+}
+
+export interface JobSearchResult {
+  jobs: Job[];
+  page: number;
+  hasNext: boolean;
 }
 
 /** First value for a possibly-repeated query param, trimmed; "" → undefined. */
@@ -183,13 +196,13 @@ function inEnum<T extends string>(
 export function parseJobSearchParams(
   raw: Record<string, string | string[] | undefined>,
 ): JobSearchParams {
-  const params: JobSearchParams = {};
+  const params: JobSearchParams = { page: 1 };
 
   const q = firstParam(raw.q);
-  if (q) params.q = q;
+  if (q) params.q = q.slice(0, 200);
 
   const city = firstParam(raw.city);
-  if (city) params.city = city;
+  if (city) params.city = city.slice(0, 100);
 
   const category = inEnum(firstParam(raw.category), JOB_CATEGORIES);
   if (category) params.category = category;
@@ -203,6 +216,9 @@ export function parseJobSearchParams(
   );
   if (languageRequirement) params.languageRequirement = languageRequirement;
 
+  const payUnit = inEnum(firstParam(raw.payUnit), PAY_UNITS);
+  if (payUnit) params.payUnit = payUnit;
+
   const payMinRaw = firstParam(raw.payMin);
   if (payMinRaw !== undefined) {
     const payMin = Number(payMinRaw);
@@ -212,7 +228,43 @@ export function parseJobSearchParams(
   const sort = inEnum(firstParam(raw.sort), JOB_SORTS);
   if (sort) params.sort = sort;
 
+  if (!params.payUnit && (params.payMin !== undefined || sort === "pay_high" || sort === "pay_low")) {
+    params.payUnit = "hour";
+  }
+
+  const pageRaw = Number(firstParam(raw.page));
+  if (Number.isInteger(pageRaw) && pageRaw >= 1 && pageRaw <= 500) {
+    params.page = pageRaw;
+  }
+
   return params;
+}
+
+function mockPublicJobCities(): string[] {
+  return [
+    ...new Set(
+      getMockJobs().filter((job) => job.state === "CA").map((job) => job.city),
+    ),
+  ].sort((a, b) => a.localeCompare(b));
+}
+
+export async function getPublicJobCities(): Promise<string[]> {
+  if (!isSupabaseConfigured()) {
+    assertMockJobsAllowed("getPublicJobCities");
+    return mockPublicJobCities();
+  }
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.rpc("list_public_job_cities");
+    if (error) throw error;
+    return ((data ?? []) as PublicJobCityRow[]).map(({ city }) => city);
+  } catch (err) {
+    console.error("[db] getPublicJobCities failed:", err);
+    if (!mayFallbackToMockJobs()) throw err;
+    console.warn("[db] getPublicJobCities falling back to mock data");
+    return mockPublicJobCities();
+  }
 }
 
 /**
@@ -222,6 +274,7 @@ export function parseJobSearchParams(
  */
 export function filterAndSortMockJobs(params: JobSearchParams): Job[] {
   const filtered = getMockJobs().filter((job) => {
+    if (job.state !== "CA") return false;
     if (params.q && !matchesKeyword(job, params.q)) return false;
     if (params.city && job.city !== params.city) return false;
     if (params.category && job.category !== params.category) return false;
@@ -232,8 +285,8 @@ export function filterAndSortMockJobs(params: JobSearchParams): Job[] {
     ) {
       return false;
     }
-    // "Minimum pay" filter: keep jobs whose top of range meets the floor.
-    if (params.payMin !== undefined && job.payMax < params.payMin) return false;
+    if (params.payUnit && job.payUnit !== params.payUnit) return false;
+    if (params.payMin !== undefined && job.payMin < params.payMin) return false;
     return true;
   });
 
@@ -252,22 +305,19 @@ function sortJobs(jobs: Job[], sort: JobSort | undefined): Job[] {
   const sorted = [...jobs];
   switch (sort) {
     case "pay_high":
-      sorted.sort((a, b) => b.payMax - a.payMax);
+      sorted.sort((a, b) => b.payMin - a.payMin || b.id.localeCompare(a.id));
       break;
     case "pay_low":
-      sorted.sort((a, b) => a.payMin - b.payMin);
+      sorted.sort((a, b) => a.payMin - b.payMin || b.id.localeCompare(a.id));
       break;
     case "newest":
     default:
-      sorted.sort((a, b) => b.postedAt.localeCompare(a.postedAt));
+      sorted.sort((a, b) =>
+        b.postedAt.localeCompare(a.postedAt) || b.id.localeCompare(a.id),
+      );
       break;
   }
   return sorted;
-}
-
-/** Escape PostgREST `or`/`ilike` metacharacters in a user-supplied term. */
-function escapeIlike(term: string): string {
-  return term.replace(/[%,()_\\]/g, "\\$&");
 }
 
 /**
@@ -282,64 +332,62 @@ function escapeIlike(term: string): string {
  */
 export async function searchApprovedJobs(
   params: JobSearchParams,
-): Promise<Job[]> {
+): Promise<JobSearchResult> {
+  const requestedPage = params.page;
+  const page =
+    typeof requestedPage === "number" &&
+    Number.isInteger(requestedPage) &&
+    requestedPage >= 1 &&
+    requestedPage <= 500
+      ? requestedPage
+      : 1;
+  const payUnit = params.payUnit ??
+    (params.payMin !== undefined || params.sort === "pay_high" || params.sort === "pay_low"
+      ? "hour"
+      : undefined);
+  const effectiveParams = { ...params, page, payUnit };
+
   if (!isSupabaseConfigured()) {
     assertMockJobsAllowed("searchApprovedJobs");
-    return filterAndSortMockJobs(params);
+    const jobs = filterAndSortMockJobs(effectiveParams);
+    const from = (page - 1) * 20;
+    return {
+      jobs: jobs.slice(from, from + 20),
+      page,
+      hasNext: jobs.length > from + 20,
+    };
   }
 
   try {
     const supabase = await createSupabaseServerClient();
-    let query = supabase
-      .from("public_job_listings")
-      .select(PUBLIC_JOB_SELECT)
-      .eq("moderation_status", "approved");
-
-    if (params.city) query = query.eq("city", params.city);
-    if (params.category) query = query.eq("category", params.category);
-    if (params.jobType) query = query.eq("job_type", params.jobType);
-    if (params.languageRequirement) {
-      query = query.eq("language_requirement", params.languageRequirement);
-    }
-    if (params.payMin !== undefined) {
-      query = query.gte("pay_max", params.payMin);
-    }
-    if (params.q) {
-      const term = escapeIlike(params.q);
-      query = query.or(
-        `title.ilike.%${term}%,company_name.ilike.%${term}%,` +
-          `description.ilike.%${term}%`,
-      );
-    }
-    switch (params.sort) {
-      case "pay_high":
-        query = query.order("pay_max", { ascending: false });
-        break;
-      case "pay_low":
-        query = query.order("pay_min", { ascending: true });
-        break;
-      case "newest":
-      default:
-        query = query.order("posted_at", { ascending: false });
-        break;
-    }
-
-    const { data, error } = await query;
+    const { data, error } = await supabase.rpc("search_public_jobs", {
+      search_query: params.q ?? null,
+      search_city: params.city ?? null,
+      search_category: params.category ?? null,
+      search_job_type: params.jobType ?? null,
+      search_language_requirement: params.languageRequirement ?? null,
+      search_pay_unit: payUnit ?? null,
+      search_pay_min: params.payMin ?? null,
+      search_sort: params.sort ?? "newest",
+      search_page: page,
+    });
     if (error) throw error;
     const rows = (data ?? []) as unknown as PublicJobListingRow[];
-    const jobs = rows.map(mapRow);
-
-    // The public view flattens safe company identity into `company_name`, so the
-    // DB can search all three fields in one OR. Re-check the mapped rows to keep
-    // exact case-insensitive substring semantics aligned with the mock path.
-    const keyword = params.q;
-    return keyword
-      ? jobs.filter((job) => matchesKeyword(job, keyword))
-      : jobs;
+    return {
+      jobs: rows.slice(0, 20).map(mapRow),
+      page,
+      hasNext: rows.length > 20,
+    };
   } catch (err) {
     console.error("[db] searchApprovedJobs failed:", err);
     if (!mayFallbackToMockJobs()) throw err;
     console.warn("[db] searchApprovedJobs falling back to mock data");
-    return filterAndSortMockJobs(params);
+    const jobs = filterAndSortMockJobs(effectiveParams);
+    const from = (page - 1) * 20;
+    return {
+      jobs: jobs.slice(from, from + 20),
+      page,
+      hasNext: jobs.length > from + 20,
+    };
   }
 }

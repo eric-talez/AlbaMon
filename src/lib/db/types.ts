@@ -120,6 +120,10 @@ export interface PublicJobListingRow {
   company_is_verified: boolean;
 }
 
+export interface PublicJobCityRow {
+  city: string;
+}
+
 export interface ApplicationRow {
   id: string;
   job_id: string;

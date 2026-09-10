@@ -386,6 +386,9 @@ export function parseEmployerJobForm(formData: FormData): ValidationResult<Emplo
   if (!city.ok) return city;
   const state = stateValue(formData);
   if (!state.ok) return state;
+  if (state.value !== "CA") {
+    return { ok: false, message: "현재는 캘리포니아 근무지 공고만 등록할 수 있습니다." };
+  }
   const addressDisplayMode = enumValue(
     formData,
     "addressDisplayMode",
@@ -400,6 +403,9 @@ export function parseEmployerJobForm(formData: FormData): ValidationResult<Emplo
   }
   const payMin = parseMoney(formData, "payMin", "최소 급여");
   if (!payMin.ok) return payMin;
+  if (payMin.value <= 0) {
+    return { ok: false, message: "0보다 큰 기본 급여를 입력해 주세요. 팁은 별도입니다." };
+  }
   const payMax = parseMoney(formData, "payMax", "최대 급여");
   if (!payMax.ok) return payMax;
   if (payMax.value < payMin.value) {
@@ -449,11 +455,11 @@ export function parseEmployerJobForm(formData: FormData): ValidationResult<Emplo
       title: title.value,
       category: category.value,
       jobType: jobType.value,
-      city: city.value,
+      city: city.value.replace(/\s+/g, " "),
       state: state.value,
       addressDisplay:
         addressDisplayMode.value === "city_only"
-          ? `${city.value}, ${state.value}`
+          ? `${city.value.replace(/\s+/g, " ")}, ${state.value}`
           : (rawAddress.value as string),
       addressDisplayMode: addressDisplayMode.value,
       payMin: payMin.value,

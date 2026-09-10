@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     template: `%s | ${SITE_NAME}`,
   },
   description:
-    "미국 한인 커뮤니티를 위한 Korean-English bilingual 로컬 구인구직 플랫폼. LA/OC 지역 알바·파트타임·정규직.",
+    "캘리포니아 한인 커뮤니티를 위한 Korean-English bilingual 로컬 구인구직 플랫폼. 알바·파트타임·정규직.",
   openGraph: {
     type: "website",
     siteName: SITE_NAME,

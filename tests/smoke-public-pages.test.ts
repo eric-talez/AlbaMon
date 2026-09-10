@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("next/navigation", () => ({
@@ -16,6 +17,7 @@ vi.mock("@/lib/auth/guards", () => ({
 import { requireUser } from "@/lib/auth/guards";
 import Home from "@/app/(public)/page";
 import JobsPage from "@/app/(public)/jobs/page";
+import { metadata as rootMetadata } from "@/app/layout";
 import JobDetailPage, {
   generateMetadata as generateJobMetadata,
 } from "@/app/(public)/jobs/[id]/page";
@@ -26,6 +28,8 @@ import PrivacyPage from "@/app/(public)/privacy/page";
 import PostingPolicyPage from "@/app/(public)/posting-policy/page";
 import WorkAuthorizationInfoPage from "@/app/(public)/work-authorization-info/page";
 import { getMockJobs } from "@/lib/mock/jobs";
+import { JobFilters } from "@/components/JobFilters";
+import { SiteFooter } from "@/components/SiteFooter";
 
 const mockRequireUser = vi.mocked(requireUser);
 const approvedJob = getMockJobs()[0];
@@ -60,6 +64,13 @@ describe("homepage", () => {
     expect(html).toContain("K-Work US");
     expect(html).toContain('href="/jobs"');
     expect(html).toContain("법률 자문이 아닙니다");
+    expect(html).toContain("California");
+    expect(html).not.toMatch(/LA\s*\/\s*(?:OC|Orange County)/i);
+    expect(rootMetadata.description).toContain("캘리포니아");
+    expect(rootMetadata.description).not.toMatch(/LA\s*\/\s*OC/i);
+    expect(renderToStaticMarkup(createElement(SiteFooter))).not.toMatch(
+      /LA\s*\/\s*(?:OC|Orange County)/i,
+    );
   });
 });
 
@@ -75,6 +86,26 @@ describe("jobs browse page", () => {
     // Explicit label association on the filter controls.
     expect(html).toContain('for="filter-q"');
     expect(html).toContain('id="filter-q"');
+    expect(html).toContain('method="get"');
+    expect(html).toContain('maxLength="200"');
+    expect(html).toContain("San Jose");
+    expect(html).toContain("CA 전체");
+    expect(html).toContain("급여 단위 (Pay unit)");
+    expect(html).toContain('<option value="" selected="">전체 급여 단위</option>');
+  });
+
+  it("preserves filters while resetting pagination on GET submit", () => {
+    const html = renderToStaticMarkup(
+      createElement(JobFilters, {
+        cities: ["Irvine", "San Jose"],
+        values: { q: "서버", city: "Irvine", payUnit: "hour", payMin: 20, page: 2 },
+      }),
+    );
+    expect(html).toContain('value="서버"');
+    expect(html).toContain('<option value="Irvine" selected="">Irvine</option>');
+    expect(html).toContain('<option value="hour" selected="">시급</option>');
+    expect(html).not.toContain('name="page"');
+    expect(html).toContain('href="/jobs"');
   });
 });
 

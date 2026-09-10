@@ -31,7 +31,7 @@ export default async function DashboardPage() {
         >
           <h2 className="font-semibold">공고 둘러보기</h2>
           <p className="mt-1 text-sm text-muted">
-            LA/OC 지역의 승인된 공고를 검색합니다.
+            캘리포니아 지역의 승인된 공고를 검색합니다.
           </p>
         </Link>
 

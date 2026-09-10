@@ -47,7 +47,7 @@ export default async function SeekerApplicationsPage() {
       ) : result.applications.length === 0 ? (
         <section className="mt-6 rounded-xl border border-dashed border-border p-6 text-center">
           <h2 className="font-semibold">아직 제출한 지원서가 없습니다.</h2>
-          <p className="mt-2 text-sm text-muted">관심 있는 LA/OC 채용 공고를 찾아보세요.</p>
+          <p className="mt-2 text-sm text-muted">관심 있는 캘리포니아 채용 공고를 찾아보세요.</p>
           <Link href="/jobs" className="mt-4 inline-block text-sm font-medium text-brand hover:underline">
             채용 공고 보기
           </Link>

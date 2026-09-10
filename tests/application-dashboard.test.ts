@@ -197,4 +197,16 @@ describe("application dashboard access and states", () => {
     expect(employerDashboard).toContain('href: "/employer/applications"');
     expect(employerDashboard).toContain('user.role === "employer"');
   });
+
+  it("uses California-wide job discovery copy in seeker dashboards", async () => {
+    const seekerDashboard = readFileSync(
+      join(process.cwd(), "src", "app", "dashboard", "page.tsx"),
+      "utf8",
+    );
+    const applicationsHtml = renderToStaticMarkup(await SeekerApplicationsPage());
+
+    expect(seekerDashboard).toContain("캘리포니아 지역의 승인된 공고");
+    expect(applicationsHtml).toContain("캘리포니아 채용 공고");
+    expect(`${seekerDashboard}\n${applicationsHtml}`).not.toMatch(/LA\s*\/\s*OC/i);
+  });
 });

@@ -96,6 +96,32 @@ describe("job form validation", () => {
     expect(parseEmployerJobForm(form)).toMatchObject({ ok: false });
   });
 
+  it("allows only California job locations and normalizes city whitespace", () => {
+    const outsideCalifornia = validJobForm();
+    outsideCalifornia.set("state", "NV");
+    expect(parseEmployerJobForm(outsideCalifornia)).toEqual({
+      ok: false,
+      message: "현재는 캘리포니아 근무지 공고만 등록할 수 있습니다.",
+    });
+
+    const california = validJobForm();
+    california.set("city", "  Los   Angeles  ");
+    expect(parseEmployerJobForm(california)).toMatchObject({
+      ok: true,
+      value: { city: "Los Angeles", addressDisplay: "Los Angeles, CA" },
+    });
+  });
+
+  it("requires positive base pay independently of tips", () => {
+    const form = validJobForm();
+    form.set("payMin", "0");
+    form.set("tipsAvailable", "on");
+    expect(parseEmployerJobForm(form)).toEqual({
+      ok: false,
+      message: "0보다 큰 기본 급여를 입력해 주세요. 팁은 별도입니다.",
+    });
+  });
+
   it("requires the compliance acknowledgement before submission", () => {
     const form = validJobForm();
     form.delete("complianceAcknowledgement");

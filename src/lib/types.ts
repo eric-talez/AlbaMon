@@ -115,7 +115,7 @@ export interface Job {
   requirements: string[];
   benefits: string[];
   moderationStatus: ModerationStatus;
-  postedAt: string; // ISO date
+  postedAt: string; // ISO timestamp
 }
 
 /* --- Korean-first label maps (bilingual where useful) --- */
