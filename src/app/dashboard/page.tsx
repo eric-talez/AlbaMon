@@ -35,6 +35,16 @@ export default async function DashboardPage() {
           </p>
         </Link>
 
+            <Link
+              href="/dashboard/applications"
+              className="rounded-xl border border-border p-5 transition-colors hover:bg-surface"
+            >
+              <h2 className="font-semibold">내 지원 현황</h2>
+              <p className="mt-1 text-sm text-muted">
+                제출한 지원서와 현재 상태를 확인합니다.
+              </p>
+            </Link>
+
         {user.role !== "seeker" ? (
           <Link
             href={home}
@@ -49,15 +59,6 @@ export default async function DashboardPage() {
           </Link>
         ) : (
           <>
-            <Link
-              href="/dashboard/applications"
-              className="rounded-xl border border-border p-5 transition-colors hover:bg-surface"
-            >
-              <h2 className="font-semibold">내 지원 현황</h2>
-              <p className="mt-1 text-sm text-muted">
-                제출한 지원서와 현재 상태를 확인합니다.
-              </p>
-            </Link>
             <Link
               href="/employer/request-access"
               className="rounded-xl border border-border p-5 transition-colors hover:bg-surface"

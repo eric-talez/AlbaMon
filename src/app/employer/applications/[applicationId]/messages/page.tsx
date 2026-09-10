@@ -1,7 +1,8 @@
+import { normalizePage } from "@/lib/pagination";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireRole } from "@/lib/auth/guards";
+import { requireUser } from "@/lib/auth/guards";
 import { getApplicationThread } from "@/lib/db/messages";
 import { MessageThread } from "@/components/applications/MessageThread";
 import { sendEmployerApplicationMessage } from "./actions";
@@ -10,14 +11,17 @@ export const metadata: Metadata = { title: "지원자 메시지" };
 
 export default async function EmployerApplicationMessagesPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ applicationId: string }>;
+  searchParams?: Promise<{ page?: string | string[] }>;
 }) {
   const { applicationId } = await params;
+  const page = normalizePage((await searchParams)?.page);
   const path = `/employer/applications/${encodeURIComponent(applicationId)}/messages`;
-  const user = await requireRole("employer", path);
-  const result = await getApplicationThread(applicationId, user.id);
-  if (result.status === "not_allowed") notFound();
+  const user = await requireUser(path);
+  const result = await getApplicationThread(applicationId, user.id, page);
+  if (result.status === "not_allowed" || (result.status === "ok" && !["employer", "admin"].includes(result.thread.participantSide))) notFound();
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10">
@@ -43,6 +47,9 @@ export default async function EmployerApplicationMessagesPage({
           <MessageThread
             applicationId={result.thread.applicationId}
             messages={result.thread.messages}
+            page={page}
+            hasOlder={result.thread.hasOlder}
+            canSend={result.thread.participantSide !== "admin"}
             sendAction={sendEmployerApplicationMessage}
           />
         </>

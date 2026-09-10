@@ -1,32 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("@/lib/auth/guards", () => ({ requireRole: vi.fn() }));
+vi.mock("@/lib/auth/guards", () => ({ requireUser: vi.fn() }));
 vi.mock("@/lib/db/messages", () => ({ sendApplicationMessage: vi.fn() }));
 vi.mock("@/lib/notifications/dev", () => ({ notifyNewMessage: vi.fn() }));
 
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth/guards";
+import { requireUser } from "@/lib/auth/guards";
 import { sendApplicationMessage } from "@/lib/db/messages";
 import { notifyNewMessage } from "@/lib/notifications/dev";
 import { sendSeekerApplicationMessage } from "@/app/dashboard/applications/[applicationId]/messages/actions";
 import { sendEmployerApplicationMessage } from "@/app/employer/applications/[applicationId]/messages/actions";
 
-const mockRequireRole = vi.mocked(requireRole);
+const mockRequireUser = vi.mocked(requireUser);
 const mockSend = vi.mocked(sendApplicationMessage);
 const mockNotify = vi.mocked(notifyNewMessage);
 const applicationId = "11111111-1111-4111-8111-111111111111";
 const idle = { status: "idle", message: "" } as const;
 
 beforeEach(() => {
-  mockRequireRole.mockImplementation(async (role) => ({
-    id: `${role}-1`,
-    email: `${role}@example.com`,
-    role,
-    isDev: false,
-    aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
-  }));
-  mockSend.mockResolvedValue({ status: "sent", messageId: "message-1" });
+  mockRequireUser.mockResolvedValue({id:"promoted-1",email:"user@example.com",role:"employer",isDev:false,aal:"aal1",accountStatus:"active",displayName:null});
+  mockSend.mockResolvedValue({ status: "sent", messageId: "message-1", recipientId:"owner-1", recipientSide:"employer" });
 });
 
 afterEach(() => vi.clearAllMocks());
@@ -40,27 +34,25 @@ function form(body = " Hello ", id = applicationId): FormData {
 }
 
 describe("application message actions", () => {
-  it("reauthenticates seeker, derives sender identity, notifies, and refreshes both views", async () => {
+  it("reauthenticates a promoted applicant, derives sender identity, notifies, and refreshes both views", async () => {
     const result = await sendSeekerApplicationMessage(idle, form());
-    expect(mockRequireRole).toHaveBeenCalledWith(
-      "seeker",
-      `/dashboard/applications/${applicationId}/messages`,
+    expect(mockRequireUser).toHaveBeenCalledWith(
+      "/dashboard/applications",
     );
-    expect(mockSend).toHaveBeenCalledWith(applicationId, "seeker-1", "Hello");
-    expect(mockNotify).toHaveBeenCalledWith(applicationId, "message-1", "seeker");
+    expect(mockSend).toHaveBeenCalledWith(applicationId, "promoted-1", "Hello");
+    expect(mockNotify).toHaveBeenCalledWith(applicationId, "message-1", "owner-1", "employer");
     expect(revalidatePath).toHaveBeenCalledWith(`/dashboard/applications/${applicationId}/messages`);
     expect(revalidatePath).toHaveBeenCalledWith(`/employer/applications/${applicationId}/messages`);
     expect(result.status).toBe("success");
   });
 
-  it("uses the exact employer role and employer-derived sender", async () => {
+  it("uses the same caller-bound action from the employer route", async () => {
     await sendEmployerApplicationMessage(idle, form("Reply"));
-    expect(mockRequireRole).toHaveBeenCalledWith(
-      "employer",
-      `/employer/applications/${applicationId}/messages`,
+    expect(mockRequireUser).toHaveBeenCalledWith(
+      "/dashboard/applications",
     );
-    expect(mockSend).toHaveBeenCalledWith(applicationId, "employer-1", "Reply");
-    expect(mockNotify).toHaveBeenCalledWith(applicationId, "message-1", "employer");
+    expect(mockSend).toHaveBeenCalledWith(applicationId, "promoted-1", "Reply");
+    expect(mockNotify).toHaveBeenCalledWith(applicationId, "message-1", "owner-1", "employer");
   });
 
   it("rejects invalid IDs and blank or oversized bodies before writing", async () => {

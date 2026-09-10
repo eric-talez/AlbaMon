@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useTransition } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ApplicationMessage } from "@/lib/db/messages";
 import type { MessageFormState } from "@/lib/messages/action";
 
@@ -11,32 +13,49 @@ function formatMessageTime(value: string): string {
   return Number.isNaN(date.getTime())
     ? "시간 정보 없음"
     : new Intl.DateTimeFormat("ko-KR", {
+        timeZone: "America/Los_Angeles",
         dateStyle: "medium",
         timeStyle: "short",
-      }).format(date);
+      }).format(date) + " PT";
 }
 
 export function MessageThread({
   applicationId,
   messages,
+  page,
+  hasOlder,
+  canSend,
   sendAction,
 }: {
   applicationId: string;
   messages: ApplicationMessage[];
+  page: number;
+  hasOlder: boolean;
+  canSend: boolean;
   sendAction: (
     previousState: MessageFormState,
     formData: FormData,
   ) => Promise<MessageFormState>;
 }) {
   const [state, formAction, pending] = useActionState(sendAction, INITIAL_STATE);
+  const router = useRouter();
+  const [refreshing, startRefresh] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (state.status === "success") formRef.current?.reset();
-  }, [state.status]);
+  }, [state]);
 
   return (
     <>
+      <div className="mt-4 flex items-center gap-4 text-sm">
+        <button type="button" disabled={refreshing} onClick={() => startRefresh(() => router.refresh())} className="rounded-full border border-border px-4 py-2 disabled:opacity-60">새로고침 / Refresh</button>
+        <span className="text-muted">새 메시지는 새로고침하여 확인하세요. / Refresh to check for replies.</span>
+      </div>
+      <nav className="mt-4 flex gap-4 text-sm text-brand" aria-label="메시지 페이지 / Message pages">
+        {hasOlder ? <Link href={`?page=${page + 1}`}>이전 메시지 / Older messages</Link> : null}
+        {page > 1 ? <Link href={`?page=${page - 1}`}>최근 메시지 / Newer messages</Link> : null}
+      </nav>
       {messages.length === 0 ? (
         <section className="mt-6 rounded-xl border border-dashed border-border p-6 text-center">
           <h2 className="font-semibold">아직 메시지가 없습니다.</h2>
@@ -66,7 +85,7 @@ export function MessageThread({
         </ol>
       )}
 
-      <form ref={formRef} action={formAction} className="mt-6 rounded-xl border border-border bg-surface p-5">
+      {canSend ? <form ref={formRef} action={formAction} className="mt-6 rounded-xl border border-border bg-surface p-5">
         <input type="hidden" name="applicationId" value={applicationId} />
         <label htmlFor="message-body" className="text-sm font-semibold">새 메시지</label>
         <textarea
@@ -93,7 +112,7 @@ export function MessageThread({
         >
           {pending ? "전송 중…" : "메시지 보내기"}
         </button>
-      </form>
+      </form> : <p className="mt-6 text-sm text-muted">관리자 읽기 전용 / Admin read only</p>}
     </>
   );
 }

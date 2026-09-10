@@ -1,7 +1,5 @@
 import "server-only";
 
-import type { Role } from "@/lib/types";
-
 export type DevNotificationEvent =
   | {
       type: "application_submitted";
@@ -19,6 +17,7 @@ export type DevNotificationEvent =
       type: "new_message";
       applicationId: string;
       messageId: string;
+      recipientId: string;
       audience: "seeker" | "employer";
     };
 
@@ -61,12 +60,14 @@ export function notifyApplicationStatusChanged(
 export function notifyNewMessage(
   applicationId: string,
   messageId: string,
-  senderRole: Extract<Role, "seeker" | "employer">,
+  recipientId: string,
+  recipientSide: "applicant" | "employer",
 ): DevNotificationResult {
   return emitDevNotification({
     type: "new_message",
     applicationId,
     messageId,
-    audience: senderRole === "seeker" ? "employer" : "seeker",
+    recipientId,
+    audience: recipientSide === "applicant" ? "seeker" : "employer",
   });
 }

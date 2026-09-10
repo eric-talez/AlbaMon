@@ -13,12 +13,12 @@ const mockClient = vi.mocked(createSupabaseServerClient);
 // maybeSingle() with a queued result. Mirrors the supabase-js fluent surface
 // used by updateApplicationStatus (select/update -> eq -> [select] -> maybeSingle).
 function makeClient(queue: Array<{ data: unknown; error: unknown }>) {
-  const calls: Array<{ op: "select" | "update"; payload?: unknown }> = [];
+  const calls: Array<{ op: "select" | "update" | "eq"; payload?: unknown }> = [];
   let i = 0;
   function chain(op: "select" | "update", payload?: unknown) {
     calls.push({ op, payload });
     const node: Record<string, unknown> = {
-      eq: () => node,
+      eq: (...args: unknown[]) => { calls.push({op: "eq", payload: args}); return node; },
       select: () => node,
       maybeSingle: async () => queue[i++] ?? { data: null, error: null },
     };
@@ -52,14 +52,14 @@ afterEach(() => {
 describe("updateApplicationStatus", () => {
   it("reads the prior status, writes only status, and returns the transition", async () => {
     const { client, calls } = makeClient([
-      { data: { status: "submitted" }, error: null },
+      { data: { status: "submitted", updated_at: "2026-09-09T01:02:03.123456Z" }, error: null },
       { data: { id: "application-1" }, error: null },
     ]);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockClient.mockResolvedValue(client as any);
 
     await expect(
-      updateApplicationStatus("application-1", "interview"),
+      updateApplicationStatus("application-1", "interview", "2026-09-09T01:02:03.123456Z"),
     ).resolves.toEqual({
       status: "updated",
       previousStatus: "submitted",
@@ -68,6 +68,7 @@ describe("updateApplicationStatus", () => {
 
     const update = calls.find((c) => c.op === "update");
     expect(update?.payload).toEqual({ status: "interview" });
+    expect(calls).toContainEqual({op: "eq", payload: ["updated_at", "2026-09-09T01:02:03.123456Z"]});
   });
 
   it("resolves not_found when the caller cannot see the application", async () => {
@@ -76,49 +77,49 @@ describe("updateApplicationStatus", () => {
     mockClient.mockResolvedValue(client as any);
 
     await expect(
-      updateApplicationStatus("application-2", "reviewing"),
+      updateApplicationStatus("application-2", "reviewing", "2026-09-09T01:02:03.123456Z"),
     ).resolves.toEqual({ status: "not_found" });
   });
 
   it("maps RLS/check violations on update to not_allowed", async () => {
     for (const code of ["42501", "23514", "23503"]) {
       const { client } = makeClient([
-        { data: { status: "submitted" }, error: null },
+        { data: { status: "submitted", updated_at: "2026-09-09T01:02:03.123456Z" }, error: null },
         { data: null, error: { code } },
       ]);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       mockClient.mockResolvedValue(client as any);
 
       await expect(
-        updateApplicationStatus("application-3", "offered"),
+        updateApplicationStatus("application-3", "offered", "2026-09-09T01:02:03.123456Z"),
       ).resolves.toEqual({ status: "not_allowed" });
     }
   });
 
-  it("treats a zero-row update (filtered by RLS) as not_allowed", async () => {
+  it("treats a zero-row update after a visible read as conflict", async () => {
     const { client } = makeClient([
-      { data: { status: "submitted" }, error: null },
+      { data: { status: "submitted", updated_at: "2026-09-09T01:02:03.123456Z" }, error: null },
       { data: null, error: null },
     ]);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockClient.mockResolvedValue(client as any);
 
     await expect(
-      updateApplicationStatus("application-4", "rejected"),
-    ).resolves.toEqual({ status: "not_allowed" });
+      updateApplicationStatus("application-4", "rejected", "2026-09-09T01:02:03.123456Z"),
+    ).resolves.toEqual({ status: "conflict" });
   });
 
   it("returns error on an unexpected database failure", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const { client } = makeClient([
-      { data: { status: "submitted" }, error: null },
+      { data: { status: "submitted", updated_at: "2026-09-09T01:02:03.123456Z" }, error: null },
       { data: null, error: { code: "XX000" } },
     ]);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockClient.mockResolvedValue(client as any);
 
     await expect(
-      updateApplicationStatus("application-5", "reviewing"),
+      updateApplicationStatus("application-5", "reviewing", "2026-09-09T01:02:03.123456Z"),
     ).resolves.toEqual({ status: "error" });
   });
 
@@ -127,7 +128,7 @@ describe("updateApplicationStatus", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "your-anon-key");
 
     await expect(
-      updateApplicationStatus("application-6", "reviewing"),
+      updateApplicationStatus("application-6", "reviewing", "2026-09-09T01:02:03.123456Z"),
     ).resolves.toEqual({ status: "unavailable" });
     expect(mockClient).not.toHaveBeenCalled();
   });

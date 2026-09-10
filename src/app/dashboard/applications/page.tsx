@@ -1,7 +1,10 @@
+import { normalizePage } from "@/lib/pagination";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireRole } from "@/lib/auth/guards";
+import { requireUser } from "@/lib/auth/guards";
 import { getSeekerApplications } from "@/lib/db/applications";
+import { WithdrawApplicationControl } from "@/components/applications/WithdrawApplicationControl";
+import { withdrawOwnApplication } from "./actions";
 import { APPLICATION_STATUS_LABELS } from "@/lib/types";
 
 export const metadata: Metadata = { title: "내 지원 내역" };
@@ -9,7 +12,7 @@ export const metadata: Metadata = { title: "내 지원 내역" };
 function formatSubmittedAt(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "날짜 정보 없음";
-  return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium" }).format(date);
+  return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeZone: "America/Los_Angeles" }).format(date) + " PT";
 }
 
 function statusLabel(status: string): string {
@@ -19,9 +22,10 @@ function statusLabel(status: string): string {
   );
 }
 
-export default async function SeekerApplicationsPage() {
-  await requireRole("seeker", "/dashboard/applications");
-  const result = await getSeekerApplications();
+export default async function SeekerApplicationsPage({ searchParams }: { searchParams?: Promise<{ page?: string | string[] }> } = {}) {
+  const page = normalizePage((await searchParams)?.page);
+  await requireUser("/dashboard/applications");
+  const result = await getSeekerApplications(page);
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
@@ -83,6 +87,9 @@ export default async function SeekerApplicationsPage() {
                 </div>
               ) : null}
 
+              {["submitted", "reviewing", "interview", "offered"].includes(application.status) ? (
+                <WithdrawApplicationControl applicationId={application.id} expectedUpdatedAt={application.applicationUpdatedAt} withdrawAction={withdrawOwnApplication} />
+              ) : null}
               <div className="mt-4 flex flex-wrap gap-4 border-t border-border pt-4 text-sm">
                 {application.jobIsPublic ? (
                   <Link
@@ -105,6 +112,10 @@ export default async function SeekerApplicationsPage() {
           ))}
         </ul>
       )}
+      <nav className="mt-6 flex gap-4 text-sm text-brand" aria-label="지원 목록 페이지 / Application pages">
+        {page > 1 ? <Link href={`?page=${page - 1}`}>이전 / Previous</Link> : null}
+        {result.status === "ok" && result.hasNext ? <Link href={`?page=${page + 1}`}>다음 / Next</Link> : null}
+      </nav>
     </main>
   );
 }

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth/guards";
+import { requireUser } from "@/lib/auth/guards";
 import { sendApplicationMessage } from "@/lib/db/messages";
 import { notifyNewMessage } from "@/lib/notifications/dev";
 
@@ -10,21 +10,14 @@ export interface MessageFormState {
   message: string;
 }
 
-type ParticipantRole = "seeker" | "employer";
-
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export async function sendMessageForRole(
-  role: ParticipantRole,
-  basePath: "/dashboard/applications" | "/employer/applications",
+export async function sendMessageForParticipant(
   formData: FormData,
 ): Promise<MessageFormState> {
   const applicationId = formData.get("applicationId");
-  const threadPath = typeof applicationId === "string" && UUID_PATTERN.test(applicationId)
-    ? `${basePath}/${applicationId}/messages`
-    : basePath;
-  const user = await requireRole(role, threadPath);
+  const user = await requireUser("/dashboard/applications");
 
   const bodyValue = formData.get("body");
   if (typeof applicationId !== "string" || !UUID_PATTERN.test(applicationId)) {
@@ -46,7 +39,7 @@ export async function sendMessageForRole(
     // Best-effort dev notification: a notify failure must never turn a
     // successfully sent message into an error for the user.
     try {
-      notifyNewMessage(applicationId, result.messageId, role);
+      notifyNewMessage(applicationId, result.messageId, result.recipientId, result.recipientSide);
     } catch (err) {
       console.error("[notification] new_message failed:", err);
     }

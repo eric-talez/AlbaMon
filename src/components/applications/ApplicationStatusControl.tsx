@@ -3,10 +3,11 @@
 import { useActionState } from "react";
 import type { ApplicationStatusFormState } from "@/lib/applications/status-action";
 import {
-  APPLICATION_STATUSES,
   APPLICATION_STATUS_LABELS,
   type ApplicationStatus,
 } from "@/lib/types";
+
+import { EMPLOYER_APPLICATION_STATUSES, canEmployerChangeStatus } from "@/lib/applications/status";
 
 const INITIAL_STATE: ApplicationStatusFormState = { status: "idle", message: "" };
 
@@ -18,10 +19,12 @@ const INITIAL_STATE: ApplicationStatusFormState = { status: "idle", message: "" 
 export function ApplicationStatusControl({
   applicationId,
   currentStatus,
+  expectedUpdatedAt,
   updateAction,
 }: {
   applicationId: string;
   currentStatus: string;
+  expectedUpdatedAt: string;
   updateAction: (
     previousState: ApplicationStatusFormState,
     formData: FormData,
@@ -30,11 +33,14 @@ export function ApplicationStatusControl({
   const [state, formAction, pending] = useActionState(updateAction, INITIAL_STATE);
 
   // Fall back to the seeker's initial state if the stored value is unknown.
-  const selectedStatus = (APPLICATION_STATUSES as readonly string[]).includes(
+  const selectedStatus = (EMPLOYER_APPLICATION_STATUSES as readonly string[]).includes(
     currentStatus,
   )
     ? (currentStatus as ApplicationStatus)
     : "submitted";
+  if (!canEmployerChangeStatus(currentStatus as ApplicationStatus, "reviewing")) {
+    return <p className="mt-4 text-sm text-muted">지원자가 철회한 지원서입니다. / Withdrawn by the applicant.</p>;
+  }
   const selectId = `application-status-${applicationId}`;
 
   return (
@@ -44,6 +50,7 @@ export function ApplicationStatusControl({
       aria-label="지원 상태 변경"
     >
       <input type="hidden" name="applicationId" value={applicationId} />
+      <input type="hidden" name="expectedUpdatedAt" value={expectedUpdatedAt} />
       <label htmlFor={selectId} className="text-sm font-semibold">
         지원 상태 변경
       </label>
@@ -51,10 +58,11 @@ export function ApplicationStatusControl({
         <select
           id={selectId}
           name="status"
+          key={currentStatus}
           defaultValue={selectedStatus}
           className="w-full rounded-xl border border-border bg-background p-2 text-sm outline-none focus:border-brand sm:w-auto"
         >
-          {APPLICATION_STATUSES.map((status) => (
+          {EMPLOYER_APPLICATION_STATUSES.map((status) => (
             <option key={status} value={status}>
               {APPLICATION_STATUS_LABELS[status]}
             </option>

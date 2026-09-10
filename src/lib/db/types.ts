@@ -145,6 +145,8 @@ export interface MessageRow {
 }
 
 export interface ApplicationThreadContextRow {
+  participant_side: "applicant" | "employer" | "admin";
+  recipient_id: string | null;
   application_id: string;
   job_id: string;
   job_title: string;
@@ -164,6 +166,7 @@ export interface SeekerApplicationListingRow {
   cover_note: string | null;
   submitted_at: string;
   job_is_public: boolean;
+  application_updated_at: string;
 }
 
 /** Row returned by the employer-owned application listing RPC. */
@@ -178,6 +181,7 @@ export interface EmployerApplicationListingRow {
   cover_note: string | null;
   submitted_at: string;
   job_is_public: boolean;
+  application_updated_at: string;
 }
 
 export interface ReportRow {
