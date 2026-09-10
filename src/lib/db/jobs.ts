@@ -320,6 +320,19 @@ function sortJobs(jobs: Job[], sort: JobSort | undefined): Job[] {
   return sorted;
 }
 
+function mockSearchResult(
+  params: JobSearchParams,
+  page: number,
+): JobSearchResult {
+  const jobs = filterAndSortMockJobs(params);
+  const from = (page - 1) * 20;
+  return {
+    jobs: jobs.slice(from, from + 20),
+    page,
+    hasNext: jobs.length > from + 20,
+  };
+}
+
 /**
  * Approved jobs matching `params` for the public board.
  *
@@ -349,13 +362,7 @@ export async function searchApprovedJobs(
 
   if (!isSupabaseConfigured()) {
     assertMockJobsAllowed("searchApprovedJobs");
-    const jobs = filterAndSortMockJobs(effectiveParams);
-    const from = (page - 1) * 20;
-    return {
-      jobs: jobs.slice(from, from + 20),
-      page,
-      hasNext: jobs.length > from + 20,
-    };
+    return mockSearchResult(effectiveParams, page);
   }
 
   try {
@@ -382,12 +389,6 @@ export async function searchApprovedJobs(
     console.error("[db] searchApprovedJobs failed:", err);
     if (!mayFallbackToMockJobs()) throw err;
     console.warn("[db] searchApprovedJobs falling back to mock data");
-    const jobs = filterAndSortMockJobs(effectiveParams);
-    const from = (page - 1) * 20;
-    return {
-      jobs: jobs.slice(from, from + 20),
-      page,
-      hasNext: jobs.length > from + 20,
-    };
+    return mockSearchResult(effectiveParams, page);
   }
 }

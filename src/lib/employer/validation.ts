@@ -449,17 +449,22 @@ export function parseEmployerJobForm(formData: FormData): ValidationResult<Emplo
     };
   }
 
+  const normalizedCity = city.value.replace(/\s+/g, " ");
+  const isKoreatownAlias =
+    normalizedCity.toLowerCase() === "los angeles (koreatown)";
+  const canonicalCity = isKoreatownAlias ? "Los Angeles" : normalizedCity;
+
   return {
     ok: true,
     value: {
       title: title.value,
       category: category.value,
       jobType: jobType.value,
-      city: city.value.replace(/\s+/g, " "),
+      city: canonicalCity,
       state: state.value,
       addressDisplay:
         addressDisplayMode.value === "city_only"
-          ? `${city.value.replace(/\s+/g, " ")}, ${state.value}`
+          ? `${isKoreatownAlias ? "Koreatown, " : ""}${canonicalCity}, ${state.value}`
           : (rawAddress.value as string),
       addressDisplayMode: addressDisplayMode.value,
       payMin: payMin.value,

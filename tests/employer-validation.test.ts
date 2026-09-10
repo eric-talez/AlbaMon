@@ -112,6 +112,19 @@ describe("job form validation", () => {
     });
   });
 
+  it("canonicalizes the known Koreatown city alias and retains the neighborhood", () => {
+    const form = validJobForm();
+    form.set("city", "Los Angeles (Koreatown)");
+
+    expect(parseEmployerJobForm(form)).toMatchObject({
+      ok: true,
+      value: {
+        city: "Los Angeles",
+        addressDisplay: "Koreatown, Los Angeles, CA",
+      },
+    });
+  });
+
   it("requires positive base pay independently of tips", () => {
     const form = validJobForm();
     form.set("payMin", "0");

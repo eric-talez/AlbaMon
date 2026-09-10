@@ -105,3 +105,22 @@ Applied the implementer template, TDD, writing-good-tests, systematic debugging,
 ## Commit
 
 Selected-file commit message: `feat: support California search with consistent pay and pagination`. The immutable hash is reported to the controller after creation.
+
+## Review fix round 1
+
+Addressed both Important findings from `task-5-review.md` without taking the separately ledgered minor work.
+
+- Added a focused parser regression for the approved known alias `Los Angeles (Koreatown)`. RED returned city `Los Angeles (Koreatown)` and address `Los Angeles (Koreatown), CA` (1 failed / 31 passed). The parser now canonicalizes only this known alias to city `Los Angeles` and retains its neighborhood as `Koreatown, Los Angeles, CA` for city-only display. It does not rewrite arbitrary city names or hosted rows.
+- Extracted the repeated mock filtering, offset, 20-row slice, page, and `hasNext` calculation into local `mockSearchResult`. Both the unconfigured path and permitted development error fallback call the same helper; database paging remains unchanged.
+
+Fresh fix verification, all with the required Node 22 PATH:
+
+| Command | Actual result |
+| --- | --- |
+| `npm test -- tests/employer-validation.test.ts` (RED) | exit 1; 1 failed, 31 passed; exact known alias remained split |
+| `npm test -- tests/employer-validation.test.ts tests/job-search.test.ts` (GREEN) | exit 0; 2 files, 61 tests passed |
+| `npm run typecheck` | exit 0; no errors |
+| `npm run lint` | exit 0; no warnings/errors |
+| `git diff --check` | run after staging; result recorded in the controller handoff |
+
+Fix self-review confirmed the alias match is deliberately limited to the one approved case (case-insensitive after existing whitespace normalization), full-address mode still preserves employer-provided detail, city-only mode retains Koreatown in `addressDisplay`, and both mock fallback branches now have one result computation. No migration, database, browser, authentication, production fallback policy, or ledgered minor behavior changed. Per the fix brief, full DB/browser suites were not rerun for these isolated parser/local-helper changes.
