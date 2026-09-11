@@ -219,7 +219,7 @@ function checkDocCrossLinks() {
 function checkNoSecretShapedValues() {
   const docsDir = join(root, "docs");
   if (!existsSync(docsDir)) return ["docs/ directory missing"];
-  const files = readdirSync(docsDir)
+  const files = readdirSync(docsDir, { recursive: true })
     .filter((name) => name.endsWith(".md"))
     .map((name) => join("docs", name));
   for (const extra of ["README.md", ".env.example", "supabase/config.toml"]) {

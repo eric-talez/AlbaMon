@@ -1,4 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "crons": [{ "path": "/api/internal/notifications", "schedule": "* * * * *" }]
+  "crons": [
+    {
+      "path": "/api/internal/notifications",
+      "schedule": "* * * * *"
+    }
+  ],
+  "buildCommand": "npm run build:release"
 }

@@ -7,6 +7,7 @@ import { getSiteUrl } from "@/lib/site";
  * additionally opt out via per-page `robots: { index: false }` metadata.
  */
 export default function robots(): MetadataRoute.Robots {
+  if (process.env.NEXT_PUBLIC_INDEXING_ENABLED === "false") return { rules: { userAgent: "*", disallow: "/" } };
   return {
     rules: {
       userAgent: "*",

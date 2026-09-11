@@ -1,7 +1,9 @@
+> Historical reference. [California deployment](DEPLOYMENT.md) and [launch checklist](LAUNCH_CHECKLIST.md) govern current public release; no old beta exception waives a gate.
+
 # Beta Readiness Runbook — K-Work US
 
 How to verify, in order, that a deployed K-Work US instance is ready for the
-first small private beta (LA/OC). Companion docs:
+historical private beta (superseded by the California public-launch design). Companion docs:
 [`DEPLOYMENT.md`](DEPLOYMENT.md) is *how to set everything up*,
 [`LAUNCH_CHECKLIST.md`](LAUNCH_CHECKLIST.md) is *what must be true* (and the
 sign-off of record), [`PRODUCTION_ENV_VARS.md`](PRODUCTION_ENV_VARS.md) is the
@@ -86,7 +88,7 @@ in [`LAUNCH_CHECKLIST.md §2`](LAUNCH_CHECKLIST.md#2-supabase-setup--migrations)
 Rehearse the identical flow locally first ([`LOCAL_SUPABASE.md`](LOCAL_SUPABASE.md))
 — same migrations, seed expectations, and admin-promotion SQL, zero blast radius.
 
-- [ ] Project region suits LA/OC users (e.g. `us-west-1`).
+- [ ] Actual project region is recorded for California users (e.g. `us-west-1`).
 - [ ] Auth URL configuration (Dashboard → Authentication → URL Configuration):
       Site URL = production domain; redirect URLs include `/auth/callback`.
 - [ ] Email confirmation setting reviewed (Authentication → Providers → Email)
@@ -353,13 +355,13 @@ the sign-off of record; this one is the execution summary feeding it.
 | CI green + `npm run verify:beta` pass on the release commit | §2 | ☐ | Hard |
 | Required env vars set and valid, no placeholder fragments | §3 | ☐ | Hard |
 | Supabase configured (auth URLs, backups) | §4 | ☐ | Hard |
-| All 10 migrations verified (incl. explicit API-role grants) | §5 | ☐ | Hard |
+| All current migrations verified against remote history | §5 | ☐ | Hard |
 | Zero seed/demo data (users, companies, jobs, applications, messages, reports) | §6 | ☐ | Hard |
 | Founding admin verified; no unintended admins | §7 | ☐ | Hard |
 | Public visibility invariant (approved-only) proven | §9 | ☐ | Hard |
 | Role guards hold for all roles | §10–§13 | ☐ | Hard |
 | Mobile/desktop QA passed | §14 | ☐ | Hard |
-| Attorney review of legal copy | §15 | ☐ | Conditional — accepted-pending for private beta; hard blocker for public launch |
+| Attorney review of legal copy | §15 | ☐ | Hard blocker for public launch |
 
 Any unchecked **Hard** row = **no-go**. Conditional rows must either pass or
 be explicitly accepted (name + date) with their scope limitation enforced.

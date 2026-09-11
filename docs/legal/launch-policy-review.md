@@ -69,7 +69,10 @@ Migration `20260909000710_policy_publication_identity.sql` adds nullable
 `profiles.policy_identity` and `jobs.posting_policy_identity`, without defaults
 or backfill. It initializes the singleton `policy_publication` pointer only to
 `draft:23194732385dbc6318df4713775a0ae2ce482e69cd45324ca94d95beb9d821f7`, the initial
-checked-in draft. Existing rows remain unacknowledged. The public, read-only RPC
+checked-in draft. Existing rows remain unacknowledged. Fresh local/CI setup uses
+`npm run setup:local-policy` to advance only that initial pointer when the current
+bundle changes; it refuses any different already transitioned pointer. Never
+rewrite this historical seed or manufacture acceptance to make setup pass. The public, read-only RPC
 `current_policy_identity()` reports the pointer. For local initial setup, apply
 00710 only to the owned disposable stack and compare that RPC with the bundled
 `policyAcceptanceIdentity()`; no final facts, acceptance or review is implied.
@@ -96,7 +99,9 @@ Before a real reviewed activation:
    import { createClient } from "@supabase/supabase-js";
    import { policyAcceptanceIdentity } from "./src/lib/policy-publication.mjs";
    import { checkReleaseSettings } from "./scripts/check-release-env.mjs";
+   import { checkDeployTarget } from "./scripts/check-deploy-target.mjs";
    checkReleaseSettings(process.env); // real reviewed bundle + existing settings
+   checkDeployTarget(process.env.EMAIL_ENVIRONMENT, process.env); // exact selected DB/origin/indexing/mail mapping
    const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL,
      process.env.SUPABASE_SERVICE_ROLE_KEY,
      { auth: { persistSession: false, autoRefreshToken: false } });

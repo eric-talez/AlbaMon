@@ -67,6 +67,14 @@ jobs:
       - name: Reset isolated local database
         run: supabase db reset --local
 
+      - name: Align fresh local database with the current policy bundle
+        run: npm run setup:local-policy
+
+      - name: Offline launch documentation checks
+        run: |
+          npm run verify:beta
+          npm run verify:local-supabase
+
       - name: Live database authorization matrix
         run: npm run test:db
 

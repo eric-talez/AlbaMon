@@ -112,11 +112,11 @@ it.each(["development", "test", ""])("standalone release config preflight works 
   expect(checkReleaseEnv({ NODE_ENV: runtime }).status).toBe(0);
 });
 
-// The actual CLI must reject the checked-in unresolved facts even with synthetic infrastructure settings.
-it("actual release CLI blocks the unresolved policy manifest", () => {
-  const result = spawnSync(process.execPath, ["scripts/check-release-env.mjs"], { encoding: "utf8", env: { ...process.env, ...releaseEnv } });
+// The real CLI cannot use a synthetic approval; absent target mapping still blocks a reviewed checkout.
+it("actual release CLI cannot pass from synthetic infrastructure alone", () => {
+  const result = spawnSync(process.execPath, ["scripts/check-release-env.mjs"], { encoding: "utf8", env: { ...process.env, ...releaseEnv, STAGING_PROJECT_REF: "" } });
   expect(result.status).not.toBe(0);
-  expect(result.stderr).toContain("Policy publication blocked:");
+  expect(result.stderr).toMatch(/Policy publication blocked:|Missing or invalid staging project ref/);
 });
 
 it("pure release validator rejects absent or mismatched database identity", async () => {

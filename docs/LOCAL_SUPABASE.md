@@ -455,3 +455,12 @@ hosted project after its schema deploy instead
 
 Restart the stack after any config change (`supabase stop && supabase
 start`), and revert every local-only block before committing (§16).
+
+## Current policy bundle after local migrations
+
+Run `npm run setup:local-policy` after applying migrations to the owned disposable
+API55321/DB55322 stack. It advances only the immutable initial draft pointer via
+CAS to the current checked-in bundle, or no-ops if already equal. An already
+transitioned different pointer requires the explicit [publication procedure](legal/launch-policy-review.md).
+Never rewrite historical00710, fabricate user/job acknowledgement, or reset a
+populated database to align facts. CI performs this setup before DB/browser checks.

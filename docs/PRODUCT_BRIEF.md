@@ -1,294 +1,46 @@
-# K-Work US — Product Brief
+# K-Work US — Product brief
 
-> Source of truth: `docs/K-Work_US_Development_Plan.pdf` (Version 0.1). This file is
-> a working summary for engineers. When in doubt, the PDF governs.
+The [California public-launch design](superpowers/specs/2026-09-09-california-launch-design.md)
+is the current scope. The original Version0.1 PDF and numbered Slice notes are
+historical planning material, not launch authority.
 
-## What we are building
+K-Work US is a mobile-first hiring marketplace for California workplaces, with
+Korean-first UI and key English guidance. Seekers and employers both use it free.
+Community specialization and job-related Korean ability requirements are allowed;
+nationality or ethnicity restrictions are not. The operator, domain and reviewed
+public policy facts remain unselected; implementation is not public launch approval.
 
-K-Work US is a **mobile-first, Korean-English bilingual local hiring marketplace**
-for the U.S. Korean community. Initial market: **LA / Orange County**.
+The core journey is browse → sign in → explicitly acknowledge policies → apply →
+message → manage interview/offer status. Employers request access, maintain a
+company, submit compliant pay/location information for review, and manage the
+publication lifecycle and applicants. Active administrators use TOTP/AAL2 for
+review, reports, suspensions and aggregate marketplace signals. Offered status
+is not evidence of a completed hire.
 
-It is a lightweight "hiring OS": _post job → apply → message → interview → offer_,
-managed in one place — not just a community bulletin board.
+Public jobs use one canonical predicate: California, approved, unexpired and
+eligible owner. Approval records real publication/expiry; unknown historical
+dates are not invented. Search supports city/category/type/language/pay/sort and
+pagination. Public sitemap/structured data use the same actual public records.
 
-**Brand note:** The product name is **K-Work US**. We do **not** use legacy or
-confusingly similar marketplace brand names anywhere in code or UI (trademark /
-brand-confusion risk).
+Next.js App Router, TypeScript, Tailwind and Supabase Auth/Postgres/RLS remain the
+stack. Verified sessions and current database roles authorize callers; form role
+values and user metadata do not. Writes enforce ownership, active status, policy
+identity, concurrency and audit rules at the database boundary. Production builds
+and runtimes never publish samples. Trusted notification workers use the outbox,
+Resend and signed webhooks; real provider delivery is still unverified.
 
-## Positioning (critical)
+Policies use version `ca-launch-v1` plus a draft/reviewed bundle identity. Operator
+facts, complete prose and external review must align with a service-controlled CAS
+current pointer; prior acceptance evidence is retained. Filling facts requires a
+reviewed publication workflow, not changing historical migrations or bulk consent.
+See [policy review](legal/launch-policy-review.md).
 
-- Korean-**English bilingual** jobs and Korean/Asian-community-friendly local hiring.
-- **NOT** "Korean-only" hiring. Language can be expressed as a **job-related
-  requirement** (e.g. "Korean required for customer communication"), never as a
-  nationality, ethnicity, citizenship, or immigration-status restriction.
+Payments/boosts, nationwide expansion, AI matching, resume file upload, realtime
+chat, payroll and individual work-eligibility determinations are excluded from
+the first launch. Existing unused boost schema is retained for compatibility.
 
-## MVP scope (Must-have)
-
-1. Public job board with filters (city, category, job type, pay, schedule, language).
-2. Job detail page with pay range, schedule, location, and a work-authorization
-   disclaimer.
-3. One-click application for authenticated seekers.
-4. Employer onboarding + company profile.
-5. Employer job posting with compliance-first validation.
-6. Employer dashboard + applicant management.
-7. Admin moderation (approve/reject) with safety flags.
-8. Reports/blocking, employer verification.
-9. Stripe-based featured/urgent boosts. *(De-scoped from the MVP in Slice 23.)*
-10. Admin analytics/KPIs.
-
-### Non-goals (MVP)
-
-- Payments and paid job boosts: de-scoped in Slice 23. The `jobs.boost` column,
-  enum, and write-protection triggers remain in the schema, intentionally
-  unused. Revisit post-beta.
-- Native iOS/Android apps (mobile web first).
-- Payroll, background checks, placement success fees.
-- Determining an individual's legal work eligibility (we provide general info and
-  point students to their DSO only).
-- Nationwide expansion before product-market fit.
-
-## Compliance constraints (coded from day one)
-
-| Risk | Product rule |
-| --- | --- |
-| National-origin discrimination | Block "Korean-only / 한국인만"; allow job-related language requirements. |
-| Visa-status preference | Block "OPT only", "H-1B preferred", visa-status gating. |
-| Illegal cash pay | Block "under the table", "cash only no tax", "세금 없이". |
-| Pay opacity | `pay_min` / `pay_max` required on every job (CA pay transparency). |
-| Student work confusion | Disclaimer: platform does not judge work authorization; consult DSO. |
-| Privacy | Restrict resume/phone access; honor deletion requests (RLS + privacy settings). |
-
-Standard disclaimers live in `src/components/WorkAuthorizationDisclaimer.tsx`
-and on job detail, application, and employer posting flows.
-
-## Recommended architecture
-
-- **Frontend/Backend:** Next.js App Router + TypeScript + Tailwind (Server Actions / API routes).
-- **DB/Auth/Storage:** Postgres via Supabase (Auth + RLS).
-- **Payments:** none in the MVP (de-scoped in Slice 23). **Email:** Resend/SendGrid. **SMS (Phase 2):** Twilio.
-- **Deploy:** Vercel + Supabase. **Analytics:** PostHog/Plausible or DB aggregation first.
-
-## Roles
-
-`seeker` · `employer` · `admin` — enforced with **server-side** checks (never
-client-only) and Supabase RLS.
-
-## Slice plan (one PR per slice)
-
-| # | Slice | Done when |
-| --- | --- | --- |
-| 0 | Project baseline | App runs locally; lint/typecheck/test scripts exist. |
-| 1 | Public shell | Home + jobs list/detail shell render on mobile + desktop (mock data). |
-| 2 | Auth & roles | Role-protected routes work; server-side guards. |
-| 3 | Database schema | Migrations + seed; only approved jobs are public. |
-| 4 | Job browse/search | Filters/sort/pagination; pending jobs never public. |
-| 5 | Job detail & apply | One application per seeker/job; duplicate blocked. |
-| 6 | Application dashboards | Seekers see their own submissions; employers see applicants only for owned jobs. |
-| 7 | Employer onboarding | Only employers create/edit company profile. |
-| 8 | Post job | Compliance validation; new jobs pending, not public. |
-| 9 | Admin moderation | Approve/reject; flagged keywords reach review queue. |
-| 10 | Application status workflow | Employers update owned application status; seekers see status. |
-| 11 | Verification trust and report queue | Verified badges; signed-in job reports; admin report queue. |
-| 12 | Payments & boosts | Stripe checkout activates boost via webhook. *(Removed in Slice 23.)* |
-| 13 | Analytics | Admin KPI dashboard. |
-| 14 | Compliance polish | Disclaimers, posting acknowledgement, risky-language validation, admin flags. |
-| 15 | Launch hardening | QA, a11y, SEO, deploy checklist. |
-
-## Current status
-
-- **Slice 0 — Project baseline:** ✅ done.
-- **Slice 1 — Public shell:** ✅ done (`/`, `/jobs`, `/jobs/[id]`; header,
-  mobile bottom-nav, footer, job cards, and work-authorization disclaimer).
-- **Slice 2 — Auth & roles:** ✅ done.
-  - Supabase SSR clients (browser/server) + `proxy.ts` session refresh
-    (Next 16 renamed `middleware` → `proxy`).
-  - Roles `seeker` / `employer` / `admin`; central permission matrix in
-    `lib/auth/access.ts`; **server-side** guards in `lib/auth/guards.ts`.
-  - **Dev-auth fallback:** while Supabase env vars are placeholders, a
-    cookie-based mock session lets you pick a role to exercise guards locally.
-  - Configured runtime authorization reads `profiles.role`; `user_metadata.role`
-    is not trusted. Email/password and OAuth initiation UI remain future work.
-- **Slice 3 — Database schema & seed:** ✅ done.
-  - Migrations are the source of truth: `supabase/migrations/` (enums, six core
-    tables, constraints/indexes, `updated_at` trigger, auth helper functions) +
-    `supabase/seed.sql` (3 fictional LA/OC companies, 8 approved + 1 pending +
-    1 draft job). See [`DATABASE.md`](DATABASE.md).
-  - **Row Level Security** on all tables: public reads only `approved` jobs;
-    profile self-update cannot change role; employer job inserts are forced to
-    `pending`; audit logs are admin-read / service-role-write only.
-  - Slice 4.5 owner policies require the actor's current employer/admin role, so
-    role demotion revokes private ownership-based access.
-- **Slice 4 — Job browse/search:** ✅ scoped implementation done.
-  - Server-rendered GET search supports keyword, city, category, job type,
-    language, minimum pay, and newest/pay sorting with URL state.
-  - Configured reads use an approved-only public view with safe company identity;
-    local/test/build use deterministic approved-only mocks.
-  - Original roadmap items still deferred: schedule filter, featured-first sort,
-    pagination/load-more, expiry filtering, and a dedicated loading state.
-- **Slice 5 — Job detail & apply:** scoped implementation done.
-  - Approved job details link to a guarded application route.
-  - Seekers may submit one optional 1,000-character cover note per job.
-  - Employer/admin roles, unapproved jobs, duplicate writes, and missing profiles
-    fail closed through server checks plus database RLS/constraints.
-  - Supabase-unconfigured environments do not simulate application writes.
-- **Slice 6 — Application dashboards:** scoped implementation done.
-  - Seekers see only their own application history; employers see only
-    applications for jobs under companies they own.
-  - Caller-bound RPCs re-check runtime database roles and expose employers only
-    applicant display names and emails without broadening profile RLS.
-  - Unconfigured environments show an explicit unavailable state and never
-    create mock application records.
-  - Minimum employer setup continues in Slice 7 below.
-- **Slice 7 — Minimum employer setup and pending job submission:** scoped
-  implementation done.
-  - Employers can create their first company, edit existing owned companies,
-    submit jobs only as `pending`, and review owned-job statuses.
-  - Server Actions derive ownership from the verified session and block explicit
-    discriminatory, visa-preference, and illegal-cash wording.
-  - Verification and boost fields reject employer writes while trusted
-    admin/service-role workflows remain available.
-  - This does not absorb the broader old Slice 8 roadmap item; roadmap
-    rebaselining or downstream renumbering belongs in a separate docs-only PR.
-- **Slice 8 — Admin job moderation and company verification:** scoped
-  implementation done.
-  - Exact-admin pages show pending-job and unverified-company queues.
-  - Admins may approve or reject only currently pending jobs and may verify or
-    unverify companies through caller-authenticated RLS-backed writes.
-  - Approval sets the public posting timestamp; rejected jobs remain non-public.
-  - No new migration, service-role client, rejection reason, or audit subsystem
-    is introduced.
-- **Slice 9 — Application messaging and notification stubs:** scoped
-  implementation done.
-  - Seekers and owning employers exchange bounded messages per application;
-    admins retain read access through RLS but have no messaging UI.
-  - Development-only, non-PII notification stubs cover application submission,
-    status changes, and new messages without provider credentials.
-  - Real email delivery and broad notification preferences remain deferred.
-- **Slice 10 — Application Status Workflow:** scoped implementation done.
-  - Employers can update application statuses for jobs owned by their company
-    from `/employer/applications`; seekers see the current status on
-    `/dashboard/applications`.
-  - Supported statuses are `submitted`, `reviewing`, `interview`, `offered`,
-    `rejected`, and `withdrawn`; seeker-created applications still start as
-    `submitted`.
-  - Status writes use the caller-authenticated Supabase session and a
-    server-side employer guard, with RLS enforcing owned-job authorization.
-  - Supabase-unconfigured environments show an unavailable state and never
-    simulate persistent status writes.
-  - Real email notifications, notification preferences, contracts, and payroll
-    remain deferred.
-- **Slice 11 — Verification Trust and Report Queue:** scoped implementation done.
-  - Public job cards/details show careful company verification signals without
-    implying safety, legal, immigration, hiring, or job-quality guarantees.
-  - Signed-in users can report approved job listings for discriminatory wording,
-    visa-status preference, illegal cash pay, misleading/suspicious content,
-    spam, or other concerns.
-  - Admins can review `/admin/reports`, mark open reports as reviewed or
-    dismissed, and see an open-report count on `/admin`.
-  - Report writes and admin queue reads use caller-authenticated Supabase
-    sessions and RLS; no service-role client or mock persistent report writes
-    are used.
-  - Blocking/sanctions, email alerts, and full trust-and-safety case management
-    remain deferred.
-- **Slice 12 — Payments and Boosts:** implemented, then **removed in Slice 23**.
-  - Originally shipped Stripe Checkout for `featured`/`urgent` boosts (boost
-    page, server-side checkout creation, signature-verified webhook at
-    `/api/stripe/webhook`, boost badges on public cards/details).
-  - Payments and paid boosts were de-scoped from the MVP in Slice 23; the
-    `jobs.boost` column, enum, and write-protection triggers remain in the
-    schema, intentionally unused. Revisit post-beta.
-- **Slice 13 — Admin Analytics and KPI Dashboard:** scoped implementation done.
-  - Admins can open `/admin/analytics` from `/admin` to review aggregate
-    marketplace KPIs for jobs, applications, companies, reports, and messages.
-  - Reads use the caller-authenticated Supabase session with existing admin RLS
-    and expose counts only, not message bodies, applicant details, application
-    notes, report details, or thread content.
-  - Job status, application status, report status, recent activity, and company
-    verification counts are included (boost counts were removed in Slice 23).
-  - External analytics providers, chart libraries, CSV export, and cohort
-    retention remain deferred.
-- **Slice 14 — Compliance Polish:** scoped implementation done.
-  - Shared informational disclaimers now cover work authorization, wage/tax
-    classification, employer-provided job details, reports, and company
-    verification without presenting legal advice or legal determinations.
-  - Employer job posting requires a compliance acknowledgement before server-side
-    submission; the acknowledgement is validated but not stored.
-  - Risky-language validation blocks clear discrimination, nationality-only,
-    visa/citizenship-only, off-the-books cash pay, unpaid training, tips-only,
-    and 1099-only phrases while allowing job-related Korean language skills.
-  - Admin job moderation computes compliance review flags with category and
-    reason text. Flags are review aids only and do not auto-approve or
-    auto-reject jobs.
-  - No schema, RLS, service-role, legal review, E-Verify, tax/payroll, sanctions,
-    email delivery, or automated enforcement workflow is added.
-- **Slice 21 — Employer access requests:** scoped implementation done.
-  - Real auth users always start as `seeker`. A signed-in seeker requests
-    employer access at `/employer/request-access` (business/contact/location
-    details plus an optional reason); signed-out visitors are redirected to
-    `/login?next=/employer/request-access`.
-  - Employer-area entry routes seekers to the request flow instead of a
-    dead-end forbidden page; employers and admins are unaffected, and
-    employer/admin accounts see an "already has employer access" state instead
-    of the form.
-  - Admins review the queue at `/admin/employer-requests` (pending first,
-    newest first, with a pending count on `/admin`). Approval promotes the
-    requester to `employer` atomically through an admin-only SECURITY DEFINER
-    function; rejection records the decision without changing any role. Users
-    cannot self-promote, and one pending request is allowed per account.
-  - The form and status pages state that admin review is required before
-    posting jobs, that approval is not guaranteed, and that K-Work US does not
-    verify or guarantee business registration, legal status, or work
-    authorization.
-  - Approval does not create a company; company registration, job submission,
-    approved-only public visibility, payments, and auth providers are
-    unchanged. The user-facing flow never uses the service-role client.
-- **Slice 22 — Admin operations console:** scoped implementation done.
-  - `/admin` is a real operations dashboard: per-queue count cards (pending
-    jobs, unverified companies, open reports, employer access requests) that
-    resolve independently with ok / zero / unavailable / error states, so one
-    failing queue degrades one card instead of hiding the console.
-  - Always-visible admin navigation (jobs, companies, employer requests,
-    reports, analytics, health check) plus an operational-health card that
-    reuses the public `/api/health` presence report — statuses only, never
-    env values.
-  - With placeholder Supabase values, the dashboard shows an "Admin setup
-    required" panel with the local-setup commands and env-variable **names**
-    from [`LOCAL_SUPABASE.md`](LOCAL_SUPABASE.md); dev-auth admin previews
-    the UI only, live counts need a configured Supabase.
-  - Read-only recent-activity section on `audit_logs` (admin-read RLS,
-    narrow select, latest 5); nothing writes the table yet, so its calm
-    empty state is expected. No audit-write behavior was added.
-  - No schema/RLS changes, no service-role reads, and payments, auth
-    providers, and public job visibility are unchanged.
-- **Slice 23 — De-scope payments:** done.
-  - Removed all Stripe/payment/boost functionality from the MVP: the boost
-    page and checkout Server Action, the `/api/stripe/webhook` route, the
-    payments helpers, Stripe env vars, the `stripe` health check, boost badges
-    and CTAs, and boost analytics.
-  - No schema change: the `jobs.boost` column, `boost_type` enum, boost-is-null
-    insert policy, and `prevent_job_boost_change` trigger remain, intentionally
-    unused. Public job visibility, auth, RLS, admin moderation, reports, and
-    employer access behavior are unchanged.
-- **Fix — explicit table grants (PR #25):** done.
-  - Current Supabase projects apply no implicit table privileges to the API
-    roles, so every real sign-in (social or phone OTP) minted a session and
-    then failed closed at the `profiles.role` lookup (`permission denied for
-    table profiles`, 42501), bouncing back to `/login`.
-    `20260707000000_explicit_table_grants.sql` adds deterministic,
-    least-privilege grants for `anon`/`authenticated`/`service_role`; RLS is
-    unchanged as the row-level gate. Pinned by `tests/db-schema.test.ts`
-    ([`DATABASE.md`](DATABASE.md#table-grants-supabase-api-roles)).
-- **Slice 24 — Post-grants readiness docs:** done (docs-only).
-  - Runbooks updated for the hosted schema deploy: `supabase login` →
-    `supabase link` → `supabase db push`, 10 migrations, never `db reset` or
-    `seed.sql` against hosted/production, and a post-migration smoke
-    (health → first `seeker` signup → admin via SQL → `/admin` live counts →
-    auth flags last) in [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project).
-  - Where auth stands: the Slice 19 foundation (buttons, flags, callback,
-    registry) is code-complete and fully rehearsable on the local stack, but
-    real Google/Kakao/Phone E2E needs a Supabase project with **both** the
-    schema deployed (profiles trigger + explicit grants) **and** that
-    provider's credentials — the hosted project needs its migrations pushed
-    before provider E2E can complete. Naver stays setup-required pending
-    custom-OIDC verification; local phone test OTP and hosted SMS remain
-    separate flows; payments/boosts stay de-scoped (Slice 23).
+[Deployment](DEPLOYMENT.md), [launch checklist](LAUNCH_CHECKLIST.md) and
+[actual environment evidence](launch-evidence/environments.md) define readiness.
+The final D2 verification/fault/restore campaign and actual hosted/provider/legal/
+physical-device gates remain separately recorded. Local tests establish software
+behavior; they cannot select the operator or approve a public launch.

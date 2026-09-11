@@ -15,7 +15,11 @@
     "verify:local-supabase": "node scripts/verify-local-supabase-readiness.mjs",
     "test:db": "supabase test db --local",
     "test:e2e": "playwright test",
-    "test:notifications:local": "RUN_NOTIFICATION_LOCAL=true vitest run tests/notification-local.test.ts"
+    "test:notifications:local": "RUN_NOTIFICATION_LOCAL=true vitest run tests/notification-local.test.ts",
+    "verify:deploy-target": "node scripts/check-deploy-target.mjs",
+    "smoke:deployment": "node scripts/smoke-deployment.mjs",
+    "setup:local-policy": "node scripts/activate-local-policy.mjs",
+    "check:production-artifact": "node scripts/check-production-artifact.mjs"
   },
   "dependencies": {
     "@next/env": "16.3.4",

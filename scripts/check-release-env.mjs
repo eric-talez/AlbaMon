@@ -1,5 +1,6 @@
 import { validatePolicyPublication, policyFacts, policyAcceptanceIdentity } from "../src/lib/policy-publication.mjs";
 import { pathToFileURL } from "node:url";
+import { checkDeployTarget } from "./check-deploy-target.mjs";
 import { isIP } from "node:net";
 
 
@@ -88,6 +89,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   nextEnv.loadEnvConfig(process.cwd(), false);
   try {
     checkReleaseSettings();
+    checkDeployTarget(process.env.EMAIL_ENVIRONMENT);
     checkReleaseEnv(process.env, policyFacts, await readDatabasePolicyIdentity());
     console.log("Release settings and database policy identity match; provider/DNS/inbox evidence must be verified separately.");
   } catch (error) {

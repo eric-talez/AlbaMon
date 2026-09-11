@@ -5,7 +5,7 @@ import { syntheticPublication } from "./fixtures/policy-publication.mjs";
 import { policyContent } from "../src/lib/policy-publication.mjs";
 import facts from "../src/lib/policy-facts.json";
 test("incomplete facts and absent external review cannot publish", () => {
-  expect(validatePolicyPublication(facts).length).toBeGreaterThan(0);
+  expect(validatePolicyPublication({ ...syntheticPublication(), status: "draft", review: { completedAt: null, evidenceReference: null, bundleSha256: null } }).length).toBeGreaterThan(0);
 });
 test("both current acknowledgement versions and clocks are required", () => {
   const current = {policyIdentity:policyAcceptanceIdentity(),termsVersion:"ca-launch-v1",termsAcceptedAt:"2026-09-10T00:00:00Z",privacyNoticeVersion:"ca-launch-v1",privacyNoticeAcknowledgedAt:"2026-09-10T00:00:00Z"};

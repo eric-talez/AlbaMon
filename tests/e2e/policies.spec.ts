@@ -5,7 +5,8 @@ for (const path of ["/terms", "/privacy", "/posting-policy", "/work-authorizatio
     const response = await page.goto(path);
     expect(response?.status()).toBe(200);
     await expect(page.locator("main")).not.toContainText(/Coming soon|준비 중/);
-    await expect(page.locator("main")).toContainText("Draft for review");
+    await expect(page.locator("main")).toContainText(policyAcceptanceIdentity());
+    if (policyAcceptanceIdentity().startsWith("draft:")) await expect(page.locator("main")).toContainText("Draft for review");
     expect(await page.locator("main section").count()).toBeGreaterThanOrEqual(4);
   });
 }

@@ -1,161 +1,220 @@
-# Deployment — Vercel + Supabase
+# California public launch deployment
 
-How to deploy K-Work US for the California public launch. The app is a standard Next.js 16
-App Router project: **Vercel** hosts the app and **hosted Supabase** provides
-Auth + Postgres (with RLS). Nothing in this guide contains real credentials —
-every value shown is a placeholder.
+K-Work US is free for seekers and employers, with public workplaces restricted to
+California. The [approved design](superpowers/specs/2026-09-09-california-launch-design.md)
+and current migrations supersede the original PDF and historical Slice/private-beta notes.
+Use Node **22.x** (`.nvmrc`), pinned lockfile, Supabase CLI **2.109.1** and Vercel CLI
+**59.13.1** for the recorded procedure. No actual hosted deployment is verified;
+see [environment evidence](launch-evidence/environments.md),
+[environment variables](PRODUCTION_ENV_VARS.md), [launch checklist](LAUNCH_CHECKLIST.md)
+and [local setup](LOCAL_SUPABASE.md).
 
-Companion docs:
+## Inventory before any hosted mutation
 
-- [`LAUNCH_CHECKLIST.md`](LAUNCH_CHECKLIST.md) — go/no-go checklist for the beta.
-- [`../supabase/README.md`](../supabase/README.md) — schema, migrations & seed details.
-- [`DATABASE.md`](DATABASE.md) — schema and access-layer reference.
+The operator must select actual existing Vercel/Supabase projects, domain,
+provider accounts and support/operator facts. Inspect existing projects before
+creating another or accepting new cost. CLI/browser access in this session was
+unavailable; this does not prove no account or existing live data exists.
 
-## 1. Prerequisites
-
-- Node.js 20+ and npm 10+ (`npm install`, `npm run build` must pass locally).
-- A [Supabase](https://supabase.com) account + [Supabase CLI](https://supabase.com/docs/guides/cli).
-- A [Vercel](https://vercel.com) account with access to this Git repository.
-
-## 2. Supabase (hosted project)
-
-1. Create a new Supabase project (region close to LA/OC users, e.g. `us-west-1`).
-2. Link and push migrations from the repo root:
-
-   ```bash
-   supabase login
-   supabase link --project-ref <your-project-ref>
-   supabase db push
-   ```
-
-   `db push` applies everything in `supabase/migrations/` **in filename order**:
-
-   | Order | Migration | What it sets up |
-   |---|---|---|
-   | 1 | `20260621000000_init_schema.sql` | Enums, all tables, triggers, helper functions, RLS |
-   | 2 | `20260622000000_audit_hardening.sql` | Role-revocation safety + approved-only `public_job_listings` view |
-   | 3 | `20260623000000_application_submission.sql` | Seeker insert policy + cover-note limit |
-   | 4 | `20260624000000_application_listing_functions.sql` | Caller-bound dashboard RPCs |
-   | 5 | `20260625000000_employer_write_hardening.sql` | Verification/boost write guards (retained schema hardening; boost is unused since Slice 23) |
-   | 6 | `20260626000000_application_messages.sql` | Participant-bound message threads |
-   | 7 | `20260627000000_application_status_workflow.sql` | Application status constraint + policies |
-   | 8 | `20260628000000_report_queue_hardening.sql` | Report reason/status constraints + RLS |
-   | 9 | `20260706000000_employer_access_requests.sql` | Seeker→employer request queue + admin review RPC |
-   | 10 | `20260707000000_explicit_table_grants.sql` | Explicit least-privilege table grants for the API roles — **required**: without it real sign-ins mint a session but fail closed at the `profiles.role` lookup (42501) and bounce to `/login` ([`DATABASE.md`](DATABASE.md#table-grants-supabase-api-roles)) |
-
-   Without the CLI: run each file in the Supabase **SQL editor**, in the same
-   order.
-
-3. **Do not run `supabase/seed.sql` against production.** It creates fictional
-   demo employers, companies, and jobs with well-known UUIDs and a shared
-   password — it exists for local dev and demos only. See the
-   [launch checklist](LAUNCH_CHECKLIST.md#3-seed--demo-data) for how to verify
-   none of it is present. Likewise, **never run `supabase db reset` against a
-   hosted/production project** — it drops and recreates the database.
-   `supabase db push` is the only schema command this guide uses against
-   hosted; `db reset` belongs to the disposable local stack
-   ([`LOCAL_SUPABASE.md §14`](LOCAL_SUPABASE.md#14-resetting-the-local-db-safely)).
-
-4. Configure Auth (Dashboard → Authentication → URL Configuration):
-   - **Site URL**: `https://<your-domain>`
-   - **Redirect URLs**: `https://<your-domain>/auth/callback` (plus your Vercel
-     preview URL pattern if you want auth on previews).
-
-5. Collect keys (Dashboard → Project Settings → API):
-   - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
-   - `anon` `public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `service_role` key → `SUPABASE_SERVICE_ROLE_KEY` — **server-only**: never
-     expose it to the browser or commit it anywhere. No app code path currently
-     uses it (reserved for trusted server-side workflows; `/api/health` reports
-     its presence).
-
-### Post-migration smoke
-
-Run in order after the first Vercel deploy (§4), against the production URL:
-
-1. `GET /api/health` returns 200 and `GET /api/ready` returns
-   `200 {"status":"ok"}`. Health proves the process is live; readiness proves
-   the public database is reachable with the anon client.
-2. First real sign-up creates a `public.profiles` row with role `seeker`.
-   All auth flags default to `false`, so enable **one** provider for this —
-   its smoke ([`BETA_READINESS.md §17`](BETA_READINESS.md#17-social--phone-auth-verification))
-   doubles as this check. Passing proves the `on_auth_user_created` trigger
-   **and** the `20260707…` table grants in one step; without the grants the
-   sign-in mints a session, then bounces back to `/login` with
-   `permission denied for table profiles` (42501) in the logs.
-3. Promote the founding admin **manually via SQL** (§5 below).
-4. `/admin` (as that admin) shows live queue counts — not the "Admin setup
-   required" panel.
-5. Every other `NEXT_PUBLIC_AUTH_*` flag stays `false` until its own
-   provider smoke passes
-   ([`BETA_READINESS.md §17`](BETA_READINESS.md#17-social--phone-auth-verification),
-   [`LAUNCH_CHECKLIST.md §12`](LAUNCH_CHECKLIST.md#12-social--phone-auth-providers)).
-
-## 3. Payments (de-scoped in Slice 23)
-
-Payments and paid boosts were de-scoped from the MVP in Slice 23; the
-`jobs.boost` column, enum, and write-protection triggers remain in the schema,
-intentionally unused. Revisit post-beta.
-
-No Stripe account, products, keys, or webhook endpoint are needed to deploy.
-This numbered section is kept as a stub so cross-references to later sections
-stay stable.
-
-## 4. Vercel
-
-1. Import the Git repository into Vercel. Framework preset **Next.js**, build
-   command `npm run build:release`. The release command rejects missing or
-   placeholder public settings, non-public HTTP origins, and Google auth that
-   has not been explicitly enabled after testing.
-2. Set environment variables (Project → Settings → Environment Variables). Use
-   Production values only on Production; test-mode values on Preview.
-
-   | Variable | Example / placeholder | Scope | Notes |
-   |---|---|---|---|
-   | `NEXT_PUBLIC_SITE_URL` | `https://<your-domain>` | client | Canonical/OG/sitemap base; falls back to localhost if unset |
-   | `NEXT_PUBLIC_SUPABASE_URL` | `https://<project-ref>.supabase.co` | client | |
-   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `<anon-public-key>` | client | RLS is the authorization gate |
-   | `NEXT_PUBLIC_AUTH_GOOGLE_ENABLED` | `true` | client | Required only after the hosted Google sign-in flow passes its smoke test |
-   | `SUPABASE_SERVICE_ROLE_KEY` | `<service-role-key>` | server-only | Reserved for trusted server-side workflows; no app code path uses it |
-   | `EMAIL_PROVIDER` | `dev` | server-only | Real delivery (`resend`/`sendgrid`) is deferred; `dev` logs stubs |
-   | `EMAIL_FROM` | `K-Work US <no-reply@your-domain>` | server-only | Unused while `EMAIL_PROVIDER=dev` |
-   | `RESEND_API_KEY` / `SENDGRID_API_KEY` | *(empty)* | server-only | Only when a real provider is enabled |
-   | `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST` | *(empty)* | client | Referenced but not initialized; leave empty for beta |
-
-   `npm run build` remains available for credential-free CI checks. It does not
-   prerender mock job details. Only `npm run build:release` may create a
-   deployable artifact.
-
-3. Deploy. Then complete the
-   [post-deploy verification](LAUNCH_CHECKLIST.md#10-qa--verification) —
-   at minimum: `/`, `/jobs`, a job detail page, `/robots.txt`, `/sitemap.xml`,
-   sign-up → apply, and employer posting → admin approval.
-
-## 5. First admin account
-
-The seed ships no admin, and there is deliberately no UI or API to grant the
-role (self-promotion is blocked by a DB trigger + RLS). After the very first
-sign-up, promote that user in the Supabase SQL editor:
-
-```sql
-update public.profiles
-set role = 'admin'
-where id = '<auth-user-uuid>';  -- Authentication → Users → copy the user's UUID
+```bash
+supabase projects list
+npx --yes vercel@59.13.1 whoami
+npx --yes vercel@59.13.1 project inspect "$VERCEL_PROJECT" --scope "$VERCEL_TEAM"
+npx --yes vercel@59.13.1 env ls preview --scope "$VERCEL_TEAM"
+npx --yes vercel@59.13.1 env ls production --scope "$VERCEL_TEAM"
 ```
 
-Verify by signing in and opening `/admin`. Details and verification steps:
-[launch checklist §4](LAUNCH_CHECKLIST.md#4-admin-setup).
+Record actual project name/ref, region, plan, backup type/retention/latest point,
+prior deploys, migration versions, safe business counts and known seed presence.
+Run the read-only [existing-data inventory](launch-evidence/environments.md#existing-data-inventory)
+before schema changes; keep identified rows in protected operator evidence.
+Never copy production data into staging. Fixtures require fictional jobs and
+owner-controlled test accounts. Hosted reset/seed is prohibited.
 
-## 6. Known issues
+## Exact environment mapping
 
-- **Windows + non-ASCII project path (Turbopack panic).** On Windows, `next
-  build`/`next dev` can crash with a Rust char-boundary panic when the project
-  sits in a path containing non-ASCII (e.g. Korean) characters. This is a
-  toolchain issue, not app code — move/clone the repo to an ASCII-only path
-  (e.g. `C:\work\k-work-us`) instead of patching the app. CI/Vercel builds are
-  unaffected.
-- **Email delivery is a dev stub.** `EMAIL_PROVIDER=dev` logs notification
-  events server-side; no real email/SMS is sent during the beta.
-- **Browser E2E is deferred.** Automated coverage is Vitest (unit +
-  server-render smoke tests); the manual QA script in the launch checklist
-  covers real-browser flows at 390px/1440px.
+Vercel **Preview → staging Supabase**, **Production → production Supabase**.
+Set the actual four non-secret values `STAGING_PROJECT_REF`,
+`PRODUCTION_PROJECT_REF`, `STAGING_ORIGIN`, `PRODUCTION_ORIGIN` in both hosting
+scopes and operator shells. Origins must be distinct public HTTPS origins,
+without userinfo, path, query or fragment; optional root slash is normalized.
+Refs must differ and match the selected Supabase URL exactly. The guard validates
+shape and mapping; console evidence establishes actual project ownership.
+
+`EMAIL_ENVIRONMENT` is the existing runtime environment setting. There is no
+additional `DEPLOYMENT_ENV` toggle. Preview requires staging email and
+`NEXT_PUBLIC_INDEXING_ENABLED=false`; Production requires production email and
+indexing `true`. Google is `true` only following actual provider setup/test;
+Kakao/Naver/Phone remain `false` until verified. Separate project keys, Resend
+sender/API/webhook and cron secrets by environment. See the full variable table.
+
+`vercel.json` sets the native **Build Command `npm run build:release`**, preserving
+the notification cron. Inspect hosted overrides too. This command validates
+reviewed policy/settings, exact target mapping and the bounded anonymous current
+policy RPC before Next builds. Ordinary `npm run build` supports local artifact
+regressions and cannot establish public readiness. `NEXT_PUBLIC_*` and headers
+are compiled: any public-origin/indexing/provider/policy change requires a fresh
+build. Never relabel a staging artifact as Production.
+
+## Staging migrations
+
+Load only the selected environment's secrets through protected operator tooling;
+do not put values in shell history or print `supabase status -o env`. Use the
+repository root for hosted commands only after verifying the explicit link.
+
+```bash
+test -n "$STAGING_PROJECT_REF"
+npm run verify:deploy-target -- staging
+supabase link --project-ref "$STAGING_PROJECT_REF"
+supabase migration list --linked
+supabase db push --dry-run
+```
+
+Compare the **entire current ordered migration directory**, not a historic count,
+with remote history and inspect the exact dry-run SQL. Stop on remote-only or
+missing history, destructive changes or an unexpected target. Do not use normal
+launch work to run migration repair, `--include-all`, `--db-url` or history edits.
+After reviewing the actual staging target and additive compatibility:
+
+```bash
+npm run verify:deploy-target -- staging
+test "$(cat supabase/.temp/project-ref)" = "$STAGING_PROJECT_REF"
+supabase db push
+supabase migration list --linked
+```
+
+Never add `--include-seed`. New migrations remain additive; do not modify old
+migrations to make changed policy facts or old data fit. Production later uses
+its separately reviewed link/dry-run/push with `PRODUCTION_PROJECT_REF` and
+`npm run verify:deploy-target -- production` immediately before the operation.
+Do not reuse the staging link for a production push.
+
+## OAuth, Preview protection and read-only smoke
+
+Set Supabase Site URL to the exact staging origin; redirect allowlist includes
+exact `STAGING_ORIGIN/auth/callback`. Avoid wildcard Vercel hosts. Google's
+approved JavaScript origin is the app origin; its authorized redirect URI is the
+**Supabase Google-provider callback displayed in that project's dashboard**.
+The app callback is still `/auth/callback`. Repeat independently for Production.
+
+Enable Vercel deployment protection for Preview. Confirm an unauthenticated
+visitor cannot access it, then grant named testers access. For automated smoke,
+the owner may provide a scoped Vercel protection automation bypass secret through
+the protected environment as `VERCEL_AUTOMATION_BYPASS_SECRET`. Smoke sends it
+only as `x-vercel-protection-bypass` to the one explicitly selected request
+origin, refuses redirects, and prints neither secret nor bodies. Do not disable
+protection to pass smoke. Protection denial is a failed/inaccessible smoke, not
+an application failure diagnosis or a pass. Document both anonymous denial and
+approved-access success separately.
+
+Ensure an existing project and explicit Preview selection before deploying: a
+new project's first CLI deployment can select Production. Use the Dashboard's
+explicit Preview flow for the first deployment if necessary. Inspect the actual
+deployment environment/build command and record its immutable URL/commit.
+
+```bash
+npx --yes vercel@59.13.1 inspect "$PREVIEW_URL" --scope "$VERCEL_TEAM"
+DEPLOYMENT_ORIGIN="$PREVIEW_URL" npm run smoke:deployment -- staging
+DEPLOYMENT_ORIGIN="$STAGING_ORIGIN" npm run smoke:deployment -- staging
+```
+
+`NEXT_PUBLIC_SITE_URL` must equal the artifact's compiled staging canonical
+origin. A **staged Production** artifact is fetched at its unique Vercel URL
+while retaining the future Production canonical domain:
+
+```bash
+npm run verify:deploy-target -- production
+npx --yes vercel@59.13.1 deploy --prod --skip-domain --scope "$VERCEL_TEAM"
+# Capture and inspect that actual deployment URL as STAGED_PRODUCTION_URL.
+DEPLOYMENT_ORIGIN="$STAGED_PRODUCTION_URL" npm run smoke:deployment -- production
+```
+
+Do not substitute the request URL into `NEXT_PUBLIC_SITE_URL` or rebuild with it.
+Promotion/domain assignment is a separately reviewed public launch action after
+all checklist gates. Re-run smoke on the canonical domain after promotion.
+
+Smoke uses GET liveness/readiness, public jobs/canonical, robots/sitemap, sample
+404, and **missing/wrong** worker authentication only. It checks operational email
+configuration, not inbox delivery. **Valid-auth GET `/api/internal/notifications`
+claims rows and sends mail.** It and signed suppression webhooks are explicitly
+mutating provider tests requiring separate owner-controlled mailbox authorization;
+they are never dry-run/read-only smoke steps. Do not run them in this session.
+
+Preview does **not** receive Vercel's platform cron: that scheduler targets the
+project's Production deployment. The one-minute entry in `vercel.json` proves
+only configured scheduling intent. Actual plan support/frequency, invocations,
+leases and delivery remain to verify. A manually authorized staging worker test
+does not prove scheduled operation. A separately selected staging Vercel project
+could use Production deployments with `EMAIL_ENVIRONMENT=staging`, isolated
+staging DB/origin, indexing=false and protection; its creation/cost is unselected.
+[Vercel Cron Jobs](https://vercel.com/docs/cron-jobs) documents the Production target.
+
+## Policy publication and founding administrator
+
+Complete the [reviewed bundle and CAS activation workflow](legal/launch-policy-review.md).
+Keep historical 00710's draft seed immutable. Archive every activated facts/prose
+bundle, identity, immutable artifact, review reference and change-notice decision.
+Read the actual current pointer before the transition; the service-only
+`activate_policy_publication(expected_identity,next_identity)` must use that
+captured expected value. Never refresh it automatically on conflict. Re-read
+with bounded anonymous RPC and run the release build against the matching
+reviewed identity. Activation writes audit evidence, never user/job acceptance.
+Until coordinated activation/deployment, policy writes may fail closed; retain
+history and audit dependencies. A code rollback should use a compatible artifact
+with the **same current identity**, not silently reactivate older terms.
+
+For a fresh local/CI stack only, after migrations run `npm run setup:local-policy`.
+It requires API55321/DB55322, holds keys in memory, and advances only the immutable
+initial draft via CAS to the checked-in current bundle (or no-ops if equal).
+It refuses an already transitioned different pointer. That case needs the explicit
+reviewed transition procedure; never reset a populated database just to align it.
+CI runs this before database/browser tests, so real reviewed facts do not require
+historical migration edits or replacing user acknowledgement history.
+
+Founding admin requires actual Google login first, creating a **seeker** profile.
+The representative independently confirms that exact UUID through trusted Auth
+and profile records. In the intended project's protected SQL editor, perform a
+transaction whose condition is the verified UUID and active seeker role:
+
+```sql
+begin;
+update public.profiles set role = 'admin'
+where id = '<owner-verified-user-uuid>'::uuid
+  and role = 'seeker' and account_status = 'active'
+returning id, role, account_status;
+-- Commit only if exactly the independently verified account was returned.
+commit;
+```
+
+Record the operator/change approval in restricted evidence. Do not add role form
+fields or trust `user_metadata`. Sign in again, explicitly acknowledge current
+policies, enroll and verify TOTP at `/account/security`; prove AAL1 denial
+and successful active+AAL2 admin review. Retain recovery procedures securely.
+All actual founding-admin/OAuth/MFA executions remain UNVERIFIED.
+
+## Verification, recovery and evidence
+
+```bash
+npm run setup:local-policy
+npm test
+npm run typecheck
+npm run lint
+npm run verify:beta
+npm run verify:local-supabase
+npm run check:production-artifact
+```
+
+CI owns its disposable stack lifecycle; original543xx/native5432 are untouched.
+D2 owns final database/browser/fault/restore rehearsals and their measured timing.
+For a hosted recovery target, `npm run verify:deploy-target -- recovery` requires
+additional `RECOVERY_PROJECT_REF`/`RECOVERY_ORIGIN` distinct from **both** other
+targets, with matching public site and Supabase URL. It is identity preflight
+only; recovery is never accepted by `build:release`. Never restore over production.
+Verify Auth, RLS/grants, evidence retention and settings that backups do not carry.
+During an incident, check worker configuration, active cron and queue leases:
+[Instant Rollback does not update active cron jobs](https://vercel.com/docs/cron-jobs/manage-cron-jobs).
+
+For each actual action record UTC, exact SHA, target/ref/request+canonical origins,
+command, result and non-secret evidence link. Local/synthetic PASS does not imply
+actual legal review, hosted access, OAuth, email, DNS, physical-device QA, restore
+or public-release approval. Missing actual gates remain **UNVERIFIED**.

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * verify-beta-readiness.mjs - offline docs gate for the private beta.
+ * verify-beta-readiness.mjs - offline docs gate for the California public launch.
  *
  * Usage:
  *   npm run verify:beta
@@ -33,7 +33,9 @@ const root = resolve(
 const REQUIRED_FILES = [
   "docs/DEPLOYMENT.md",
   "docs/LAUNCH_CHECKLIST.md",
-  "docs/BETA_READINESS.md",
+  "docs/launch-evidence/environments.md",
+  "docs/legal/launch-policy-review.md",
+  "vercel.json",
   "docs/PRODUCTION_ENV_VARS.md",
   "docs/OPERATIONAL_HEALTH.md",
   "docs/LOCAL_SUPABASE.md",
@@ -121,24 +123,18 @@ function checkChecklistTopics() {
   ).map(({ topic }) => `launch checklist no longer covers: ${topic}`);
 }
 
-function checkRunbookStructure() {
-  const runbook = tryRead("docs/BETA_READINESS.md");
-  if (runbook === null) {
-    return ["docs/BETA_READINESS.md is missing (see required-files check)"];
-  }
-  const failures = [];
-  for (let section = 1; section <= 16; section += 1) {
-    if (!new RegExp(`^## ${section}\\. `, "m").test(runbook)) {
-      failures.push(`missing runbook section: ## ${section}.`);
-    }
-  }
-  if (!/substitute\s+for\s+attorney\s+review/i.test(runbook)) {
-    failures.push("missing attorney-review disclaimer");
-  }
-  if (!/legal,\s+tax,\s+immigration,\s+or\s+employment\s+advice/i.test(runbook)) {
-    failures.push("missing not-legal-advice disclaimer");
-  }
-  return failures;
+function checkCurrentMigrations() {
+  const dir = join(root, "supabase/migrations");
+  if (!existsSync(dir)) return ["missing current migration directory"];
+  const files = readdirSync(dir).filter(name => name.endsWith(".sql")).sort();
+  if (!files.length || files.some(name => !/^\d{14}_[a-z0-9_]+\.sql$/.test(name))) return ["invalid current migration filenames"];
+  if (new Set(files.map(name => name.slice(0,14))).size !== files.length) return ["duplicate migration history version"];
+  return [];
+}
+
+function checkNativeReleaseBuild() {
+  const config = tryRead("vercel.json");
+  return config && JSON.parse(config).buildCommand === "npm run build:release" ? [] : ["Vercel native release build command missing"];
 }
 
 function checkEnvVarReference() {
@@ -161,7 +157,7 @@ function checkEnvVarReference() {
 function checkNoSecretsInDocs() {
   const docsDir = join(root, "docs");
   if (!existsSync(docsDir)) return ["docs/ directory missing"];
-  const files = readdirSync(docsDir)
+  const files = readdirSync(docsDir, { recursive: true })
     .filter((name) => name.endsWith(".md"))
     .map((name) => join("docs", name));
   for (const extra of ["README.md", ".env.example"]) {
@@ -194,13 +190,14 @@ function checkNpmScriptWiring() {
 const checks = [
   { name: "required files exist", run: checkRequiredFilesExist },
   { name: "launch checklist covers required topics", run: checkChecklistTopics },
-  { name: "beta runbook structure", run: checkRunbookStructure },
+  { name: "current migration history names", run: checkCurrentMigrations },
+  { name: "native Vercel release build", run: checkNativeReleaseBuild },
   { name: "env var reference completeness", run: checkEnvVarReference },
   { name: "no secret-shaped values in docs", run: checkNoSecretsInDocs },
   { name: "npm script wiring", run: checkNpmScriptWiring },
 ];
 
-console.log("K-Work US - beta readiness verification (offline docs gate)");
+console.log("K-Work US - California launch verification (offline docs gate; not hosted readiness)");
 console.log(`root: ${root}`);
 console.log("");
 
