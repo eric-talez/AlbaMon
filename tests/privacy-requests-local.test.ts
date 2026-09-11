@@ -6,6 +6,7 @@ import { randomUUID, randomBytes, createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { disposePrivateExport } from "./fixtures/dispose-private-export";
 import { processPrivacyRequest } from "../scripts/privacy-request.mjs";
 import { runNotificationBatch } from "@/lib/notifications/worker";
 
@@ -90,12 +91,13 @@ test.skipIf(process.env.RUN_PRIVACY_LOCAL !== "true")("local verified-account re
     await expect(stat(path)).rejects.toThrow();
   } finally {
     vi.unstubAllGlobals();vi.unstubAllEnvs();
-    check(await service.from("notification_outbox").delete().in("entity_id",owned()));
-    check(await service.from("audit_logs").delete().in("entity_id",owned()));
-    check(await service.from("jobs").delete().eq("id",jobId));
-    check(await service.from("companies").delete().eq("id",companyId));
-    for(const id of ids) { const found=await service.auth.admin.getUserById(id);if(found.data.user) check(await service.auth.admin.deleteUser(id)); }
-    await rm(folder,{recursive:true,force:true});
+    await disposePrivateExport(folder, async () => {
+      check(await service.from("notification_outbox").delete().in("entity_id",owned()));
+      check(await service.from("audit_logs").delete().in("entity_id",owned()));
+      check(await service.from("jobs").delete().eq("id",jobId));
+      check(await service.from("companies").delete().eq("id",companyId));
+      for(const id of ids) { const found=await service.auth.admin.getUserById(id);if(found.data.user) check(await service.auth.admin.deleteUser(id)); }
+    });
     expect((await service.from("notification_outbox").select("id",{head:true,count:"exact"})).count).toBe(0);
     expect((await service.from("audit_logs").select("id").in("entity_id",owned())).data).toHaveLength(0);
   }

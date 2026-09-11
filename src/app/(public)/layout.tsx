@@ -12,8 +12,8 @@ export default async function PublicLayout({
   return (
     <div className="flex min-h-full flex-col">
       <SiteHeader user={user} />
-      {/* pb-20 leaves room for the mobile bottom nav */}
-      <div className="flex flex-1 flex-col pb-20 sm:pb-0">{children}</div>
+      {/* Reserve the navigation and device safe area. */}
+      <div className="flex flex-1 flex-col pb-[var(--mobile-bottom-offset)] sm:pb-0">{children}</div>
       <SiteFooter />
       <MobileBottomNav user={user} />
     </div>

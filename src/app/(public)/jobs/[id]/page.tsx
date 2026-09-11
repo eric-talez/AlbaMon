@@ -161,7 +161,7 @@ export default async function JobDetailPage({
           authorization eligibility.
         </p>
 
-        <div className="sticky bottom-20 mt-6 sm:static sm:bottom-auto">
+        <div className="sticky bottom-[var(--mobile-bottom-offset)] mt-6 sm:static sm:bottom-auto">
           <Link
             href={`/jobs/${encodeURIComponent(job.id)}/apply`}
             className="flex h-12 w-full items-center justify-center rounded-full bg-brand px-6 font-medium text-brand-foreground transition-opacity hover:opacity-90"

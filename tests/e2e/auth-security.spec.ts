@@ -86,10 +86,12 @@ test("local admin enrolls TOTP, retries a bad code, and steps up again after sig
     await page.getByRole("button", { name: "인증 확인 / Verify" }).click();
     await expect(page).toHaveURL(/\/admin$/);
   } finally {
-    await page.goto("about:blank"); // Prevent failure artifacts from retaining enrollment material.
-    expect((await admin.from("audit_logs").delete().eq("entity_id",data.user.id)).error).toBeNull();
-    const result = await admin.auth.admin.deleteUser(data.user.id);
-    if (result.error) throw new Error("Disposable admin cleanup failed");
+    // Dispose Auth first, then any acknowledgement committed before deletion.
+    try { await page.goto("about:blank"); } finally { // Clear enrollment UI; disposal still runs if navigation fails.
+      const result = await admin.auth.admin.deleteUser(data.user.id);
+      expect((await admin.from("audit_logs").delete().eq("entity_id",data.user.id)).error).toBeNull();
+      if (result.error) throw new Error("Disposable admin cleanup failed");
+    }
   }
 });
 
@@ -129,11 +131,13 @@ test("local profile save returns to apply, preserves identity, and refreshes an 
     await page.getByRole("button", { name: "저장하고 계속 / Save and continue" }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
   } finally {
-    await page.goto("about:blank");
-    for (const id of users) {
-      expect((await admin.from("audit_logs").delete().eq("entity_id",id)).error).toBeNull();
-      const result = await admin.auth.admin.deleteUser(id);
-      if (result.error) throw new Error("Disposable seeker cleanup failed");
+    // Dispose Auth first, then any acknowledgement committed before deletion.
+    try { await page.goto("about:blank"); } finally {
+      for (const id of users) {
+        const result = await admin.auth.admin.deleteUser(id);
+        expect((await admin.from("audit_logs").delete().eq("entity_id",id)).error).toBeNull();
+        if (result.error) throw new Error("Disposable seeker cleanup failed");
+      }
     }
   }
 });
@@ -206,10 +210,31 @@ test("local PKCE callback exchanges a real code and sends an incomplete profile 
     await page.getByRole("button", { name: "저장하고 계속 / Save and continue" }).click();
     await expect(page).toHaveURL(new RegExp(`${destination}$`));
   } finally {
-    await page.goto("about:blank");
-    const mailCleanup = await fetch(mailSearch, { method: "DELETE" });
-    expect((await admin.from("audit_logs").delete().eq("entity_id",data.user.id)).error).toBeNull();
-    const userCleanup = await admin.auth.admin.deleteUser(data.user.id);
-    if (!mailCleanup.ok || userCleanup.error) throw new Error("Disposable callback cleanup failed");
+    // Dispose Auth first, then any acknowledgement committed before deletion.
+    try { await page.goto("about:blank"); } finally {
+      const mailCleanup = await fetch(mailSearch, { method: "DELETE" });
+      const userCleanup = await admin.auth.admin.deleteUser(data.user.id);
+      expect((await admin.from("audit_logs").delete().eq("entity_id",data.user.id)).error).toBeNull();
+      if (!mailCleanup.ok || userCleanup.error) throw new Error("Disposable callback cleanup failed");
+    }
+  }
+});
+
+test("expired cookie with a revoked local session returns to login", async ({ page, context }) => {
+  const admin = adminClient();
+  const email = `expired-${randomBytes(10).toString("hex")}@example.invalid`;
+  const password = randomBytes(32).toString("base64url");
+  const created = await admin.auth.admin.createUser({ email, password, email_confirm: true });
+  if (created.error || !created.data.user) throw new Error("Expired-session fixture failed");
+  const id = created.data.user.id;
+  try {
+    await signIn(context, email, password, true);
+    expect((await admin.auth.admin.deleteUser(id)).error).toBeNull();
+    await page.goto("/dashboard/applications");
+    await expect(page).toHaveURL(/\/login\?next=%2Fdashboard$/);
+    await expect(page.getByRole("heading", { name: /로그인/ }).first()).toBeVisible();
+  } finally {
+    if ((await admin.auth.admin.getUserById(id)).data.user) expect((await admin.auth.admin.deleteUser(id)).error).toBeNull();
+    expect((await admin.from("audit_logs").delete().eq("entity_id", id)).error).toBeNull();
   }
 });
