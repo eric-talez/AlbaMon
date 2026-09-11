@@ -1,5 +1,6 @@
 "use server";
 
+import { policyAcceptanceIdentity } from "@/lib/policy-publication.mjs";
 import { hasCurrentPolicies, TERMS_VERSION, PRIVACY_NOTICE_VERSION, POLICY_WRITE_MESSAGE } from "@/lib/policies";
 import { activeWriterError, requireUser } from "@/lib/auth/guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -15,14 +16,14 @@ export async function updateOwnProfile(formData: FormData): Promise<{
   const writerError = activeWriterError(user, { acknowledgingPolicies: true });
   if (writerError) return writerError;
   if (user.isDev) return { status: "error", message: "프로필 저장은 연결된 계정에서 이용해 주세요. (A connected account is required.)" };
-  const acknowledge = !hasCurrentPolicies(user);
-  if (acknowledge && (formData.get("agreeTerms") !== TERMS_VERSION || formData.get("confirmPrivacyNotice") !== PRIVACY_NOTICE_VERSION)) {
+  const acknowledge = !hasCurrentPolicies(user, policyAcceptanceIdentity());
+  if (acknowledge && (formData.get("policyIdentity") !== policyAcceptanceIdentity() || formData.get("agreeTerms") !== TERMS_VERSION || formData.get("confirmPrivacyNotice") !== PRIVACY_NOTICE_VERSION)) {
     return { status: "error", message: POLICY_WRITE_MESSAGE };
   }
   try {
     const supabase = await createSupabaseServerClient();
     if (acknowledge) {
-      const { error } = await supabase.rpc("acknowledge_policies", { terms: TERMS_VERSION, agree_terms: true, privacy_notice: PRIVACY_NOTICE_VERSION, confirm_privacy_notice: true });
+      const { error } = await supabase.rpc("acknowledge_policies", { terms: TERMS_VERSION, agree_terms: true, privacy_notice: PRIVACY_NOTICE_VERSION, confirm_privacy_notice: true, publication_identity: policyAcceptanceIdentity() });
       if (error) return { status: "error", message: POLICY_WRITE_MESSAGE };
     }
     const { data, error } = await supabase.from("profiles")

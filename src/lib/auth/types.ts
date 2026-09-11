@@ -2,6 +2,7 @@ import type { Role } from "@/lib/types";
 
 /** The minimal authenticated user shape the app relies on. */
 export interface AuthUser {
+  policyIdentity: string | null;
   termsVersion: string | null;
   termsAcceptedAt: string | null;
   privacyNoticeVersion: string | null;

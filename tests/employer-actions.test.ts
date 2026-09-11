@@ -1,3 +1,4 @@
+import { policyAcceptanceIdentity } from "../src/lib/policy-publication.mjs";
 import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -63,6 +64,7 @@ function jobForm(companyId = "company-1"): FormData {
   form.set("description", "고객 응대 업무");
   form.set("complianceAcknowledgement", "on");
   form.set("postingPolicyVersion", "ca-launch-v1");
+  form.set("postingPolicyIdentity", policyAcceptanceIdentity());
   form.set("moderation_status", "approved");
   form.set("boost", "featured");
   form.set("owner_id", "forged-owner");

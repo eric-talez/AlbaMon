@@ -1,3 +1,4 @@
+import { policyAcceptanceIdentity } from "@/lib/policy-publication.mjs";
 import { hasCurrentPolicies } from "@/lib/policies";
 import { NextResponse, type NextRequest } from "next/server";
 import { sanitizeNextPath } from "@/lib/auth/redirect";
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (!error && data.user) {
       const profile = await getAuthProfileForUser(data.user.id);
       if (profile) {
-        const destination = profile.displayName?.trim() && hasCurrentPolicies(profile)
+        const destination = profile.displayName?.trim() && hasCurrentPolicies(profile, policyAcceptanceIdentity())
           ? next : `/dashboard/profile?next=${encodeURIComponent(next)}`;
         return privateRedirect(destination);
       }

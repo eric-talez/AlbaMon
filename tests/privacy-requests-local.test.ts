@@ -1,3 +1,4 @@
+import { policyAcceptanceIdentity } from "../src/lib/policy-publication.mjs";
 import { test, expect, vi } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import { execFileSync } from "node:child_process";
@@ -18,7 +19,7 @@ test.skipIf(process.env.RUN_PRIVACY_LOCAL !== "true")("local verified-account re
   const nativeFetch=globalThis.fetch;
   const owned=()=>[...ids,companyId,jobId,applicationId,messageId];
   const check=(r:{error:unknown})=>{if(r.error) throw new Error("Privacy rehearsal operation failed");};
-  async function account() {
+  async function account(acknowledge=true) {
     const email=`privacy-${randomUUID()}@example.invalid`,password=randomBytes(32).toString("base64url");
     const created=await service.auth.admin.createUser({email,password,email_confirm:true});check(created);
     const id=created.data.user!.id;ids.push(id);
@@ -26,11 +27,11 @@ test.skipIf(process.env.RUN_PRIVACY_LOCAL !== "true")("local verified-account re
     check(await client.auth.signInWithPassword({email,password}));
     const verified=await client.auth.getUser();check(verified);
     expect(verified.data.user?.id===id && !!verified.data.user?.email_confirmed_at).toBe(true);
-    check(await client.rpc("acknowledge_policies",{terms:"ca-launch-v1",agree_terms:true,privacy_notice:"ca-launch-v1",confirm_privacy_notice:true}));
+    if(acknowledge) check(await client.rpc("acknowledge_policies",{terms:"ca-launch-v1",agree_terms:true,privacy_notice:"ca-launch-v1",confirm_privacy_notice:true,publication_identity:policyAcceptanceIdentity()}));
     return {id,email,client};
   }
   try {
-    const owner=await account(), seeker=await account(), orphan=await account();
+    const owner=await account(), seeker=await account(), orphan=await account(false);
     check(await service.from("profiles").update({role:"employer"}).eq("id",owner.id));
     check(await service.from("companies").insert({id:companyId,owner_id:owner.id,name:"Privacy toy company",city:"Oakland"}));
     const template=await service.from("jobs").select("*").eq("id","bbbbbbbb-0000-0000-0000-000000000001").single();check(template);
@@ -56,6 +57,9 @@ test.skipIf(process.env.RUN_PRIVACY_LOCAL !== "true")("local verified-account re
     const path=join(folder,`${requestId}.json`);
     const prepared=await processPrivacyRequest(service,record,"export",path);
     expect(prepared).toMatchObject({manualRedactionReviewRequired:true});
+    const exportCandidate=JSON.parse(await readFile(path,"utf8"));
+    expect(exportCandidate.profile.policy_identity).toBe(policyAcceptanceIdentity());
+    expect(exportCandidate.policy_acknowledgements.some((entry:{metadata:{current:{identity:string}}})=>entry.metadata.current.identity===policyAcceptanceIdentity())).toBe(true);
     if (!("candidateExportSha256" in prepared)) throw new Error("Candidate export evidence missing");
     expect((await stat(path)).mode & 0o777).toBe(0o600);
     const digest=createHash("sha256").update(await readFile(path)).digest("hex");expect(digest).toBe(prepared.candidateExportSha256);

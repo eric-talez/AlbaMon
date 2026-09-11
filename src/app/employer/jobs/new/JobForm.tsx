@@ -24,7 +24,7 @@ const INITIAL_STATE: JobFormState = { status: "idle", message: "" };
 const inputClass =
   "mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-brand";
 
-export function JobForm({ companies, job }: { companies: EmployerCompany[]; job?: JobRow }) {
+export function JobForm({ companies, job, policyIdentity }: { policyIdentity: string; companies: EmployerCompany[]; job?: JobRow }) {
   const [state, formAction, pending] = useActionState(job ? saveEmployerJob : submitEmployerJob, INITIAL_STATE);
 
   if (state.status === "success") {
@@ -130,6 +130,7 @@ export function JobForm({ companies, job }: { companies: EmployerCompany[]; job?
           required
           className="mt-1"
         />
+        <input type="hidden" name="postingPolicyIdentity" value={policyIdentity} />
         <input type="hidden" name="postingPolicyVersion" value={POSTING_POLICY_VERSION} />
         <span>
           <a href="/posting-policy" target="_blank" className="underline">공고 등록 정책 / Job posting policy</a>를 확인하고 동의합니다. (I acknowledge and agree.)

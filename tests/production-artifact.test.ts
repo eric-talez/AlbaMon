@@ -20,7 +20,7 @@ const maxDnsHostname = [
 ].join(".");
 
 function checkReleaseEnv(overrides: Record<string, string> = {}) {
-  return spawnSync(process.execPath, ["--input-type=module", "-e", 'import { checkReleaseEnv } from "./scripts/check-release-env.mjs"; import { syntheticPublication } from "./tests/fixtures/policy-publication.mjs"; checkReleaseEnv(process.env, syntheticPublication());'], {
+  return spawnSync(process.execPath, ["--input-type=module", "-e", 'import { checkReleaseEnv } from "./scripts/check-release-env.mjs"; import { syntheticPublication } from "./tests/fixtures/policy-publication.mjs"; import { policyAcceptanceIdentity } from "./src/lib/policy-publication.mjs"; checkReleaseEnv(process.env, syntheticPublication(), policyAcceptanceIdentity(syntheticPublication()));'], {
     cwd: process.cwd(),
     encoding: "utf8",
     env: { ...process.env, ...releaseEnv, ...overrides },
@@ -117,4 +117,35 @@ it("actual release CLI blocks the unresolved policy manifest", () => {
   const result = spawnSync(process.execPath, ["scripts/check-release-env.mjs"], { encoding: "utf8", env: { ...process.env, ...releaseEnv } });
   expect(result.status).not.toBe(0);
   expect(result.stderr).toContain("Policy publication blocked:");
+});
+
+it("pure release validator rejects absent or mismatched database identity", async () => {
+  const { checkReleaseEnv: validate } = await import("../scripts/check-release-env.mjs");
+  const { syntheticPublication } = await import("./fixtures/policy-publication.mjs");
+  for (const identity of [undefined, `draft:${"a".repeat(64)}`, `reviewed:${"b".repeat(64)}`]) {
+    expect(() => validate({...releaseEnv,NODE_ENV:"test"}, syntheticPublication(), identity)).toThrow("database identity mismatch");
+  }
+});
+
+it("database identity read uses only the anonymous key and fixed errors", async () => {
+  const { createServer } = await import("node:http");
+  const { readDatabasePolicyIdentity } = await import("../scripts/check-release-env.mjs");
+  const identity=`draft:${"c".repeat(64)}`;
+  let malformed=false;
+  const server=createServer((request,response)=>{
+    expect(request.url).toBe("/rest/v1/rpc/current_policy_identity");
+    expect(request.method).toBe("POST");
+    expect(request.headers.apikey).toBe("anonymous-test-key");
+    expect(request.headers.authorization).toBe("Bearer anonymous-test-key");
+    response.setHeader("Content-Type","application/json");
+    response.end(JSON.stringify(malformed?{private:"must-not-escape"}:identity));
+  });
+  await new Promise<void>(resolve=>server.listen(0,"127.0.0.1",resolve));
+  try {
+    const address=server.address();if(!address||typeof address==="string") throw Error("Test server unavailable");
+    const env={NODE_ENV:"test" as const,NEXT_PUBLIC_SUPABASE_URL:`http://127.0.0.1:${address.port}`,NEXT_PUBLIC_SUPABASE_ANON_KEY:"anonymous-test-key",SUPABASE_SERVICE_ROLE_KEY:"must-not-send"};
+    expect(await readDatabasePolicyIdentity(env)).toBe(identity);
+    malformed=true;
+    await expect(readDatabasePolicyIdentity(env)).rejects.toThrow(/^Policy publication blocked: database identity unavailable$/);
+  } finally { await new Promise<void>((resolve,reject)=>server.close(error=>error?reject(error):resolve())); }
 });

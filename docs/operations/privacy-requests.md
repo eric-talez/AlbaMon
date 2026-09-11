@@ -157,3 +157,11 @@ and disposal settings; hosted Auth/backup/log/provider actions and evidence;
 reviewed response/appeal/agent procedures. Execute each missing hosted step with
 owned staging fixtures after the owner decisions, record exact results, and keep
 public release blocked until the real policy bundle and operations are reviewed.
+
+Policy identity evidence (00710): include the subject's `policy_identity`, owned
+jobs' `posting_policy_identity`, and the scoped `policy_acknowledgements` export
+section when relevant to the reviewed access scope. These contain prior/current
+identity and database times, not private legal review correspondence. Resolve an
+identity against the protected immutable bundle archive; review this evidence's
+retention/hold/disposal purpose with the other audit records. No automatic erasure
+or retention duration is introduced by this change.

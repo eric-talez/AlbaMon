@@ -87,6 +87,7 @@ test("local admin enrolls TOTP, retries a bad code, and steps up again after sig
     await expect(page).toHaveURL(/\/admin$/);
   } finally {
     await page.goto("about:blank"); // Prevent failure artifacts from retaining enrollment material.
+    expect((await admin.from("audit_logs").delete().eq("entity_id",data.user.id)).error).toBeNull();
     const result = await admin.auth.admin.deleteUser(data.user.id);
     if (result.error) throw new Error("Disposable admin cleanup failed");
   }
@@ -130,6 +131,7 @@ test("local profile save returns to apply, preserves identity, and refreshes an 
   } finally {
     await page.goto("about:blank");
     for (const id of users) {
+      expect((await admin.from("audit_logs").delete().eq("entity_id",id)).error).toBeNull();
       const result = await admin.auth.admin.deleteUser(id);
       if (result.error) throw new Error("Disposable seeker cleanup failed");
     }
@@ -206,6 +208,7 @@ test("local PKCE callback exchanges a real code and sends an incomplete profile 
   } finally {
     await page.goto("about:blank");
     const mailCleanup = await fetch(mailSearch, { method: "DELETE" });
+    expect((await admin.from("audit_logs").delete().eq("entity_id",data.user.id)).error).toBeNull();
     const userCleanup = await admin.auth.admin.deleteUser(data.user.id);
     if (!mailCleanup.ok || userCleanup.error) throw new Error("Disposable callback cleanup failed");
   }

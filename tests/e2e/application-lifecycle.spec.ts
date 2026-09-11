@@ -1,3 +1,4 @@
+import { policyAcceptanceIdentity } from "../../src/lib/policy-publication.mjs";
 import { expect, test as base, type BrowserContext } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
@@ -24,14 +25,14 @@ async function setup(context?:BrowserContext) {
     const cookies=new Map<string,string>();
     const client=createServerClient(url,anonKey,{cookies:{getAll:()=>[...cookies].map(([name,value])=>({name,value})),setAll:items=>{for(const item of items) cookies.set(item.name,item.value);}}});
     if((await client.auth.signInWithPassword({email,password})).error) throw new Error("B3 login failed");
-    if ((await client.rpc("acknowledge_policies", { terms: "ca-launch-v1", agree_terms: true, privacy_notice: "ca-launch-v1", confirm_privacy_notice: true })).error) throw new Error("Fixture self acknowledgement failed");
+    if ((await client.rpc("acknowledge_policies", { terms: "ca-launch-v1", agree_terms: true, privacy_notice: "ca-launch-v1", confirm_privacy_notice: true, publication_identity: policyAcceptanceIdentity() })).error) throw new Error("Fixture self acknowledgement failed");
     if(browser) await browser.addCookies([...cookies].map(([name,value])=>({name,value,domain:"127.0.0.1",path:"/"})));
     return {id,client,cookies};
   }
   async function cleanup() {
     const notifications=await service.from("notification_outbox").delete().in("entity_id",[...jobIds,...applicationIds]);
     if(notifications.error) throw new Error("B3 notification cleanup failed");
-    const audit=await service.from("audit_logs").delete().in("entity_id",jobIds);
+    const audit=await service.from("audit_logs").delete().in("entity_id",[...jobIds,...users]);
     const jobs=await service.from("jobs").delete().in("id",jobIds);
     const company=await service.from("companies").delete().eq("id",companyId);
     for(const id of users) if((await service.auth.admin.deleteUser(id)).error) throw new Error("B3 user cleanup failed");

@@ -1,3 +1,4 @@
+import { policyAcceptanceIdentity } from "@/lib/policy-publication.mjs";
 import { POSTING_POLICY_VERSION } from "@/lib/policies";
 import {
   JOB_CATEGORIES,
@@ -369,7 +370,7 @@ export function parseEmployerCompanyForm(formData: FormData): ValidationResult<E
 }
 
 export function parseEmployerJobForm(formData: FormData): ValidationResult<EmployerJobInput> {
-  if (formData.get("complianceAcknowledgement") !== "on" || formData.get("postingPolicyVersion") !== POSTING_POLICY_VERSION) {
+  if (formData.get("complianceAcknowledgement") !== "on" || formData.get("postingPolicyVersion") !== POSTING_POLICY_VERSION || formData.get("postingPolicyIdentity") !== policyAcceptanceIdentity()) {
     return {
       ok: false,
       message:

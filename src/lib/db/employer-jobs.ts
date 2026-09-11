@@ -1,3 +1,4 @@
+import { policyAcceptanceIdentity } from "@/lib/policy-publication.mjs";
 import { POSTING_POLICY_VERSION } from "@/lib/policies";
 import { writeFailure } from "@/lib/db/write-errors";
 import "server-only";
@@ -115,6 +116,7 @@ export async function createEmployerJob(
 function toEmployerJobColumns(input: EmployerJobInput) {
   return {
     posting_policy_version: POSTING_POLICY_VERSION,
+    posting_policy_identity: policyAcceptanceIdentity(),
     title: input.title,
     category: input.category,
     job_type: input.jobType,

@@ -1,3 +1,4 @@
+import { policyAcceptanceIdentity } from "../src/lib/policy-publication.mjs";
 import { acknowledgedPolicies } from "./fixtures/policies";
 import { beforeEach, expect, test, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ user: vi.fn(), update: vi.fn(), eq: vi.fn(), single: vi.fn() }));
@@ -5,7 +6,7 @@ vi.mock("@/lib/auth/guards", async (original) => ({ ...await original<object>(),
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: async () => ({ from: () => ({ update: mocks.update }) }) }));
 import { updateOwnProfile } from "@/app/dashboard/profile/actions";
 function form(values: Record<string, string>) {
-  const data = new FormData();
+  const data = new FormData(); data.set("policyIdentity", policyAcceptanceIdentity());
   for (const [key, value] of Object.entries(values)) data.set(key, value);
   return data;
 }

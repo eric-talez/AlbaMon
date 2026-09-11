@@ -1,3 +1,4 @@
+import { policyAcceptanceIdentity } from "../../src/lib/policy-publication.mjs";
 import { test, expect } from "@playwright/test";
 for (const path of ["/terms", "/privacy", "/posting-policy", "/work-authorization-info"]) {
   test(`reviewable policy ${path}`, async ({ page }) => {
@@ -22,14 +23,14 @@ test("explicit profile and posting acknowledgement survive REST bypass attempts 
   if(created.error || !created.data.user) throw new Error("Policy fixture creation failed");
   const id=created.data.user.id,jobIds:string[]=[];
   try {
-    expect((await service.from("profiles").select("terms_version,terms_accepted_at,privacy_notice_version,privacy_notice_acknowledged_at").eq("id",id).single()).data).toEqual({terms_version:null,terms_accepted_at:null,privacy_notice_version:null,privacy_notice_acknowledged_at:null});
+    expect((await service.from("profiles").select("terms_version,terms_accepted_at,privacy_notice_version,privacy_notice_acknowledged_at,policy_identity").eq("id",id).single()).data).toEqual({terms_version:null,terms_accepted_at:null,privacy_notice_version:null,privacy_notice_acknowledged_at:null,policy_identity:null});
     const cookies=new Map<string,string>();
     const self=createServerClient(config.API_URL,config.ANON_KEY,{cookies:{getAll:()=>[...cookies].map(([name,value])=>({name,value})),setAll:items=>{for(const item of items) cookies.set(item.name,item.value);}}});
     if((await self.auth.signInWithPassword({email,password})).error) throw new Error("Policy fixture sign-in failed");
     await context.addCookies([...cookies].map(([name,value])=>({name,value,domain:"127.0.0.1",path:"/"})));
     expect((await self.from("profiles").update({display_name:"Unchecked"}).eq("id",id)).error?.message).toBe("policy_acknowledgement_required");
     expect((await self.from("profiles").update({terms_version:"ca-launch-v1",terms_accepted_at:"1900-01-01",privacy_notice_version:"ca-launch-v1"}).eq("id",id)).error?.code).toBe("42501");
-    for(const args of [{terms:"old",agree_terms:true,privacy_notice:"ca-launch-v1",confirm_privacy_notice:true},{terms:"ca-launch-v1",agree_terms:false,privacy_notice:"ca-launch-v1",confirm_privacy_notice:true},{terms:"ca-launch-v1",agree_terms:true,privacy_notice:"ca-launch-v1",confirm_privacy_notice:false}]) expect((await self.rpc("acknowledge_policies",args)).error?.code).toBe("42501");
+    for(const args of [{terms:"old",agree_terms:true,privacy_notice:"ca-launch-v1",confirm_privacy_notice:true,publication_identity:policyAcceptanceIdentity()},{terms:"ca-launch-v1",agree_terms:false,privacy_notice:"ca-launch-v1",confirm_privacy_notice:true,publication_identity:policyAcceptanceIdentity()},{terms:"ca-launch-v1",agree_terms:true,privacy_notice:"ca-launch-v1",confirm_privacy_notice:false}]) expect((await self.rpc("acknowledge_policies",{...args,publication_identity:policyAcceptanceIdentity()})).error?.code).toBe("42501");
     // Reads remain available before agreement.
     await page.goto("/dashboard/applications");expect((await page.locator("main").textContent())?.includes("지원")).toBe(true);
     await page.goto("/dashboard/profile?next=%2Femployer");
@@ -43,13 +44,13 @@ test("explicit profile and posting acknowledgement survive REST bypass attempts 
     const before=Date.now();
     await page.getByRole("button",{name:"저장하고 계속 / Save and continue"}).click();
     await expect(page).not.toHaveURL(/dashboard\/profile/);
-    const accepted=await service.from("profiles").select("terms_version,terms_accepted_at,privacy_notice_version,privacy_notice_acknowledged_at").eq("id",id).single();
-    expect(accepted.data?.terms_version).toBe("ca-launch-v1");expect(accepted.data?.privacy_notice_version).toBe("ca-launch-v1");
+    const accepted=await service.from("profiles").select("terms_version,terms_accepted_at,privacy_notice_version,privacy_notice_acknowledged_at,policy_identity").eq("id",id).single();
+    expect(accepted.data?.policy_identity).toBe(policyAcceptanceIdentity());expect(accepted.data?.terms_version).toBe("ca-launch-v1");expect(accepted.data?.privacy_notice_version).toBe("ca-launch-v1");
     expect(Date.parse(accepted.data!.terms_accepted_at)>=before-1000).toBe(true);
     expect(accepted.data?.terms_accepted_at).toBe(accepted.data?.privacy_notice_acknowledged_at);
     expect((await self.from("profiles").update({city:"Oakland"}).eq("id",id)).error).toBeNull();
     expect((await self.from("profiles").update({terms_accepted_at:"2100-01-01"}).eq("id",id)).error?.code).toBe("42501");
-    expect((await self.rpc("acknowledge_policies",{terms:"ca-launch-v1",agree_terms:true,privacy_notice:"ca-launch-v1",confirm_privacy_notice:true})).error).toBeNull();
+    expect((await self.rpc("acknowledge_policies",{terms:"ca-launch-v1",agree_terms:true,privacy_notice:"ca-launch-v1",confirm_privacy_notice:true,publication_identity:policyAcceptanceIdentity()})).error).toBeNull();
     expect((await service.from("profiles").select("terms_accepted_at").eq("id",id).single()).data?.terms_accepted_at).toBe(accepted.data?.terms_accepted_at);
     expect((await service.from("profiles").update({role:"employer"}).eq("id",id)).error).toBeNull();
     expect((await service.from("companies").insert({id:companyId,owner_id:id,name:"Policy toy company",city:"Oakland"})).error).toBeNull();
@@ -68,6 +69,40 @@ test("explicit profile and posting acknowledgement survive REST bypass attempts 
     expect(jobs.data?.[0]).toMatchObject({posting_policy_version:"ca-launch-v1",moderation_status:"pending"});
     expect(Date.parse(jobs.data![0].posting_policy_acknowledged_at)>=before-1000).toBe(true);
     expect((await self.from("jobs").update({posting_policy_acknowledged_at:"2100-01-01"}).eq("id",jobIds[0])).error?.code).toBe("42501");
+    // Retained prior-content rows model an earlier deployment. This privileged
+    // setup is not evidence of agreement; only the following real forms are.
+    const priorIdentity=`draft:${"a".repeat(64)}`;
+    expect((await service.from("profiles").update({policy_identity:priorIdentity}).eq("id",id)).error).toBeNull();
+    expect((await service.from("jobs").update({posting_policy_identity:priorIdentity}).eq("id",jobIds[0])).error).toBeNull();
+    expect((await self.from("profiles").update({city:"Berkeley"}).eq("id",id)).error?.message).toBe("policy_acknowledgement_required");
+    expect((await self.rpc("acknowledge_policies",{terms:"ca-launch-v1",agree_terms:true,privacy_notice:"ca-launch-v1",confirm_privacy_notice:true,publication_identity:priorIdentity})).error?.code).toBe("42501");
+    await page.goto("/employer/jobs");
+    await expect(page.getByRole("link",{name:"편집 / Edit"})).toBeVisible();
+    await page.goto("/dashboard/profile?next=%2Femployer%2Fjobs");
+    await expect(page.locator('[name="agreeTerms"]')).not.toBeChecked();
+    await expect(page.locator('[name="confirmPrivacyNotice"]')).not.toBeChecked();
+    expect(await page.locator('[name="policyIdentity"]').inputValue()).toBe(policyAcceptanceIdentity());
+    await page.locator('[name="agreeTerms"]').check();
+    await page.locator('[name="confirmPrivacyNotice"]').check();
+    await page.getByRole("button",{name:"저장하고 계속 / Save and continue"}).click();
+    await expect(page).toHaveURL(/\/employer\/jobs$/);
+    const reaccepted=await service.from("profiles").select("policy_identity,terms_accepted_at,privacy_notice_acknowledged_at").eq("id",id).single();
+    expect(reaccepted.data?.policy_identity).toBe(policyAcceptanceIdentity());
+    expect(Date.parse(reaccepted.data!.terms_accepted_at)).toBeGreaterThan(Date.parse(accepted.data!.terms_accepted_at));
+    expect(reaccepted.data?.privacy_notice_acknowledged_at).toBe(reaccepted.data?.terms_accepted_at);
+    expect((await self.from("jobs").update({title:"Unacknowledged revision",posting_policy_identity:priorIdentity}).eq("id",jobIds[0])).error?.message).toBe("posting_policy_acknowledgement_required");
+    await page.goto(`/employer/jobs/${jobIds[0]}/edit`);
+    await expect(page.locator('[name="complianceAcknowledgement"]')).not.toBeChecked();
+    expect(await page.locator('[name="postingPolicyIdentity"]').inputValue()).toBe(policyAcceptanceIdentity());
+    await page.locator('[name="complianceAcknowledgement"]').check();
+    await page.getByRole("button",{name:"저장하고 재심사 / Save for review"}).click();
+    await expect(page.getByRole("status")).toContainText("검토");
+    const revised=await service.from("jobs").select("posting_policy_identity,posting_policy_acknowledged_at").eq("id",jobIds[0]).single();
+    expect(revised.data?.posting_policy_identity).toBe(policyAcceptanceIdentity());
+    expect(Date.parse(revised.data!.posting_policy_acknowledged_at)).toBeGreaterThan(Date.parse(jobs.data![0].posting_policy_acknowledged_at));
+    const history=await service.from("audit_logs").select("entity_id,metadata").eq("action","policy.acknowledged").in("entity_id",[id,jobIds[0]]);
+    for(const entityId of [id,jobIds[0]]) expect(history.data?.some(row=>row.entity_id===entityId&&row.metadata.previous?.identity===priorIdentity&&row.metadata.current.identity===policyAcceptanceIdentity())).toBe(true);
+
   } finally {
     await page.goto("about:blank").catch(()=>{});
     const allJobs=await service.from("jobs").select("id").eq("company_id",companyId);

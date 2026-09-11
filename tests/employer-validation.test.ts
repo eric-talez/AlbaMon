@@ -1,3 +1,4 @@
+import { policyAcceptanceIdentity } from "../src/lib/policy-publication.mjs";
 import { describe, expect, it } from "vitest";
 import {
   containsBlockedPostingPhrase,
@@ -40,6 +41,7 @@ function validJobForm(): FormData {
   form.set("benefits", "식사 제공");
   form.set("complianceAcknowledgement", "on");
   form.set("postingPolicyVersion", "ca-launch-v1");
+  form.set("postingPolicyIdentity", policyAcceptanceIdentity());
   return form;
 }
 

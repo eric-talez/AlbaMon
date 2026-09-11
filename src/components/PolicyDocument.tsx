@@ -1,4 +1,4 @@
-import { policyContent, policyFacts, validatePolicyPublication } from "@/lib/policy-publication.mjs";
+import { policyContent, policyFacts, policyAcceptanceIdentity, validatePolicyPublication } from "@/lib/policy-publication.mjs";
 const factLabels: Record<string, string> = {
   operatorLegalName: "운영 주체 / Operator", mailingAddress: "우편 주소 / Mailing address", supportEmail: "문의·개인정보 요청 / Support and privacy requests", effectiveDate: "적용일 / Effective date", controllingLanguage: "효력 언어 / Controlling language", minimumAgePolicy: "연령·미성년자 / Age policy", appealsAndTermination: "이의신청·계정 종료 / Appeals and termination", disputeTerms: "분쟁·책임 조항 / Disputes and liability", changeNotice: "정책 변경 공지 / Change notices", retentionSchedule: "항목별 보관·삭제·예외 / Retention and exceptions", privacyRequestProcess: "본인 확인·요청·응답 절차 / Request process", trackingAndSignals: "추적·판매/공유·DNT/GPC / Tracking and signals", processorDeployment: "실제 처리업체·지역·설정 / Verified processors", legalApplicability: "적용 법률 검토 / Legal applicability",
 };
@@ -9,6 +9,7 @@ export function PolicyDocument({ policy }: { policy: keyof typeof policyContent 
     <p className="rounded-lg border border-border bg-surface p-4 font-semibold">{draft ? "검토 초안 / Draft for review — 실제 운영 사실과 외부 검토가 미확정이며 공개 효력 정책이 아닙니다." : "검토된 정책 / Reviewed policy"}</p>
     <h1 className="mt-6 text-3xl font-bold">{document.title}</h1>
     <p className="mt-2 text-sm text-muted">K-Work US · {policyFacts.version}</p>
+    <p className="mt-2 break-all text-xs text-muted">문서 식별자 / Document identity: {policyAcceptanceIdentity()}</p>
     <p lang="en" className="mt-4 leading-7">{document.summary}</p>
     {document.sections.map(([title, body]) => <section key={title} className="mt-8">
       <h2 className="text-xl font-semibold">{title}</h2><p className="mt-3 whitespace-pre-line leading-7">{body}</p>

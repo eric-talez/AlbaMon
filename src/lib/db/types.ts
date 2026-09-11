@@ -36,6 +36,7 @@ export type {
 export type AddressDisplayMode = "full" | "city_only";
 
 export interface ProfileRow {
+  policy_identity: string | null;
   terms_version: string | null;
   terms_accepted_at: string | null;
   privacy_notice_version: string | null;
@@ -70,6 +71,7 @@ export interface CompanyRow {
 }
 
 export interface JobRow {
+  posting_policy_identity: string | null;
   posting_policy_version: string | null;
   posting_policy_acknowledged_at: string | null;
   id: string;

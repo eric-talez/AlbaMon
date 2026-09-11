@@ -1,3 +1,4 @@
+import { policyAcceptanceIdentity } from "../../src/lib/policy-publication.mjs";
 import { test, expect, type BrowserContext } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
@@ -33,7 +34,7 @@ test("local moderation rehearsal: report pause, account suspension, old JWT deni
     const client=createServerClient(url,anon,{cookies:{getAll:()=>[...cookies].map(([name,value])=>({name,value})),setAll:items=>{for(const item of items) cookies.set(item.name,item.value);}}});
     if((await client.auth.signInWithPassword({email,password})).error) throw new Error("C2 Auth login failed");
     async function sync() {if(target) await target.addCookies([...cookies].map(([name,value])=>({name,value,domain:"127.0.0.1",path:"/"})));}
-    if ((await client.rpc("acknowledge_policies", { terms: "ca-launch-v1", agree_terms: true, privacy_notice: "ca-launch-v1", confirm_privacy_notice: true })).error) throw new Error("Fixture self acknowledgement failed");
+    if ((await client.rpc("acknowledge_policies", { terms: "ca-launch-v1", agree_terms: true, privacy_notice: "ca-launch-v1", confirm_privacy_notice: true, publication_identity: policyAcceptanceIdentity() })).error) throw new Error("Fixture self acknowledgement failed");
     await sync();return {id,email,client,sync};
   }
   try {
@@ -97,7 +98,7 @@ test("local moderation rehearsal: report pause, account suspension, old JWT deni
     await suspended.getByRole("button",{name:"정지 해제 / Restore",exact:true}).click();
     await expect.poll(async()=>(await service.from("profiles").select("account_status").eq("id",owner.id).single()).data?.account_status).toBe("active");
     expect((await createClient(url,anon).from("public_job_listings").select("id").eq("id",jobId)).data).toHaveLength(0);
-    const audit=await admin.client.from("audit_logs").select("action,actor_id,metadata").eq("entity_id",owner.id).order("created_at");
+    const audit=await admin.client.from("audit_logs").select("action,actor_id,metadata").eq("entity_id",owner.id).in("action",["account.suspended","account.restored"]).order("created_at");
     expect(audit.data?.map(row=>row.action)).toEqual(["account.suspended","account.restored"]);
     expect(audit.data?.every(row=>row.actor_id===admin.id && row.metadata.reason)).toBe(true);
     const employerReports=await owner.client.from("reports").select("reporter_id").eq("id",reportId);

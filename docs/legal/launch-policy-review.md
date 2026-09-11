@@ -42,9 +42,9 @@ After owner decisions and external review:
    Record it as `review.bundleSha256` and in the protected review record. A fact
    or prose change invalidates the digest. This is integrity checking, not an
    automated proof that legal review occurred or that the service complies.
-4. Run `npm run build:release` with the existing real A2/C1 settings documented
+4. Follow the explicit database activation sequence below, then run `npm run build:release` with the existing real A2/C1 settings documented
    in `.env.example`. The standalone check runs before Next's production runtime;
-   C1's runtime-only delivery guard remains separate. A successful no-secret
+   C1's runtime-only delivery guard remains separate. The release CLI also performs a read-only, five-second bounded anonymous RPC check that the database policy identity matches this exact artifact. A successful no-secret
    `npm run build` intentionally does not grant public readiness.
 5. Verify the actual hosted policy text and support channel, Google smoke,
    provider/DNS/inbox/webhook evidence and hosted privacy rehearsal. Commit the
@@ -54,6 +54,91 @@ After owner decisions and external review:
 `tests/fixtures/policy-publication.mjs` is explicitly synthetic, imported only by
 tests. It is never loaded by the CLI or the pages. Synthetic gate passes and local
 consent records are mechanics evidence, not actual approval of draft policies.
+
+## Acceptance identity, activation and rollback handoff (D1/D2)
+
+The three required version constants remain exactly `ca-launch-v1`. Acceptance
+also requires `policyAcceptanceIdentity()`: `draft:<SHA-256>` or
+`reviewed:<SHA-256>`, hashing the exact version, public facts and complete four-page
+content. Draft to reviewed changes the identity even if the text is unchanged;
+any facts/prose revision changes the digest. Private evidence references are not
+policy content. Never reuse an identity for altered content, manufacture a bulk
+acceptance, or use a synthetic test manifest as actual reviewed publication.
+
+Migration `20260909000710_policy_publication_identity.sql` adds nullable
+`profiles.policy_identity` and `jobs.posting_policy_identity`, without defaults
+or backfill. It initializes the singleton `policy_publication` pointer only to
+`draft:23194732385dbc6318df4713775a0ae2ce482e69cd45324ca94d95beb9d821f7`, the initial
+checked-in draft. Existing rows remain unacknowledged. The public, read-only RPC
+`current_policy_identity()` reports the pointer. For local initial setup, apply
+00710 only to the owned disposable stack and compare that RPC with the bundled
+`policyAcceptanceIdentity()`; no final facts, acceptance or review is implied.
+
+Before a real reviewed activation:
+
+1. Complete the owner/external review above. Preserve the exact committed JSON
+   facts/prose, immutable application artifact, computed identity, protected review
+   evidence and proposed effective/change-notice procedure. Archive every activated
+   bundle so an identity in an acknowledgement can be resolved to what was shown.
+   Retention of that evidence requires the owner's reviewed category schedule.
+2. Apply 00710 in the intended database using D1's reviewed migration procedure.
+   Capture the actual current pointer and independently verify the project URL.
+   Build/test a private candidate with ordinary `npm run build`, the reviewed
+   bundled JSON and intended public configuration; ordinary build grants no launch
+   approval. Prepare the explicit transition window and user notice required by
+   the reviewed change-notice decision. Until coordinated activation/deployment,
+   policy-protected writes may fail closed; historical reads remain accessible.
+3. From the protected operator process, load the existing A2/C1 settings (never
+   expose the service key to Next build/browser). Use the fixed service-only RPC
+   with **the exact captured prior identity**, not an automatically refreshed one:
+
+   ```js
+   import { createClient } from "@supabase/supabase-js";
+   import { policyAcceptanceIdentity } from "./src/lib/policy-publication.mjs";
+   import { checkReleaseSettings } from "./scripts/check-release-env.mjs";
+   checkReleaseSettings(process.env); // real reviewed bundle + existing settings
+   const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL,
+     process.env.SUPABASE_SERVICE_ROLE_KEY,
+     { auth: { persistSession: false, autoRefreshToken: false } });
+   const { error } = await client.rpc("activate_policy_publication", {
+     expected_identity: capturedPriorIdentity, // approved transition record
+     next_identity: policyAcceptanceIdentity(),
+   });
+   if (error) throw new Error("Policy activation failed; inspect protected operator evidence");
+   ```
+
+   Supply `capturedPriorIdentity` from the approved transition record in that
+   process. This compare-and-set operation fails on concurrent/stale activation,
+   serializes against protected writes, and records old/new identities in
+   `audit_logs`. It never updates a profile or job acknowledgement. Authenticated
+   users and anonymous callers cannot activate or mutate the pointer.
+4. Run `npm run build:release` and deploy that matching reviewed artifact. The
+   pure `checkReleaseSettings`/`checkReleaseEnv` functions require no framework or
+   network access; only the CLI's separate `readDatabasePolicyIdentity` performs
+   the bounded anonymous read. Missing/unreachable/mismatched database identity
+   blocks release with a fixed error. No new policy environment variables or
+   external facts file exist. Preserve the C1 runtime send guard and private
+   credential handling. Recheck the pointer and hosted document identity after
+   deployment; save artifact/pointer evidence before admitting public writes.
+5. Verify with a retained older account and job in controlled staging: history
+   remains readable, next write requests explicit Terms agreement and separate
+   Privacy notice confirmation, and job editing requires explicit Posting Policy
+   agreement. Reacknowledgement sends the displayed identity; stale clients fail
+   at DB/API boundaries. Current identity changes refresh database-controlled
+   acknowledgement times; repeating the same identity preserves them. Prior/new
+   user and job evidence is retained as `policy.acknowledged` audit events and is
+   available in the scoped operator access-export candidate. Activation itself
+   does not label anyone as having agreed. Old posting identity cannot satisfy
+   resubmission or administrator approval. Pause/close preserve its prior evidence.
+
+For a code incident, prefer an earlier compatible immutable artifact carrying
+**the same currently reviewed identity**. Do not silently reactivate older legal
+terms or automate pointer rollback. A pointer change is a separate explicit
+reviewed policy transition requiring content/effective-date/notice review and
+its resulting reacknowledgement effects. If no compatible artifact exists, hold
+protected writes and escalate to the release/policy owners. Restoring a database
+backup or a mismatched code artifact is not acceptance repair. Preserve the
+activation/acknowledgement evidence; do not rewrite historical rows to fit a build.
 
 ## Decisions requiring owner and external review
 

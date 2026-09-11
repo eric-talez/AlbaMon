@@ -1,3 +1,4 @@
+import { policyAcceptanceIdentity } from "@/lib/policy-publication.mjs";
 import { hasCurrentPolicies, POLICY_WRITE_MESSAGE } from "@/lib/policies";
 import { SUSPENDED_WRITE_MESSAGE } from "@/lib/db/write-errors";
 import "server-only";
@@ -79,6 +80,6 @@ function requireAdminSession(user: AuthUser): void {
 /** Only writes call this; suspended users retain their read/history routes. */
 export function activeWriterError(user: AuthUser, options: { acknowledgingPolicies?: boolean } = {}): { status: "error"; message: string } | null {
   if (user.accountStatus === "suspended") return { status: "error", message: SUSPENDED_WRITE_MESSAGE };
-  if (!options.acknowledgingPolicies && !hasCurrentPolicies(user)) return { status: "error", message: POLICY_WRITE_MESSAGE };
+  if (!options.acknowledgingPolicies && !hasCurrentPolicies(user, policyAcceptanceIdentity())) return { status: "error", message: POLICY_WRITE_MESSAGE };
   return null;
 }

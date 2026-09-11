@@ -6,8 +6,8 @@ import { useState } from "react";
 import { sanitizeNextPath } from "@/lib/auth/redirect";
 import { updateOwnProfile } from "./actions";
 
-export function ProfileForm({ displayName, city, next, emailNotificationsEnabled, policiesAcknowledged }: {
-  policiesAcknowledged: boolean;
+export function ProfileForm({ displayName, city, next, emailNotificationsEnabled, policiesAcknowledged, policyIdentity }: {
+  policiesAcknowledged: boolean; policyIdentity: string;
   displayName: string | null; city: string | null; next: string; emailNotificationsEnabled: boolean;
 }) {
   const [message, setMessage] = useState("");
@@ -29,6 +29,7 @@ export function ProfileForm({ displayName, city, next, emailNotificationsEnabled
   }
   return (
     <form action={save} className="mt-6 space-y-4">
+      <input type="hidden" name="policyIdentity" value={policyIdentity} />
       <input type="hidden" name="next" value={sanitizeNextPath(next)} />
       <label className="block text-sm font-medium">
         표시 이름 / Display name

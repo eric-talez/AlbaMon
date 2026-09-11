@@ -1,11 +1,9 @@
-import { validatePolicyPublication, policyFacts } from "../src/lib/policy-publication.mjs";
+import { validatePolicyPublication, policyFacts, policyAcceptanceIdentity } from "../src/lib/policy-publication.mjs";
 import { pathToFileURL } from "node:url";
-import nextEnv from "@next/env";
 import { isIP } from "node:net";
 
-const { loadEnvConfig } = nextEnv;
 
-export function checkReleaseEnv(env = process.env, facts = policyFacts) {
+export function checkReleaseSettings(env = process.env, facts = policyFacts) {
   const required = [
     "NEXT_PUBLIC_SITE_URL",
     "NEXT_PUBLIC_SUPABASE_URL",
@@ -65,9 +63,35 @@ export function checkReleaseEnv(env = process.env, facts = policyFacts) {
   }
   const policyIssues = validatePolicyPublication(facts);
   if (policyIssues.length) throw new Error(`Policy publication blocked: ${policyIssues.join(", ")}`);
-  console.log("Release environment settings are present; provider/DNS/inbox evidence must be verified separately.");
+  return policyAcceptanceIdentity(facts);
+}
+export function checkReleaseEnv(env = process.env, facts = policyFacts, databaseIdentity) {
+  const identity = checkReleaseSettings(env, facts);
+  if (identity !== databaseIdentity) throw new Error("Policy publication blocked: database identity mismatch");
+  return identity;
+}
+// Bounded read-only check, deliberately separate from the pure validator.
+export async function readDatabasePolicyIdentity(env = process.env) {
+  try {
+    const response = await fetch(new URL("/rest/v1/rpc/current_policy_identity", env.NEXT_PUBLIC_SUPABASE_URL), {
+      method: "POST", headers: { apikey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY, Authorization: `Bearer ${env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`, "Content-Type": "application/json" },
+      body: "{}", signal: AbortSignal.timeout(5000), redirect: "error",
+    });
+    if (!response.ok) throw new Error();
+    const identity = await response.json();
+    if (typeof identity !== "string" || !/^(draft|reviewed):[0-9a-f]{64}$/.test(identity)) throw new Error();
+    return identity;
+  } catch { throw new Error("Policy publication blocked: database identity unavailable"); }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  loadEnvConfig(process.cwd(), false);
-  checkReleaseEnv();
+  const { default: nextEnv } = await import("@next/env");
+  nextEnv.loadEnvConfig(process.cwd(), false);
+  try {
+    checkReleaseSettings();
+    checkReleaseEnv(process.env, policyFacts, await readDatabasePolicyIdentity());
+    console.log("Release settings and database policy identity match; provider/DNS/inbox evidence must be verified separately.");
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : "Release preflight failed");
+    process.exitCode = 1;
+  }
 }

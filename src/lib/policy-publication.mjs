@@ -9,6 +9,9 @@ const REQUIRED_FACTS = ["operatorLegalName", "mailingAddress", "supportEmail", "
 export function policyBundleHash(config = policyFacts, content = policyContent) {
   return createHash("sha256").update(JSON.stringify({version: config.version, facts: config.facts, content})).digest("hex");
 }
+export function policyAcceptanceIdentity(config = policyFacts, content = policyContent) {
+  return `${validatePolicyPublication(config, content).length === 0 ? "reviewed" : "draft"}:${policyBundleHash(config, content)}`;
+}
 export function validatePolicyPublication(config = policyFacts, content = policyContent) {
   const issues = [];
   if (config?.version !== "ca-launch-v1" || config?.status !== "reviewed") issues.push("policy version/status");
