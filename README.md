@@ -9,6 +9,10 @@ and [product brief](docs/PRODUCT_BRIEF.md) supersede the original PDF and histor
 Slice roadmap. Public deployment is **UNVERIFIED** pending actual operator,
 domain, provider, policy review and hosted execution evidence.
 
+대표용 [출시 인수인계와 실제 배포 순서](docs/launch-evidence/production-release.md),
+[첫 30일 운영표](docs/operations/first-30-days.md)를 먼저 확인하세요.
+소프트웨어/로컬 검증은 완료됐지만 실제 공개는 아직 **NO-GO**입니다.
+
 ## Develop locally
 
 Use Node **22.x** (`.nvmrc`), npm and the committed lockfile:
@@ -32,6 +36,7 @@ initial draft pointer with the current checked-in bundle, never user acceptance.
 
 ```bash
 npm test
+npx next typegen
 npm run typecheck
 npm run lint
 npm run verify:beta

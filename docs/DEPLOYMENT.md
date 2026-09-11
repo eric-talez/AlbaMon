@@ -9,6 +9,11 @@ see [environment evidence](launch-evidence/environments.md),
 [environment variables](PRODUCTION_ENV_VARS.md), [launch checklist](LAUNCH_CHECKLIST.md)
 and [local setup](LOCAL_SUPABASE.md).
 
+The [Korean owner handover and production execution record](launch-evidence/production-release.md)
+contains the exact candidate/migration identities, actual NO-GO gaps, staged
+Production/promotion commands and residual findings. After real public Go use
+the [first-30-days runbook](operations/first-30-days.md).
+
 ## Inventory before any hosted mutation
 
 The operator must select actual existing Vercel/Supabase projects, domain,
@@ -208,7 +213,9 @@ npm run check:production-artifact
 ```
 
 CI owns its disposable stack lifecycle; original543xx/native5432 are untouched.
-D2 owns final database/browser/fault/restore rehearsals and their measured timing.
+D2's completed local database/browser/fault/restore results and their measured
+timing are in [candidate evidence](launch-evidence/release-candidate.md); actual
+hosted execution remains unverified.
 For a hosted recovery target, `npm run verify:deploy-target -- recovery` requires
 additional `RECOVERY_PROJECT_REF`/`RECOVERY_ORIGIN` distinct from **both** other
 targets, with matching public site and Supabase URL. It is identity preflight

@@ -10,6 +10,8 @@
 
 **Spec:** [CA 출시 설계](../specs/2026-09-09-california-launch-design.md)의 3·5·6장.
 
+> 체크 기준(2026-09-11): `[x]`는 해당 substep의 실제 완료 범위다. 소프트웨어와 미수행 hosted/대표 작업이 섞인 substep은 `[ ]`로 두고 바로 아래에 분리 상태를 적었다. [현재 인수인계](../../launch-evidence/production-release.md)가 실제 공개 NO-GO와 남은 증거를 정리한다.
+
 ## Global Constraints
 
 - 첫 출시의 공개 공고는 캘리포니아 근무지(state = CA)만 허용한다.
@@ -42,6 +44,8 @@
 순서: A4 완료→B1→B2→B3. 예전 migration을 수정하지 않고 아래 새 migration을 순서대로 추가한다. 모든 날짜 접미사는 같은 날 동시에 만드는 migration이 있다면 timestamp 충돌 없이 증가시킨다.
 
 ### Task B1: CA 도시 탐색, 급여 의미, 페이지 처리
+
+> 2026-09-11 D3 실제 상태: [CA 검색/alias·기존 데이터 큐레이션](../../launch-evidence/environments.md), [D2 최종DB/browser](../../launch-evidence/release-candidate.md). 실제 hosted 기존 행 확인과 page500/RPC 잔여는 [인수인계](../../launch-evidence/production-release.md)에 분리했다.
 
 **예상:** 8~12시간. **산출:** LA/OC 밖 CA 공고도 찾고 급여가 같은 단위로 비교됨.
 
@@ -77,7 +81,7 @@ export interface JobSearchResult {
 
 JobCategory/JobType/LanguageRequirement/PayUnit/Job은 기존 src/lib/types.ts 타입이다. 이후 모든 목록 caller는 result.jobs를 렌더링한다.
 
-- [ ] **B1.1 잘못된 급여·지역 동작을 실패 테스트로 고정한다.**
+- [x] **B1.1 잘못된 급여·지역 동작을 실패 테스트로 고정한다.**
 
 ~~~ts
 test("pay filter without unit explicitly means hourly", () => {
@@ -93,6 +97,8 @@ test("invalid page safely returns the first page", () => {
 
 - [ ] **B1.2 공개 근무지와 급여 validation을 바꾼다.**
 
+> 분리 상태: CA/pay DB·서버 validation과 로컬 inventory 완료. hosted 원본 행/실제 근무지·급여 확인과 필요 시 대표의 정상 보정 결정은 UNVERIFIED.
+
 ~~~ts
 // parseEmployerJobForm 안에서 검증. 회사 본사 주소 validation과 분리한다.
 if (state.value !== "CA") {
@@ -105,7 +111,7 @@ if (payMin.value <= 0) {
 
 DB의 INSERT/관련 UPDATE trigger에서도 state='CA', pay_min>0을 검사한다. B1 단계의 public_job_listings에도 state='CA' 조건을 넣고 B2에서 통합 공개 조건으로 교체한다. 기존 타주/0급여 행이 있으면 사전 조회 결과와 보정 계획을 대표에게 제시한다. 원본 데이터를 삭제하거나 0급여를 임의 최저임금으로 바꾸지 않는다.
 
-- [ ] **B1.3 query를 같은 단위·정확한 하한·안정된 페이지로 바꾼다.**
+- [x] **B1.3 query를 같은 단위·정확한 하한·안정된 페이지로 바꾼다.**
 
 ~~~ts
 if (params.payUnit) query = query.eq("pay_unit", params.payUnit);
@@ -124,6 +130,8 @@ q는 최대 200자, city는 최대 100자, page는 1~500으로 제한한다. DB�
 
 - [ ] **B1.4 데이터에서 도시 선택지를 만들고 CA 문구로 바꾼다.**
 
+> 분리 상태: 데이터 기반 CA 도시 UI와 정확한 Los Angeles (Koreatown) alias 구현/회귀 완료. 실제 hosted 기존 표기 inventory/대표 원본 확인은 UNVERIFIED; 임의 도시 일괄 정규화 없음.
+
 ~~~sql
 create or replace function public.list_public_job_cities()
 returns table(city text)
@@ -140,7 +148,7 @@ grant execute on function public.list_public_job_cities() to anon, authenticated
 
 함수는 공개 view만 읽는다. cities를 props로 JobFilters에 전달하고 데이터가 없을 때에는 “CA 전체”와 검색 입력을 제공한다. 도시 이름 전체를 새 라이브러리/지도 API로 관리하지 않는다. Los Angeles (Koreatown) 같은 기존 표기는 migration 전에 대표가 정규화 기준을 확인한다. 저장은 “Los Angeles”, 상세 위치는 address_display에 남기는 안을 적용한다.
 
-- [ ] **B1.5 필터 유지·초기화·다음 페이지·검색 결과 0건을 검사한다.**
+- [x] **B1.5 필터 유지·초기화·다음 페이지·검색 결과 0건을 검사한다.**
 
 ~~~bash
 npm test -- tests/job-search.test.ts tests/employer-validation.test.ts tests/smoke-public-pages.test.ts
@@ -150,7 +158,7 @@ npm run test:e2e -- tests/e2e/ca-search.spec.ts
 
 데이터 21건일 때 1페이지 20건/2페이지 1건, 필터 변경 시 page=1, 급여 단위 표시, 같은 날짜의 timestamp 순서, JS 없는 GET form을 확인한다. 홈페이지/metadata/footer에 LA/OC 한정 문구가 남지 않는다.
 
-- [ ] **B1.6 관련 파일을 선택해 커밋한다.**
+- [x] **B1.6 관련 파일을 선택해 커밋한다.**
 
 ~~~bash
 git add -p
@@ -158,6 +166,8 @@ git commit -m "feat: support California search with consistent pay and paginatio
 ~~~
 
 ### Task B2: 공고 편집·마감·재심사·게시 중지와 감사 이력
+
+> 2026-09-11 D3 실제 상태: [수명주기·기존 expiry/publication 증거](../../launch-evidence/environments.md), [D2 최종회귀](../../launch-evidence/release-candidate.md). owner 만료 public 링크는 C4에서 해결됐고 실제 legacy 조정은 대기다.
 
 **예상:** 12~18시간. **산출:** 채용이 끝나거나 문제가 생긴 공고를 즉시 내릴 수 있음.
 
@@ -176,7 +186,7 @@ git commit -m "feat: support California search with consistent pay and paginatio
 - updateEmployerJob(jobId:string, expectedUpdatedAt:string, input:EmployerJobInput)→{status:"updated"|"conflict"|"not_allowed"|"error"}.
 - Job에 expiresAt:string을, 공개 row 타입에 expires_at/updated_at을 추가한다. PUBLIC_JOB_SELECT와 mapRow, 개발 mock fixture도 갱신한다. public view의 기존 컬럼 순서는 유지하고 두 시각 필드는 마지막에 추가한다. C4는 이 필드를 소비한다.
 
-- [ ] **B2.1 공개/지원 차단을 DB 테스트로 먼저 작성한다.**
+- [x] **B2.1 공개/지원 차단을 DB 테스트로 먼저 작성한다.**
 
 ~~~sql
 -- local pgTAP transaction 안에서 seed 공고의 만료 시각을 지난 값으로 둔다.
@@ -190,7 +200,7 @@ select is(
 
 처음에는 함수가 없어 실패한다. anonymous view 조회와 seeker INSERT에서도 동일하게 비노출/실패하는 assertion을 추가한다. 수정→pending, close 후 재지원, 다른 고용주 수정, 같은 updated_at으로 두 번 변경도 검사한다.
 
-- [ ] **B2.2 공개 조건을 DB에 하나로 정의한다.**
+- [x] **B2.2 공개 조건을 DB에 하나로 정의한다.**
 
 ~~~sql
 create or replace function public.is_job_open(target_job_id uuid)
@@ -215,7 +225,7 @@ account_status는 A4에서 생성한다. public_job_listings는 기존 컬럼 �
 
 jobs 공개 SELECT policy, applications INSERT, report의 공개 공고 검사, 양쪽 application listing의 job_is_public을 이 조건으로 바꾼다. 서비스 DB helper도 일치시킨다. 승인과 지원/마감이 경합하는 경우 공고 row lock 아래에서 공개 조건을 확인하도록 신규 지원 transaction을 보강한다.
 
-- [ ] **B2.3 transition RPC와 편집 payload를 구현한다.**
+- [x] **B2.3 transition RPC와 편집 payload를 구현한다.**
 
 RPC는 auth.uid()에서 주체를 구하고 row FOR UPDATE→역할/소유권/예상 시각→허용 전환→변경→audit 순서로 실행한다. approve는 admin AAL2이고 pending만 가능하다. reject/pause의 관리자 사유는 1~500자이다.
 
@@ -243,7 +253,7 @@ const { data, error } = await supabase.from("jobs")
 
 validatedJobColumns는 createEmployerJob의 현재 필드 mapping을 같은 파일의 toEmployerJobColumns(input:EmployerJobInput)로 추출해 재사용한다. 객체 전체 spread로 FormData를 DB에 넘기지 않는다.
 
-- [ ] **B2.4 조치 이력을 남기고 고용주에게 필요한 이유만 보여준다.**
+- [x] **B2.4 조치 이력을 남기고 고용주에게 필요한 이유만 보여준다.**
 
 ~~~sql
 insert into public.audit_logs(actor_id, action, entity_type, entity_id, metadata)
@@ -255,11 +265,13 @@ RPC 변경과 같은 transaction에 저장한다. 추가 trigger는 직접 trust
 
 - [ ] **B2.5 UI와 과거 행 처리를 연결한다.**
 
+> 분리 상태: owner/admin UI 및 NULL expiry fail-closed 구현/로컬 확인 완료. 실제 운영 legacy 추출·대표 확인·재심사/중지는 NOT RUN; 게시일 불명 행의 날짜를 만들지 않음.
+
 고용주 jobs 목록: 편집/마감 버튼, 현재 status, 반려 이유. 관리자 jobs: pending/approved/paused 필터, 공개 중지와 사유 입력. 손실 가능 편집/마감에는 대상 제목을 보여준다. 관련 public/detail/dashboard 경로를 revalidate한다.
 
 기존 approved/expires_at null 행은 먼저 운영자 확인 목록으로 추출한다. 새로 확인한 실제 공고만 승인 시각+30일로 연장하고 확인하지 못한 공고는 paused 처리한다. seed는 로컬에서만 미래 만료 시각을 넣어 테스트를 유지한다.
 
-- [ ] **B2.6 종료 조건을 검사하고 커밋한다.**
+- [x] **B2.6 종료 조건을 검사하고 커밋한다.**
 
 ~~~bash
 npm run test:db
@@ -272,6 +284,8 @@ git commit -m "feat: add reviewed job edits closure and moderation history"
 만료는 cron 지연과 무관하게 WHERE 조건으로 즉시 적용된다. 보기 좋게 status를 expired로 바꾸는 정리 작업은 별개이며 공개 통제를 그 작업에 의존하지 않는다.
 
 ### Task B3: 구직자 철회, 과거 기록과 대화 보존
+
+> 2026-09-11 D3 실제 상태: [D2 최종DB/browser 및 rollback 후 이력·새 쓰기](../../launch-evidence/release-candidate.md), [복구 상세](../../launch-evidence/restore-drill.md). 실제 staging 적용/계정 검증은 D단계와 구분한다.
 
 **예상:** 6~10시간. **산출:** 역할 변경/마감 이후에도 자기 기록을 잃지 않음.
 
@@ -288,7 +302,7 @@ git commit -m "feat: add reviewed job edits closure and moderation history"
 - getApplicationThread(applicationId,currentUserId,page=1)는 50개/페이지와 hasOlder를 반환한다.
 - sendMessageForParticipant(formData:FormData)→기존 MessageFormState. requireUser 후 DB에서 실제 당사자를 검사한다.
 
-- [ ] **B3.1 다음 4개를 실패 검사로 작성한다.**
+- [x] **B3.1 다음 4개를 실패 검사로 작성한다.**
 
 ~~~ts
 test("employer UI cannot claim applicant withdrawal", () => {
@@ -301,7 +315,7 @@ test("withdrawal is terminal for employer edits", () => {
 
 이 task에서 src/lib/applications/status-action.ts에 EMPLOYER_APPLICATION_STATUSES와 canEmployerChangeStatus(from:ApplicationStatus,to:ApplicationStatus):boolean을 정의한다. 추가 DB 검사 2개: 타 지원자 철회 실패, seeker→employer 승격 후 과거 본인 이력/대화만 접근 성공.
 
-- [ ] **B3.2 본인 철회 RPC와 DB 상태 보호를 구현한다.**
+- [x] **B3.2 본인 철회 RPC와 DB 상태 보호를 구현한다.**
 
 ~~~sql
 update public.applications
@@ -315,7 +329,7 @@ returning id;
 
 RPC는 현재 계정 active 확인과 충돌 응답을 포함한다. 고용주 update policy/trigger는 withdrawn으로의 변경 및 withdrawn에서의 변경을 차단한다. 이미 철회된 동일 요청은 저장을 반복하지 않고 “이미 철회됨”으로 응답한다.
 
-- [ ] **B3.3 당사자 관계로 과거 대화 권한과 수신자를 결정한다.**
+- [x] **B3.3 당사자 관계로 과거 대화 권한과 수신자를 결정한다.**
 
 ~~~sql
 -- can_access_application_thread와 context 안의 관계:
@@ -326,7 +340,7 @@ or public.is_admin()
 
 이 표현은 원래 application_id 제한과 함께 사용한다. 알림의 상대방은 현재 role이 아니라 sender_id가 a.seeker_id인지로 구분한다. 관리자 읽기 권한은 AAL2를 요구하고 관리자라는 이유만으로 대화 발신 권한을 부여하지 않는다. company/job가 마감되어도 원래 관계를 유지한다.
 
-- [ ] **B3.4 이력/메시지 페이지와 서버 시각 표시를 보완한다.**
+- [x] **B3.4 이력/메시지 페이지와 서버 시각 표시를 보완한다.**
 
 지원 목록은 20개/페이지, 메시지는 최신 50개를 먼저 읽어 역순 렌더링하고 이전 50개 탐색을 제공한다. 새 답장 후 현재 페이지를 갱신하며 수신자가 새로고침할 수 있는 버튼을 제공한다. 실시간 수신 기능이라고 표시하지 않는다.
 
@@ -339,7 +353,7 @@ new Intl.DateTimeFormat("ko-KR", {
 
 UI에 PT를 병기한다. 51개 메시지의 첫 메시지까지 접근되는지, 마감된 공고에서도 양쪽 기존 대화가 열리는지 검사한다.
 
-- [ ] **B3.5 회귀 검증 후 커밋한다.**
+- [x] **B3.5 회귀 검증 후 커밋한다.**
 
 ~~~bash
 npm run test:db

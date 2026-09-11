@@ -17,6 +17,19 @@ files and a finally/trap that disposes the exact owned target and export directo
 on **every** exit. Do not pipe failed commands' raw diagnostics to public evidence.
 No source reset, seed, historical migration rewrite or global setting change.
 
+For each future attempt, create a **different** protected diagnostic file (mode600)
+inside that attempt's mode700 directory; never overwrite it on the next attempt.
+Before disposal, inspect it privately and retain only attempt ID, UTC interval,
+source/target identity, command/exit status, last completed phase, sanitized failure
+classification (for example `dns_resolution`, `schema_import`, `acl_mismatch`,
+`test_runner`, `auth_startup` or `unknown`), and cleanup/health results. Link the
+classification to that exact protected log while retained, with hash/reference
+and the actual disposal time under the approved retention policy. Never copy raw
+errors, credentials or private rows into durable evidence. If the log is lost,
+record the missing evidence instead of upgrading an observation into proof.
+This improves future record handling; attempt5's overwritten DNS diagnostic below
+remains lost, and no new restore or source-byte comparison is claimed.
+
 1. Assert source and original DB containers healthy. Assert target containers,
    volumes and listeners on every port56321–56329 are absent; abort if any exist.
    Record source `git rev-parse HEAD`, exact ordered migration versions (21 here)

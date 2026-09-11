@@ -6,6 +6,10 @@ Use the [approved design](superpowers/specs/2026-09-09-california-launch-design.
 exceptions do not authorize public launch. Every checked gate needs UTC, exact
 commit, actual target/ref/origins, action/result and non-secret evidence reference.
 
+Current result: **public NO-GO**. The [Korean owner handover and production record](launch-evidence/production-release.md)
+separate completed local software evidence from these unexecuted real release gates.
+Use [first 30 days](operations/first-30-days.md) only after an actual public T0.
+
 ## 1. Environment variables and ownership
 
 - [ ] Actual operator/support/domain, Vercel and two Supabase projects selected; existing resources inspected before creating/billing anything.
@@ -52,7 +56,7 @@ commit, actual target/ref/origins, action/result and non-secret evidence referen
 
 ## 8. Rollback, restore and public promotion
 
-- [ ] D2 fault/restore drill records actual backup coverage, recoverable point, RPO ≤24h and measured RTO ≤60m; Auth/settings/RLS and audit dependencies preserved.
+- [ ] D2 fault/restore drill records actual backup coverage, recoverable point, RPO ≤24h and measured RTO ≤4h; Auth/settings/RLS and audit dependencies preserved. Local 114.070s restore and 1,003ms artifact switch do not prove hosted objectives.
 - [ ] Compatible immutable code rollback uses same current reviewed policy identity; no silent older-policy activation or assumption that Instant Rollback changes active cron.
 - [ ] Staged Production URL smoke expects the future Production canonical; domain promotion only after all actual external gates pass.
 - [ ] Any missing fact, access, review or execution remains **UNVERIFIED / NO-GO**. Synthetic configuration PASS and local production-shaped builds are software evidence only.

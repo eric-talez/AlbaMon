@@ -10,6 +10,8 @@
 
 **Spec:** [확정 방향과 출시 설계](../specs/2026-09-09-california-launch-design.md).
 
+> 체크 기준(2026-09-11): `[x]`는 해당 substep의 실제 완료 범위다. 소프트웨어와 미수행 hosted/대표 작업이 섞인 substep은 `[ ]`로 두고 바로 아래에 분리 상태를 적었다. [현재 인수인계](../../launch-evidence/production-release.md)가 실제 공개 NO-GO와 남은 증거를 정리한다.
+
 ## Global Constraints
 
 - 첫 출시의 공개 공고는 캘리포니아 근무지(state = CA)만 허용한다.
@@ -126,14 +128,21 @@
 
 ### Task D1: 환경 분리와 staging 배포
 
+> 2026-09-11 D3 실제 상태: [D1 환경·실제 실행 경계](../../launch-evidence/environments.md), [배포 guard/runbook](../../DEPLOYMENT.md). Production→production/Preview→staging 소프트웨어는 검증됐으나 실제 계정·프로젝트는 미선택이다.
+
 **예상:** 4~6시간. **선행:** A 기반. 신규 migration이 추가될 때 staging에 반복 적용한다.
 
 **Files:** Modify docs/DEPLOYMENT.md, docs/PRODUCTION_ENV_VARS.md, docs/LAUNCH_CHECKLIST.md, README.md, docs/PRODUCT_BRIEF.md. Create docs/launch-evidence/environments.md.
 
 **Interfaces:** Vercel Preview는 staging Supabase, Production은 production Supabase. Vercel Build Command는 npm run build:release. 환경별 origin은 HTTPS이며 OAuth callback은 정확한 /auth/callback이다.
 
-- [ ] **D1.1 기존 호스팅과 DB를 읽기 전용으로 확인한다.** 현재 운영 중인 DB가 있는지, migration 10개가 적용됐는지, 실사용 행이 있는지 확인한다. 새 project를 만들기 전에 기존 것을 재사용할 수 있는지 판단한다.
+- [ ] **D1.1 기존 호스팅과 DB를 읽기 전용으로 확인한다.** 현재 운영 중인 DB가 있는지, 현재 전체 ordered migration(준비 후보21개)의 version/name/statements가 일치하는지, 실사용 행이 있는지 확인한다. 새 project를 만들기 전에 기존 것을 재사용할 수 있는지 판단한다.
+
+> 분리 상태: read-only CLI/browser 접근 점검과 local21migration/안전한 inventory 완료. 실제 hosted 소유·기존 사용자·전체 history/재사용 결정은 UNVERIFIED.
+
 - [ ] **D1.2 staging을 연결하고 변경 계획만 확인한다.** STAGING_PROJECT_REF는 콘솔에서 확인한 실제 값이고 셸 환경에 둔다.
+
+> 분리 상태: 명령·대상 guard 준비 완료; actual staging ref 미선택으로 link/history/dry-run은 NOT RUN.
 
 ~~~bash
 test -n "$STAGING_PROJECT_REF"
@@ -144,6 +153,8 @@ supabase db push --dry-run
 
 - [ ] **D1.3 대상 project가 staging임을 확인한 뒤 migration을 적용한다.**
 
+> 분리 상태: 실제 staging push NOT RUN. 대상·백업·dry-run 검토가 선행한다.
+
 ~~~bash
 supabase db push
 ~~~
@@ -151,8 +162,14 @@ supabase db push
 --include-seed를 사용하지 않는다. production 데이터를 staging에 복사하지 않는다. staging fixture는 대표가 통제하는 테스트 계정·가상 공고로만 만든다.
 
 - [ ] **D1.4 Vercel Preview env와 Supabase Auth를 맞춘다.** Google OAuth 승인 origin, Supabase Site URL/redirect allowlist, NEXT_PUBLIC_AUTH_GOOGLE_ENABLED=true를 설정한다. 다른 provider는 검증 전 false이다. staging의 canonical/noindex와 배포 보호를 확인한다.
+
+> 분리 상태: compiled noindex/canonical·환경 분리/local smoke 완료. 실제 Preview protection/Google/Auth/호스팅 env는 UNVERIFIED.
+
 - [ ] **D1.5 첫 관리자와 MFA를 구성한다.** 실제 로그인으로 seeker profile 생성→대표가 해당 UUID 확인→trusted 운영 경로에서 admin 승격→TOTP 등록→AAL2 심사 성공을 확인한다. 폼이나 user_metadata로 admin을 만드는 경로는 만들지 않는다.
-- [ ] **D1.6 환경 증거와 문서를 갱신한다.** docs의 “PDF가 최우선”/LA·OC 비공개 베타/원래 Slice 번호 설명을 이번 설계 링크와 함께 정리한다. 기존 offline 문서 검사가 요구하는 migration 수나 경로가 바뀌면 검사도 실제 구조에 맞춰 갱신한다.
+
+> 분리 상태: trusted bootstrap/MFA 절차와 local AAL1거절/AAL2성공 완료. 실제 Google 계정/대표 UUID 확인/hosted 승격은 NOT RUN.
+
+- [x] **D1.6 환경 증거와 문서를 갱신한다.** docs의 “PDF가 최우선”/LA·OC 비공개 베타/원래 Slice 번호 설명을 이번 설계 링크와 함께 정리한다. 기존 offline 문서 검사가 요구하는 migration 수나 경로가 바뀌면 검사도 실제 구조에 맞춰 갱신한다.
 
 ~~~bash
 npm run verify:beta
@@ -163,6 +180,8 @@ git commit -m "docs: align deployment environments with California public launch
 
 ### Task D2: 전체 검증과 장애·복구 리허설
 
+> 2026-09-11 D3 실제 상태: [최종 candidate/734unit/498DB/27browser/audits0](../../launch-evidence/release-candidate.md), [실제 local restore/Auth/동일정책 artifact rollback](../../launch-evidence/restore-drill.md). 원인 불명 stream 경고5건과 lost diagnostic 경계는 그대로 남긴다.
+
 **예상:** 6~10시간. **선행:** A~C의 필수 기능 완료.
 
 **Files:** Create docs/launch-evidence/release-candidate.md, restore-drill.md. Modify docs/OPERATIONAL_HEALTH.md.
@@ -170,6 +189,8 @@ git commit -m "docs: align deployment environments with California public launch
 **Interfaces:** 검사 결과는 날짜·commit·환경·명령·결과·증거 링크를 가진다. 비밀번호·토큰·지원서 원문은 증거에 포함하지 않는다.
 
 - [ ] **D2.1 release candidate를 고정하고 자동 검사를 실행한다.**
+
+> 분리 상태: 고정 source/immutable artifact 및 로컬 자동 검사는 완료. 실제 build:release는 NEXT_PUBLIC_SITE_URL 누락으로 exit1; 혼합 release 단계는 미완료.
 
 ~~~bash
 npm ci
@@ -185,12 +206,28 @@ npm run build:release
 typecheck/build 순서가 생성된 Next 타입에 의존하면 next typegen을 typecheck 전에 명시해 fresh checkout에서도 동일하게 실행되게 한다.
 
 - [ ] **D2.2 실제 provider 브라우저 검사를 수행한다.** 신규 Google 사용자, seeker 2명, employer 2명, admin 1명으로 아래 Go/No-go 표를 검사한다. 자동 fixture login은 Google 검사를 대신하지 않는다.
+
+> 분리 상태: local Auth fixture matrix 완료; 실제 Google/provider 계정 행렬은 NOT RUN.
+
 - [ ] **D2.3 실패를 주입한다.** staging의 잘못된 DB key→ready 503·실제 오류 화면; 이메일 provider 오류→저장 성공·queue 재시도; 만료 쿠키→로그인 복귀; 같은 상태 2회 변경→conflict; 원문 개인정보가 로그에 없는지 확인한다. 운영 secret을 변경해 장애를 만들지 않는다.
+
+> 분리 상태: isolated local invalid-key/root-fault/회복·실제 local 만료세션·provider-double 재시도·conflict 검사 완료. 실제 staging fault/외부 alert/production 로그 privacy는 UNVERIFIED.
+
 - [ ] **D2.4 백업을 별도 폐기 가능한 환경에 복원한다.** 시간 측정, public job 수·profile 수·주요 FK·RLS/권한·로그인 설정을 확인한다. DB 복원과 OAuth/provider/Vercel env 복구가 별도임을 기록한다. 실제 프로젝트의 백업 범위와 Auth 데이터 복원 범위를 확인한다.
+
+> 분리 상태: 별도563xx local restore14manifest/15FK/498SQL/실제Auth114.070s 완료. 실제 hosted backup/PITR 범위·nonempty OAuth/MFA·설정 복구는 UNVERIFIED.
+
 - [ ] **D2.5 앱 rollback을 수행한다.** staging을 직전 정상 deployment로 되돌리고 현재 additive schema와 호환되는지 확인한다. DB reset을 rollback으로 사용하지 않는다. 목표 RPO 24시간/RTO 4시간을 측정 결과로 검증한다.
+
+> 분리 상태: local A→distinct same-source fault B→fresh immutable A 및 이력/새 쓰기 완료(1003ms). 실제 이전 hosted deployment rollback과 RPO24h/RTO4h는 UNVERIFIED.
+
 - [ ] **D2.6 미통과 항목을 수정하고 해당 검사를 다시 실행한다.** Docker/브라우저/provider가 없어 실행하지 못한 항목은 미검증으로 남기며 PASS로 쓰지 않는다.
 
+> 분리 상태: privacy/auth teardown·dev advisories·safe-area·runbook 수정/해당 회귀 완료. stream 영향과 외부 미통과 항목은 인수인계에 남으며 모두 해결했다고 체크하지 않음.
+
 ### Task D3: production 배포와 공개 시작
+
+> 2026-09-11 D3 실제 상태: [대표 인수인계·21 migration/hash·실행 기록·residual](../../launch-evidence/production-release.md), [첫 30일 운영 준비](../../operations/first-30-days.md). 로컬 준비만 완료됐고 실제 배포/공개 Go/T0가 없다.
 
 **예상:** 4~6시간 + 첫 주 운영. **선행:** 아래 필수 Go/No-go 전부 통과, 대표의 실제 공개 결정.
 
@@ -199,7 +236,12 @@ typecheck/build 순서가 생성된 Next 타입에 의존하면 next typegen을 
 **Interfaces:** 실제 production project/도메인/배포 commit을 기록한다. 기존 사용자가 있다면 영향/변경 안내가 준비되어 있어야 한다.
 
 - [ ] **D3.1 production 백업/현재 schema를 확인한다.** 배포 담당은 대표다. Codex는 대상·예정 변경·검증 결과를 먼저 제시한다.
+
+> 분리 상태: 대상/백업/schema inventory와 변경 제시 양식 준비 완료. 실제 production project/backup은 UNVERIFIED.
+
 - [ ] **D3.2 production 대상 확인 후 additive migration을 적용한다.**
+
+> 분리 상태: 21 migration/hash·guard/link/history/dry-run/push 순서 준비 완료. 실제 production additive push NOT RUN.
 
 ~~~bash
 test -n "$PRODUCTION_PROJECT_REF"
@@ -211,7 +253,12 @@ supabase db push --dry-run
 dry-run 검토 후에만 supabase db push를 실행한다. reset/seed는 실행하지 않는다.
 
 - [ ] **D3.3 production env로 새 빌드를 배포한다.** staging artifact를 운영 env로 바꿔 재사용하지 않는다. NEXT_PUBLIC 값은 빌드 시 고정되므로 별도 production build가 필요하다. Domain/TLS/redirect/canonical, worker secret, 이메일 origin을 확인한다.
+
+> 분리 상태: 별도 Production 새 빌드/staged URL/canonical 절차 준비 완료. 실제 Production artifact·domain/TLS/provider 확인 NOT RUN.
+
 - [ ] **D3.4 공개 직전 smoke를 한다.**
+
+> 분리 상태: 안전한 read-only smoke 구현·로컬 검사 완료. 실제 Production URL/계정/메일/seed 비노출 smoke NOT RUN.
 
 ~~~bash
 curl --fail --silent --show-error "$PRODUCTION_ORIGIN/api/health"
@@ -222,8 +269,16 @@ curl --fail --silent --show-error "$PRODUCTION_ORIGIN/jobs"
 실제 계정 로그인·승인·지원·이메일·메시지·공고 마감도 확인한다. 샘플 이름/kw-001/시드 UUID가 공개 응답과 sitemap에 없음을 확인한다.
 
 - [ ] **D3.5 공개한다.** 사용자 가입과 탐색은 누구나 가능하고 무료다. 공고/고용주 심사 조건을 명확히 표시한다. 대표가 승인한 실제 공고만 올린다.
+
+> 분리 상태: 무료 CA 이용/심사 소프트웨어 완료. 실제 공급 수 UNKNOWN, 대표 public Go NOT GIVEN, promotion NOT RUN.
+
 - [ ] **D3.6 첫 24시간 집중 확인한다.** 5xx/ready 실패, 로그인 실패, 메시지 저장, 이메일 backlog, 신고, 비용 급증을 확인한다. 데이터 손상·권한 노출이면 신규 쓰기/해당 기능을 중지하고 정상 버전으로 복귀한다.
+
+> 분리 상태: 첫24h/30일 운영표 준비 완료. 실제 T0 없음; 관찰/모니터 자동화 NOT RUN.
+
 - [ ] **D3.7 결과를 기록한다.** 배포 commit·migration·시각·검사 결과·잔여 P2를 남긴다. 모든 계획 파일의 checkbox는 실제로 수행한 항목만 완료 표시한다.
+
+> 분리 상태: 로컬 source/artifact/21migration/hash·검사·잔여 및 네 계획 checkbox 정리 완료. 실제 배포 commit/시각/결과와 첫24h 기록은 NOT RUN이라 혼합 단계 미완료.
 
 ## 7. Go / No-go
 
@@ -278,8 +333,6 @@ CA 전체에서 가입/검색/공고 신청을 허용한다. 초기 영업 시�
 
 ## 10. 실행을 시작할 때
 
-다음 첫 단위는 **A1 보안 업데이트**다. 한 번에 전체 계획을 구현하라는 요청보다 다음처럼 범위를 지정한다.
-
-> CA 출시 설계와 Launch Foundation 계획을 읽고 A1만 실행해 줘. 현재 작업 디렉터리의 변경을 보존하고, 실제 audit 결과를 기준으로 의존성을 업데이트한 뒤 테스트·타입·lint·build를 확인해 줘. 변경과 검증 결과를 검토할 수 있게 제시해 줘.
+A~C 소프트웨어와 D1~D3의 로컬 준비/검증은 수행됐다. 다음 실행은 [production 인수인계](../../launch-evidence/production-release.md)의 실제 미검증 입력·hosted 단계다. A1을 다시 시작하거나 로컬 PASS를 공개 Go로 바꾸지 않는다.
 
 실행 방식은 작업별 에이전트+검토 또는 현재 작업에서 순차 실행 중 선택할 수 있다. 어느 경우에도 실제 provider 계정 작업·정책 확정·고객 발송·production 공개는 대표가 결정한다. 이 문서 작성 자체로 해당 외부 작업이 실행된 것은 아니다.
