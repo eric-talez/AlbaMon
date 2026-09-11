@@ -132,8 +132,10 @@ three corrections: staging preparation/apply stop on failures and bind the
 approved clean source, target, manifest and dry-run receipt; the general
 Production deploy shortcut is retired in favor of the sole ordered D3 procedure;
 job dates render in America/Los_Angeles, 24-hour PT, preserving ISO `dateTime`
-and the missing-publication fallback. Scoped rereview is **pending**; these are
-implemented/self-reviewed corrections, not a future review PASS.
+and the missing-publication fallback. The final scoped rereview of `2632255..212daef` confirmed **I-1/I-2/M-1
+ADDRESSED**, with no new Critical/Important/Minor breakage. The
+[closure record](execution-closure.md) preserves the completed review, cleanup
+and execution decisions; existing follow-ups and public NO-GO remain explicit.
 
 | Fresh verification on the final fix source | Actual result |
 |---|---|

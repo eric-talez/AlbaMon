@@ -4,7 +4,7 @@
 
 후보는 `codex/california-public-launch`, 작업 위치는 `/Users/rinny/IdeaProjects/AlbaMon/.worktrees/california-public-launch`입니다. D2 로컬 증거는 unit **734 PASS + 6 opt-in skip**, 원본/복원 DB **각 498 PASS**, 최종 브라우저 **27/27 PASS**, 전체/운영 audit **각 0**입니다. 브라우저에는 원인·사용자 영향이 미해결인 stream 경고 5건이 있습니다. 이는 실제 Google·메일·호스팅 PASS가 아닙니다.
 
-최종 리뷰 수정 source `63e4632d6f24ce77e4e42072a0e0b8621997c443`의 새 검증은 **unit775 PASS + 6 skip**, typegen/typecheck/lint 및 별도 ordinary local build PASS입니다. [새 build identity와 최종 수정 검증](release-candidate.md#final-review-corrections-and-fresh-local-build--2026-09-11)은 아래 D2 immutable artifact/복원 증거와 구분합니다. I-1/I-2/M-1은 수정했고 scoped rereview는 아직 대기 중입니다.
+최종 리뷰 수정 source `63e4632d6f24ce77e4e42072a0e0b8621997c443`의 새 검증은 **unit775 PASS + 6 skip**, typegen/typecheck/lint 및 별도 ordinary local build PASS입니다. [새 build identity와 최종 수정 검증](release-candidate.md#final-review-corrections-and-fresh-local-build--2026-09-11)은 아래 D2 immutable artifact/복원 증거와 구분합니다. I-1/I-2/M-1은 최종 scoped rereview에서 모두 ADDRESSED, 새 Critical/Important/Minor 0건으로 확인됐습니다. [최종 종료 기록과 실행 결정](execution-closure.md)에 검토 범위·정리 결과·남은 공개 조건을 보존했습니다.
 
 다음 실제 단계는 운영자/연락처/도메인과 기존 프로젝트 선택 → 정책 외부 검토 및 실제 계정·메일 승인 → 아래 대상 확인/백업/`db push --dry-run` → 검토된 `db push` → 별도 Production 새 빌드 → 실제 smoke/복구/공급 증거 → 대표의 공개 Go입니다. 첫날 이후에는 [첫 30일 운영표](../operations/first-30-days.md)를 사용합니다. 이미 미정이라고 답한 입력을 다시 확정된 사실로 취급하지 않습니다.
 
@@ -230,7 +230,7 @@ DEPLOYMENT_ORIGIN="$PRODUCTION_ORIGIN" npm run smoke:deployment -- production
 
 ## 남은 리뷰 항목과 처리 상태
 
-최종 whole-branch review는 Critical0 / Important2(I-1·I-2) / Minor1(M-1)을 발견했습니다. 세 항목은 최종 수정 commit에서 처리했으며 scoped rereview는 대기 중입니다. 아래 기존 Minor의 nonblocking merge 판정은 공개 승인과 별개입니다. **미해결 P2를 0이라고 선언하거나 경고를 면제하지 않습니다.** 아래 ID는 기존 ledger를 합친 것이며 새로운 결함 판정을 만들어내지 않습니다.
+최종 whole-branch review는 Critical0 / Important2(I-1·I-2) / Minor1(M-1)을 발견했습니다. 세 항목은 최종 수정 commit에서 처리했고, 단일 scoped rereview도 모두 ADDRESSED로 종료됐습니다. [종료 기록](execution-closure.md)을 참조하세요. 아래 기존 Minor의 nonblocking merge 판정은 공개 승인과 별개입니다. **미해결 P2를 0이라고 선언하거나 경고를 면제하지 않습니다.** 아래 ID는 기존 ledger를 합친 것이며 새로운 결함 판정을 만들어내지 않습니다.
 
 | ID / 수준 | 실제 잔여 상태 | 다음 판단 / 책임 |
 |---|---|---|
