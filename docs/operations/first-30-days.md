@@ -36,27 +36,30 @@ T0는 실제 promotion과 대표 공개 Go의 시각입니다. 자동 monitor �
 ## 장애 대응과 복구
 
 1. **containment:** 데이터 손상·권한 노출이면 대표가 해당 기능/공개 접근과 신규 쓰기를 즉시 제한합니다. 공고는 AAL2 `/admin/reports`의 **공고 중지 후 검토 완료**, 계정은 `/admin/users`의 정지와 사유 기록을 사용합니다. 정지 완료 후 기존 JWT도 DB의 현재 상태로 새 쓰기가 차단되고 기존 지원/대화는 보존됩니다. 전체 장애용 maintenance toggle은 구현되어 있지 않으므로 선택된 호스팅의 접근 제한/트래픽 중지 방법을 공개 전 실제 검증합니다. 이메일 비활성화는 앱 전체 쓰기 중지가 아닙니다.
-2. **메일 불확실성:** `EMAIL_NOTIFICATIONS_ENABLED=false`를 실제 해당 hosting scope에 적용하고 반영/진행 중 worker를 확인합니다. 이미 guard를 통과한 발송은 도착할 수 있습니다. pending/sending/lease/provider ID/frozen payload를 보존합니다. 완료 불명 건을 복제/수동 재발송하거나 attempts를 초기화하지 않습니다. [재시도·idempotency·suppression 절차](../OPERATIONAL_HEALTH.md#email-activation-and-queue-recovery--unverified)로 확인합니다. 올바른 인증의 worker GET와 signed webhook은 **mutating**이며 read-only 명령이 아닙니다.
+2. **메일 불확실성:** 승인된 실제 프로젝트의 Settings → Cron Jobs → **Disable Cron Jobs**로 새 scheduler 호출을 즉시 중지하고 disabled 상태/UTC를 확인합니다. 수동 worker 호출도 중지합니다. 현재 deployment의 실행 중 worker·노출/통제 불명 credential·다른 scheduler가 계속 보낼 가능성이 있으면 실제 provider에서 해당 API key를 revoke/pause하여 새 provider 요청을 차단하고 확인합니다. 이미 수락된/in-flight 발송은 도착할 수 있고 회수할 수 없습니다. `EMAIL_NOTIFICATIONS_ENABLED=false`를 Vercel 설정에 저장하는 것만으로 **현재 immutable deployment에는 반영되지 않습니다**. 현재 `build:release` gate는 이 값을 `true`로 요구하므로 false 새 Production build나 gate 우회를 중지 방법으로 지시하지 않습니다. pending/sending/lease/provider ID/frozen payload를 보존합니다. 완료 불명 건을 복제/수동 재발송하거나 attempts를 초기화하지 않습니다. [재시도·idempotency·suppression 절차](../OPERATIONAL_HEALTH.md#email-activation-and-queue-recovery--unverified)로 확인합니다. 올바른 인증의 worker GET와 signed webhook은 **mutating**이며 read-only 명령이 아닙니다. 환경값은 [새 deployment부터 적용](https://vercel.com/docs/environment-variables)되며 [Resend API key 삭제](https://resend.com/docs/dashboard/api-keys/introduction)는 provider 계층의 권한 철회 조치이며 실제 삭제 결과를 확인합니다.
 3. **앱 rollback:** 실제 이전 immutable hosted artifact의 source/build/deployment ID, **현재 active policy identity 일치**, 현 schema에서 이력 읽기·새 쓰기 호환을 확인합니다. 아래 URL은 선택된 실제 compatible artifact이며 로컬 A의 폐기된 archive/Preview URL을 넣지 않습니다. 현재 알려진 이전 hosted artifact는 없습니다.
+
+   위 production runbook의 승인된 org/project ID·이름과 보호된 `RECORD_DIR`을 사용합니다. `APPROVED_ROLLBACK_SHA`는 선택된 이전 artifact의 검토된 전체 source SHA입니다. 그 artifact에 기록된 `releaseCommit` 및 (있으면) gitSource SHA가 일치해야 합니다. provenance가 없는 과거 artifact는 이 자동 절차로 통과시키지 않고 별도 증거 검토가 필요합니다.
 
    ```bash
    (
-   set -e
-   test -n "$ROLLBACK_DEPLOYMENT_URL"
-   test -n "$VERCEL_TEAM"
-   test -n "$VERCEL_PROJECT"
+   set -euo pipefail
+   umask 077
+   : "${ROLLBACK_DEPLOYMENT_URL:?}" "${APPROVED_ROLLBACK_SHA:?}" "${RECORD_DIR:?}"
    npm run verify:deploy-target -- production
-   npx --yes vercel@59.13.1 inspect "$ROLLBACK_DEPLOYMENT_URL" --scope "$VERCEL_TEAM"
+   npx --yes vercel@59.13.1 api "/v9/projects/$APPROVED_VERCEL_PROJECT_ID" --method GET --raw --scope "$APPROVED_VERCEL_ORG_ID" > "$RECORD_DIR/project-rollback.json"
+   npx --yes vercel@59.13.1 api "/v13/deployments/${ROLLBACK_DEPLOYMENT_URL#https://}?withGitRepoInfo=true" --method GET --raw --scope "$APPROVED_VERCEL_ORG_ID" > "$RECORD_DIR/deployment-rollback.json"
+   APPROVED_RELEASE_SHA="$APPROVED_ROLLBACK_SHA" APPROVED_DEPLOYMENT_URL="$ROLLBACK_DEPLOYMENT_URL" node scripts/check-vercel-identity.mjs "$RECORD_DIR/project-rollback.json" "$RECORD_DIR/deployment-rollback.json"
    # 대표의 incident 복구 결정과 artifact/policy/호환 확인 후:
-   npx --yes vercel@59.13.1 rollback "$ROLLBACK_DEPLOYMENT_URL" --scope "$VERCEL_TEAM"
-   npx --yes vercel@59.13.1 rollback status "$VERCEL_PROJECT" --scope "$VERCEL_TEAM"
+   npx --yes vercel@59.13.1 rollback "$ROLLBACK_DEPLOYMENT_URL" --scope "$APPROVED_VERCEL_ORG_ID"
+   npx --yes vercel@59.13.1 rollback status "$APPROVED_VERCEL_PROJECT_NAME" --scope "$APPROVED_VERCEL_ORG_ID"
    DEPLOYMENT_ORIGIN="$PRODUCTION_ORIGIN" npm run smoke:deployment -- production
    )
    ```
 
    [Vercel rollback](https://vercel.com/docs/cli/rollback)의 실제 plan/대상 지원을 확인합니다. timeout을 취소로 가정하지 말고 상태를 확인합니다. 호환 artifact가 없으면 접근 제한을 유지하고 검증된 수정본을 새 Production build합니다. 과거 약관을 조용히 재활성화하거나 DB reset으로 rollback하지 않습니다. rollback은 active cron을 갱신하지 않으므로 scheduler 대상/secret/queue를 별도 확인합니다.
 4. **DB 복원:** 손상 의심 상태를 보존하고 확인된 backup을 **별도 recovery project**로 복원합니다. `npm run verify:deploy-target -- recovery`로 production/staging과 다른 실제 ref/origin을 검증합니다. [복원 runbook](../launch-evidence/restore-drill.md)의 schema/data/FK/RLS/grants/Auth/policy/audit/history 비교와 실제 로그인·이력·쓰기 검증을 수행하고 provider/OAuth/keys/env를 별도로 복구합니다. 로컬 명령을 그대로 production에 적용하지 않습니다. 실제 복구점 나이와 incident→복구 시간으로 RPO≤24h/RTO≤4h를 평가합니다.
-5. **재개:** 오류 원인과 권한 경계 확인 후 실제 readiness·로그인·본인 기록·새 메시지/지원·승인/마감·메일 상태를 검증합니다. 계정 해제는 별도 사유/audit를 남기며 기존 공고를 자동 공개하지 않습니다. 필요한 정책/개인정보 안내는 실제 support와 검토된 내용으로 대표가 승인합니다. 복구 결과, 남은 데이터 손실/불명 범위, 영향 대상과 다음 조치를 기록합니다.
+5. **재개:** credential을 철회했다면 승인된 새 key를 선택된 Production 환경에 등록하고 `EMAIL_NOTIFICATIONS_ENABLED=true`인 정상 `build:release` 경로로 새 Production artifact를 만듭니다. 기존 immutable artifact의 key가 바뀌었다고 가정하지 않습니다. cron은 계속 disabled로 두고 [identity/Protection/smoke와 승인된 실메일 테스트](../launch-evidence/production-release.md#3-새-production-build와-staged-url-d33)를 거친 후 실제 current deployment ID를 확인합니다. uncertain queue/provider 상태를 해소하고 대표가 재개를 승인한 뒤에만 cron을 enable하고 실제 active schedule/호출을 별도 확인합니다. 오류 원인과 권한 경계 확인 후 실제 readiness·로그인·본인 기록·새 메시지/지원·승인/마감·메일 상태를 검증합니다. 계정 해제는 별도 사유/audit를 남기며 기존 공고를 자동 공개하지 않습니다. 필요한 정책/개인정보 안내는 실제 support와 검토된 내용으로 대표가 승인합니다. 복구 결과, 남은 데이터 손실/불명 범위, 영향 대상과 다음 조치를 기록합니다.
 
 복원 실패 시에는 시도마다 다른 mode600 protected diagnostic을 쓰고 UTC/대상/실패 단계/exit와 sanitized 분류를 확정한 뒤 승인된 기간에 폐기합니다. 다음 시도가 앞선 파일을 덮어쓰면 안 됩니다. D2 attempt5의 소실 DNS 원문은 되살아난 것이 아니며 [기존 증거 경계](../launch-evidence/production-release.md#남은-리뷰-항목과-처리-상태)를 유지합니다.
 

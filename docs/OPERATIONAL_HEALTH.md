@@ -61,8 +61,14 @@ readiness after restoring configuration.
    secrets, raw payloads or headers here. Actual sends remain NOT RUN.
 4. If the queue stalls, inspect aggregate queue status in the active AAL2 admin
    UI, cron configuration, provider status, confirmed Auth address, preference
-   and `suppressed_email`. Disable `EMAIL_NOTIFICATIONS_ENABLED` to pause new
-   claims; an in-flight provider request may already have crossed the guard.
+   and `suppressed_email`. Disable the selected project’s Cron Jobs immediately
+   and stop manual worker calls; revoke/pause the actual provider credential if
+   existing workers or other callers are not contained. Confirm the effective
+   control-plane state. An in-flight/accepted send cannot be recalled. Changing
+   Vercel environment settings affects new deployments only. The release gate
+   requires `EMAIL_NOTIFICATIONS_ENABLED=true`, so a false-flag production build
+   or bypass is not a supported incident stop. Follow the
+   [current-deployment containment and recovery](operations/first-30-days.md#장애-대응과-복구) procedure.
    Preserve pending/sending rows, leases, provider IDs and frozen payloads.
 5. Transient provider failure leaves business data committed and retries with
    the same outbox ID/idempotency key and frozen payload. A lost completion write

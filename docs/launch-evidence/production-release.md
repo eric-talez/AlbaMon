@@ -26,7 +26,7 @@
 
 복원은 14개 catalog/data manifest 일치, 15개 FK 검사 및 실제 복원 Auth 로그인까지 통과했습니다(07:46:23.793 UTC, 복원 시작부터 114.070초). A → 같은 source에 고립된 root fault를 넣은 **서로 다른 B** → digest 확인 후 새 추출 A를 실제로 서비스했고, 이력 hash 보존·새 메시지·공고 수정/재심사·철회를 확인했습니다(전환 1,003ms). 이는 이전 hosted release나 정책 전환 검증이 아니며 **hosted RPO≤24h/RTO≤4h 증거가 아닙니다.** 폐기한 로컬 archive를 실제 복구 자산으로 지정하지 않습니다.
 
-D3 문서 변경 후 2026-09-11 UTC, 같은 worktree/Node22에서 수행한 확인:
+D3 최초 문서 변경 후 2026-09-11 UTC, 같은 worktree/Node22에서 수행한 확인:
 
 | D3 명령 / 범위 | 실제 결과 |
 |---|---|
@@ -35,6 +35,8 @@ D3 문서 변경 후 2026-09-11 UTC, 같은 worktree/Node22에서 수행한 확�
 | 변경 Markdown의 로컬 파일/anchor 검사; `git diff --check` | 연결 오류0 / whitespace 오류0 |
 | `npm run verify:deploy-target -- production` | exit1: `Missing or invalid staging project ref` — 두 환경 tuple을 검사하며 실제 refs가 미선택 |
 | `npm run build:release` | exit1: `Missing release setting: NEXT_PUBLIC_SITE_URL`; Next build 진입 전 차단 |
+
+리뷰 수정1의 로컬 검증은 Vercel identity CLI **24/24 PASS**, 실제 shell push guard **13사례 PASS**(임시 Git/가짜 push marker), loopback HTTP 거절 판정 **5사례 PASS**입니다. 승인 대상은 허용하고 source/manifest/dry-run/연결 대상 차이는 push 전에 막으며 anonymous200/302/500은 bypass smoke 전에 막았습니다. 401/403은 플랫폼 보호를 사람이 대조할 후보일 뿐 실제 Vercel Protection PASS가 아닙니다. focused ESLint와 두 offline gate도 통과했습니다.
 
 이 실패들은 올바르게 닫힌 **현재 NO-GO 증거**입니다. 실제 hosted smoke/link/push/배포를 실행하지 않았고, 문서만 바뀌어 DB/browser/restore 전체 검사를 다시 돌리지 않았습니다.
 
@@ -86,30 +88,45 @@ D3 문서 변경 후 2026-09-11 UTC, 같은 worktree/Node22에서 수행한 확�
 
 ### 2. production additive migration (D3.2)
 
-Node22를 사용하고 실제 선택된 값만 보호된 operator environment에 로드합니다. 아래 블록은 **각 명령 실패 시 중단**하며, link 직후 콘솔의 project/ref를 다시 대조합니다. 비밀번호·키를 인수나 셸 history에 넣지 않습니다.
+Node22를 사용하고 실제 선택된 값만 보호된 operator environment에 로드합니다. 아래 블록은 **각 명령 실패 시 중단**합니다. `APPROVED_RELEASE_SHA`는 대표가 검토한 전체40자리 commit, `APPROVED_PRODUCTION_PROJECT_REF`는 그 승인 기록의 실제 ref입니다. 모든 `APPROVED_*` 값은 보호된 승인 기록에서 export하며 현재 HEAD에서 자동으로 승인 값을 만들지 않습니다. `RECORD_DIR`은 저장소 밖의 **시도마다 새로 선택한** 보호 디렉터리 절대 경로로 미리 export합니다. 원문에는 민감 정보가 있을 수 있으므로 mode700 디렉터리/mode600 파일로 보존합니다. 같은 단계 재시도도 별도 디렉터리에 기록하여 앞선 원문을 덮어쓰지 않습니다. 공개 기록에는 UTC·대상·단계·exit·sanitized 분류·hash/reference만 남깁니다. 비밀번호·키를 인수나 셸 history에 넣지 않습니다.
 
 ```bash
 (
-set -e
-test -n "$PRODUCTION_PROJECT_REF"
+set -euo pipefail
+umask 077
+: "${RECORD_DIR:?}" "${APPROVED_RELEASE_SHA:?}" "${APPROVED_PRODUCTION_PROJECT_REF:?}"
+mkdir -m 700 "$RECORD_DIR"
+test "$(git rev-parse HEAD)" = "$APPROVED_RELEASE_SHA"
+test -z "$(git status --porcelain)"
+test "$PRODUCTION_PROJECT_REF" = "$APPROVED_PRODUCTION_PROJECT_REF"
 npm run verify:deploy-target -- production
 supabase link --project-ref "$PRODUCTION_PROJECT_REF"
-test "$(cat supabase/.temp/project-ref)" = "$PRODUCTION_PROJECT_REF"
-supabase migration list --linked
+test "$(cat supabase/.temp/project-ref)" = "$APPROVED_PRODUCTION_PROJECT_REF"
+supabase migration list --linked > "$RECORD_DIR/migrations-before.txt" 2>&1
 shasum -a 256 -c docs/launch-evidence/migrations.sha256
-supabase db push --dry-run
+supabase db push --dry-run > "$RECORD_DIR/dry-run.txt" 2>&1
+shasum -a 256 docs/launch-evidence/migrations.sha256 "$RECORD_DIR/dry-run.txt"
 )
 ```
 
-실제 대상·예정 변경·백업·기존 데이터 영향·dry-run을 대표가 검토한 뒤에만 다음 블록을 실행합니다. remote-only/missing history, destructive SQL 또는 예상하지 않은 차이는 중단 사유입니다. `reset`, `seed`, `--include-seed`, 강제 history repair로 해결하지 않습니다.
+실제 대상·예정 변경·백업·기존 데이터 영향·before history·dry-run 원문/exit를 대표가 검토한 뒤, 승인 기록에 release SHA, production ref, manifest 파일 hash, dry-run 파일 hash, reviewer/UTC를 함께 남깁니다. 그 기록에서 `APPROVED_MANIFEST_SHA256`와 `APPROVED_DRY_RUN_SHA256`를 export합니다. **실행 직전 현재 파일에서 승인 hash를 다시 계산해 대입하면 안 됩니다.** remote-only/missing history, destructive SQL 또는 예상하지 않은 차이는 중단 사유입니다. `reset`, `seed`, `--include-seed`, 강제 history repair로 해결하지 않습니다. 중간 source/dirty 파일/manifest/dry-run/대상 변경 또는 다른 운영자의 DB 변경이 있으면 새로운 history/dry-run과 재검토가 필요합니다.
 
 ```bash
 (
-set -e
+set -euo pipefail
+umask 077
+: "${APPROVED_MANIFEST_SHA256:?}" "${APPROVED_DRY_RUN_SHA256:?}"
 npm run verify:deploy-target -- production
-test "$(cat supabase/.temp/project-ref)" = "$PRODUCTION_PROJECT_REF"
-supabase db push
-supabase migration list --linked
+test "$PRODUCTION_PROJECT_REF" = "$APPROVED_PRODUCTION_PROJECT_REF"
+test "$(cat supabase/.temp/project-ref)" = "$APPROVED_PRODUCTION_PROJECT_REF"
+# 승인 이후 저장소/대상 변경을 금지한 실행 창에서 push 바로 앞에 확인한다.
+test "$(git rev-parse HEAD)" = "$APPROVED_RELEASE_SHA"
+test -z "$(git status --porcelain)"
+test "$(shasum -a 256 docs/launch-evidence/migrations.sha256 | cut -d ' ' -f 1)" = "$APPROVED_MANIFEST_SHA256"
+test "$(shasum -a 256 "$RECORD_DIR/dry-run.txt" | cut -d ' ' -f 1)" = "$APPROVED_DRY_RUN_SHA256"
+shasum -a 256 -c docs/launch-evidence/migrations.sha256
+supabase db push > "$RECORD_DIR/push.txt" 2>&1
+supabase migration list --linked > "$RECORD_DIR/migrations-after.txt" 2>&1
 )
 ```
 
@@ -119,37 +136,56 @@ supabase migration list --linked
 
 실제 Google/Supabase callbacks, admin TOTP/AAL2, 검토된 정책 identity, [sender/DNS/inbox와 알림 복구](../OPERATIONAL_HEALTH.md#email-activation-and-queue-recovery--unverified)를 먼저 검증합니다. 실메일 테스트는 별도의 명시적 승인과 대표 소유 테스트 주소가 필요합니다. 현재 승인/발송은 없습니다.
 
-실제 Vercel의 project/team 연결 및 hosted Build Command=`npm run build:release`를 확인합니다. **Vercel Production → production**, Preview → staging이며 refs/origins는 서로 다릅니다. Production은 `EMAIL_ENVIRONMENT=production`, indexing=true, `NEXT_PUBLIC_SITE_URL=PRODUCTION_ORIGIN`으로 새로 빌드합니다. 기존 local/Preview artifact를 재지정하지 않습니다.
+실제 콘솔에서 승인한 Vercel 조직 ID·프로젝트 ID·이름을 `APPROVED_VERCEL_ORG_ID`, `APPROVED_VERCEL_PROJECT_ID`, `APPROVED_VERCEL_PROJECT_NAME`으로 export하고 기록합니다(현재 모두 UNSELECTED). `.vercel/project.json`은 그 프로젝트에 이미 연결되어 있어야 합니다. 없거나 다르면 중단하고 실제 계정에서 연결을 바로잡은 뒤 다시 검증합니다. 이름이 같아도 ID가 다르면 다른 프로젝트입니다. hosted Build Command=`npm run build:release`를 확인합니다. **Vercel Production → production**, Preview → staging이며 refs/origins는 서로 다릅니다. Production은 `EMAIL_ENVIRONMENT=production`, indexing=true, `NEXT_PUBLIC_SITE_URL=PRODUCTION_ORIGIN`으로 새로 빌드합니다. 기존 local/Preview artifact를 재지정하지 않습니다.
+
+**deploy 전에** 승인된 프로젝트의 다음 control-plane 증거를 operator/UTC와 함께 기록합니다. 미확인 상태에서는 아래 deploy 명령을 실행하지 않습니다.
+
+- Deployment Protection이 **새 generated Production URL까지** 보호하는 실제 설정/plan을 확인합니다. 현재 Standard Protection의 적용 범위를 확인하거나 All Deployments를 사용합니다. legacy Standard의 최신 Production URL 예외는 허용하지 않습니다. `--skip-domain` 자체는 접근 보호가 아닙니다.
+- Project Settings → Cron Jobs → **Disable Cron Jobs**를 적용하고 실제 disabled 상태를 확인합니다. 다른 scheduler/수동 worker 호출도 중지하고 worker secret 접근자를 통제합니다. 기존 실행/lease와 queue를 확인하여 진행 중 발송이 없음을 확인합니다. 기존 worker나 credential 사용을 통제할 수 없으면 provider credential을 revoke/pause하여 독립적으로 발송을 차단한 뒤에만 진행합니다. 이미 provider가 수락한 발송은 취소됐다고 하지 않습니다. pending/sending/lease/payload는 보존합니다.
+- 별도 실메일 테스트 승인 전에는 유효 worker 인증을 보내지 않습니다. 새 Production 생성/승격으로 cron 설정이 생기더라도 프로젝트의 disabled 상태가 유지되는지 다시 확인합니다. Protection bypass smoke는 scheduler containment 증거가 아닙니다.
+
+[Deployment Protection](https://vercel.com/docs/deployment-protection), [Cron Jobs 중지/관리](https://vercel.com/docs/cron-jobs/manage-cron-jobs)를 2026-09-11 확인했습니다. API 응답은 private configuration을 포함할 수 있으므로 raw JSON을 출력/공유하지 않습니다. 아래 [검증기](../../scripts/check-vercel-identity.mjs)는 CLI의 생략된 inspect 출력 대신 실제 API의 org/project/source/URL을 검사합니다.
 
 ```bash
 (
-set -e
-test -n "$VERCEL_TEAM"
-test -n "$VERCEL_PROJECT"
-test -z "$(git status --porcelain)"
-git status --short
-git rev-parse HEAD
+set -euo pipefail
+umask 077
+: "${APPROVED_VERCEL_ORG_ID:?}" "${APPROVED_VERCEL_PROJECT_ID:?}" "${RECORD_DIR:?}"
+npx --yes vercel@59.13.1 api "/v9/projects/$APPROVED_VERCEL_PROJECT_ID" --method GET --raw --scope "$APPROVED_VERCEL_ORG_ID" > "$RECORD_DIR/project-preflight.json"
+node scripts/check-vercel-identity.mjs "$RECORD_DIR/project-preflight.json"
+export VERCEL_ORG_ID="$APPROVED_VERCEL_ORG_ID" VERCEL_PROJECT_ID="$APPROVED_VERCEL_PROJECT_ID"
 npm run verify:deploy-target -- production
 npm run build:release
-npx --yes vercel@59.13.1 deploy --prod --skip-domain --scope "$VERCEL_TEAM"
+test "$(git rev-parse HEAD)" = "$APPROVED_RELEASE_SHA"
+test -z "$(git status --porcelain)"
+shasum -a 256 -c docs/launch-evidence/migrations.sha256
+npx --yes vercel@59.13.1 deploy --prod --skip-domain --meta "releaseCommit=$APPROVED_RELEASE_SHA" --scope "$APPROVED_VERCEL_ORG_ID"
 )
 ```
 
-실제 반환 URL을 작업 기록과 `STAGED_PRODUCTION_URL`에 지정하고, 같은 team/project의 방금 생성한 Production deployment인지 확인한 뒤:
+반환된 unique URL을 `STAGED_PRODUCTION_URL`로 export합니다. `releaseCommit`은 위 clean checkout 배포 명령이 남긴 provenance 표식이며 독립적인 artifact hash 증명은 아닙니다. protected build log의 source/build ID와 설정도 대조합니다. API의 gitSource SHA가 있으면 동일해야 합니다. URL/id/source를 승인 기록에 묶고 기존 artifact를 새로 만든 것으로 취급하지 않습니다.
 
 ```bash
 (
-set -e
-test -n "$STAGED_PRODUCTION_URL"
-test -n "$VERCEL_TEAM"
-npx --yes vercel@59.13.1 inspect "$STAGED_PRODUCTION_URL" --scope "$VERCEL_TEAM"
-DEPLOYMENT_ORIGIN="$STAGED_PRODUCTION_URL" npm run smoke:deployment -- production
+set -euo pipefail
+umask 077
+: "${STAGED_PRODUCTION_URL:?}"
+npx --yes vercel@59.13.1 api "/v9/projects/$APPROVED_VERCEL_PROJECT_ID" --method GET --raw --scope "$APPROVED_VERCEL_ORG_ID" > "$RECORD_DIR/project-staged.json"
+npx --yes vercel@59.13.1 api "/v13/deployments/${STAGED_PRODUCTION_URL#https://}?withGitRepoInfo=true" --method GET --raw --scope "$APPROVED_VERCEL_ORG_ID" > "$RECORD_DIR/deployment-staged.json"
+APPROVED_DEPLOYMENT_URL="$STAGED_PRODUCTION_URL" node scripts/check-vercel-identity.mjs "$RECORD_DIR/project-staged.json" "$RECORD_DIR/deployment-staged.json"
+# bypass header/cookie 없이 요청: curl 설정 파일도 무시하며 redirect를 따라가지 않는다.
+status=$(curl --disable --silent --show-error --max-time 10 --output "$RECORD_DIR/protection-body.txt" --dump-header "$RECORD_DIR/protection-headers.txt" --write-out '%{http_code}' "$STAGED_PRODUCTION_URL/jobs")
+case "$status" in 401|403) ;; *) echo 'Anonymous protection denial NOT verified; stop'; exit 1 ;; esac
 )
 ```
 
-명령은 승인된 clean checkout의 정확한 release SHA에서 수행합니다. 실제 facts/소스/설정이 달라지면 해당 변경의 검증과 새 artifact identity를 남깁니다. 배포 ID, source SHA, build ID/log reference, 실제 env target, compiled public 설정, policy identity, migration manifest를 서로 묶습니다. 로컬 `build:release` 성공만으로 hosted override/build 성공을 대신하지 않습니다.
+위 응답이 앱 오류가 아닌 **Vercel Protection의 거절**인지 보호된 header/body와 사전 dashboard 설정을 사람이 대조하고 기록합니다. 200/redirect/timeout 또는 구분 불가 시 중단합니다. 다른 보호 방식의 응답이면 해당 방식의 공식 검증 방법을 확인해야 하며 단순 non-200을 PASS로 바꾸지 않습니다. 새 deployment의 cron disabled와 기존/in-flight 발송 containment도 재확인한 뒤에만 별도 승인된 보호 bypass를 사용한 read-only smoke를 실행합니다:
 
-`--skip-domain`은 도메인 자동 연결만 늦춥니다. 접근 보호나 이메일/cron 중지를 보장하지 않으므로 unique Production URL의 공개 전 접근 보호와 production queue/scheduler 영향을 실제로 확인합니다. 보호할 수 없는 미검증 artifact를 공개하지 않습니다. **요청 URL은 STAGED_PRODUCTION_URL, compiled canonical/메일 origin은 미래 PRODUCTION_ORIGIN**입니다. smoke를 통과하려고 canonical을 unique URL로 바꾸지 않습니다. [Vercel deploy 문서](https://vercel.com/docs/cli/deploy)를 2026-09-11 확인했습니다.
+```bash
+DEPLOYMENT_ORIGIN="$STAGED_PRODUCTION_URL" npm run smoke:deployment -- production
+```
+
+실제 facts/소스/설정이 달라지면 해당 변경의 검증과 새 artifact identity를 남깁니다. 배포 ID, source SHA, build ID/log reference, 실제 env target, compiled public 설정, policy identity, migration manifest를 서로 묶습니다. 로컬 `build:release` 성공만으로 hosted override/build 성공을 대신하지 않습니다. **요청 URL은 STAGED_PRODUCTION_URL, compiled canonical/메일 origin은 미래 PRODUCTION_ORIGIN**입니다. smoke를 통과하려고 canonical을 unique URL로 바꾸지 않습니다. [Vercel deploy](https://vercel.com/docs/cli/deploy), [deployment API](https://vercel.com/docs/rest-api/deployments/get-a-deployment-by-id-or-url)를 2026-09-11 확인했습니다.
 
 ### 4. 실제 smoke와 공개 Go (D3.4–D3.5)
 
@@ -161,18 +197,20 @@ read-only smoke는 health/ready/jobs, canonical, robots/sitemap, sample/seed 비
 
 ```bash
 (
-set -e
-test -n "$STAGED_PRODUCTION_URL"
-test -n "$VERCEL_TEAM"
-test -n "$VERCEL_PROJECT"
+set -euo pipefail
+umask 077
+: "${STAGED_PRODUCTION_URL:?}"
 npm run verify:deploy-target -- production
-npx --yes vercel@59.13.1 promote "$STAGED_PRODUCTION_URL" --scope "$VERCEL_TEAM"
-npx --yes vercel@59.13.1 promote status "$VERCEL_PROJECT" --scope "$VERCEL_TEAM"
+npx --yes vercel@59.13.1 api "/v9/projects/$APPROVED_VERCEL_PROJECT_ID" --method GET --raw --scope "$APPROVED_VERCEL_ORG_ID" > "$RECORD_DIR/project-promote.json"
+npx --yes vercel@59.13.1 api "/v13/deployments/${STAGED_PRODUCTION_URL#https://}?withGitRepoInfo=true" --method GET --raw --scope "$APPROVED_VERCEL_ORG_ID" > "$RECORD_DIR/deployment-promote.json"
+APPROVED_DEPLOYMENT_URL="$STAGED_PRODUCTION_URL" node scripts/check-vercel-identity.mjs "$RECORD_DIR/project-promote.json" "$RECORD_DIR/deployment-promote.json"
+npx --yes vercel@59.13.1 promote "$STAGED_PRODUCTION_URL" --scope "$APPROVED_VERCEL_ORG_ID"
+npx --yes vercel@59.13.1 promote status "$APPROVED_VERCEL_PROJECT_NAME" --scope "$APPROVED_VERCEL_ORG_ID"
 DEPLOYMENT_ORIGIN="$PRODUCTION_ORIGIN" npm run smoke:deployment -- production
 )
 ```
 
-`promote`는 [기존 deployment를 current로 지정](https://vercel.com/docs/cli/promote)합니다. 명령 timeout은 취소 증거가 아니므로 상태를 확인한 뒤 판단합니다. 공개 후 canonical에서 무인증 접근, 가입/탐색 무료, 공고/고용주 별도 심사 안내, 정상 redirect/robots(index 허용)/sitemap, TLS, OAuth 복귀와 메일 origin을 다시 확인합니다. Search Console/URL Inspection은 실제 domain 증거로 기록하며 검색 노출을 보장하지 않습니다. 실패하면 [첫날 containment/rollback](../operations/first-30-days.md#장애-대응과-복구)을 적용합니다.
+`promote`는 [기존 deployment를 current로 지정](https://vercel.com/docs/cli/promote)합니다. 명령 timeout은 취소 증거가 아니므로 상태를 확인한 뒤 판단합니다. 승인된 공개 시점에 canonical domain의 Protection 범위를 공개 의도에 맞게 조정하고 generated URL 보호는 유지합니다. 별도 실메일 테스트 승인 또는 공개 Go에 명시된 시점까지 cron은 disabled로 유지합니다. 승인된 테스트는 통제된 worker 호출로 검증하고, 실제 스케줄 재개는 queue/credential/secret/현재 deployment를 확인한 뒤 별도 승인·UTC를 기록합니다. enable 후 실제 active schedule/호출/수신을 확인하며 수동 호출을 cron PASS로 대신하지 않습니다. 공개 후 canonical에서 무인증 접근, 가입/탐색 무료, 공고/고용주 별도 심사 안내, 정상 redirect/robots(index 허용)/sitemap, TLS, OAuth 복귀와 메일 origin을 다시 확인합니다. Search Console/URL Inspection은 실제 domain 증거로 기록하며 검색 노출을 보장하지 않습니다. 실패하면 [첫날 containment/rollback](../operations/first-30-days.md#장애-대응과-복구)을 적용합니다.
 
 ### 5. 실행 기록 (D3.6–D3.7)
 
@@ -181,8 +219,8 @@ DEPLOYMENT_ORIGIN="$PRODUCTION_ORIGIN" npm run smoke:deployment -- production
 | 실제 실행 기록 항목 | 반드시 보존할 비밀 없는 증거 |
 |---|---|
 | 백업/대상/schema | UTC, operator, project/ref/region, backup point/age/coverage, recovery test ref, before history/counts |
-| dry-run/적용 | exact release SHA, ordered pending versions+hashes, reviewed SQL reference, reviewer, command/exit, after history/counts |
-| Production build | immutable deployment URL/ID, source SHA/build ID, real target, compiled canonical/indexing, policy identity, protected build evidence |
+| dry-run/적용 | approved clean release SHA/ref, manifest+dry-run SHA-256, ordered pending versions+hashes, reviewed SQL reference, reviewer/UTC, command/exit, after history/counts |
+| Production build | approved org/project ID+name, actual API identity, immutable deployment URL/ID, source SHA/build ID, real target, compiled canonical/indexing, policy identity, pre-create Protection/cron+post-create anonymous denial, protected build evidence |
 | smoke/provider/device | UTC, request URL와 canonical 각각, 시나리오/역할, 상태/결과, 실제/fixture 구분, 승인된 발송 reference |
 | public Go/promotion | 대표의 명시적 결정·UTC, gate별 증거, 실제 확인 공급 수/날짜, 변경 안내 결정, domain/redirect/TLS 결과 |
 | 첫 24시간 | T0/T+1h/+4h/+12h/+24h 관찰, 장애/ack/recovery 시각, 비용/queue/report 추이, 실제 담당자 |
