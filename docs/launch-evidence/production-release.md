@@ -2,7 +2,9 @@
 
 **소프트웨어 구현과 로컬 배포 준비는 완료했습니다. 실제 production 배포·공개·첫 24시간 관찰은 NOT RUN / NO-GO입니다.** K-Work US는 무료 CA 구인·구직, 공고 심사/수정/마감, 지원/철회/대화, MFA 관리자/신고/정지, 알림 재시도·수신 차단, 정책 확인 기록과 운영 지표를 구현했습니다. 운영자·지원 메일·도메인은 미정이며 임의로 채우지 않았습니다.
 
-후보는 `codex/california-public-launch`, 작업 위치는 `/Users/rinny/IdeaProjects/AlbaMon/.worktrees/california-public-launch`입니다. 최종 로컬 증거는 unit **734 PASS + 6 opt-in skip**, 원본/복원 DB **각 498 PASS**, 최종 브라우저 **27/27 PASS**, 전체/운영 audit **각 0**입니다. 브라우저에는 원인·사용자 영향이 미해결인 stream 경고 5건이 있습니다. 이는 실제 Google·메일·호스팅 PASS가 아닙니다.
+후보는 `codex/california-public-launch`, 작업 위치는 `/Users/rinny/IdeaProjects/AlbaMon/.worktrees/california-public-launch`입니다. D2 로컬 증거는 unit **734 PASS + 6 opt-in skip**, 원본/복원 DB **각 498 PASS**, 최종 브라우저 **27/27 PASS**, 전체/운영 audit **각 0**입니다. 브라우저에는 원인·사용자 영향이 미해결인 stream 경고 5건이 있습니다. 이는 실제 Google·메일·호스팅 PASS가 아닙니다.
+
+최종 리뷰 수정 source `63e4632d6f24ce77e4e42072a0e0b8621997c443`의 새 검증은 **unit775 PASS + 6 skip**, typegen/typecheck/lint 및 별도 ordinary local build PASS입니다. [새 build identity와 최종 수정 검증](release-candidate.md#final-review-corrections-and-fresh-local-build--2026-09-11)은 아래 D2 immutable artifact/복원 증거와 구분합니다. I-1/I-2/M-1은 수정했고 scoped rereview는 아직 대기 중입니다.
 
 다음 실제 단계는 운영자/연락처/도메인과 기존 프로젝트 선택 → 정책 외부 검토 및 실제 계정·메일 승인 → 아래 대상 확인/백업/`db push --dry-run` → 검토된 `db push` → 별도 Production 새 빌드 → 실제 smoke/복구/공급 증거 → 대표의 공개 Go입니다. 첫날 이후에는 [첫 30일 운영표](../operations/first-30-days.md)를 사용합니다. 이미 미정이라고 답한 입력을 다시 확정된 사실로 취급하지 않습니다.
 
@@ -228,14 +230,14 @@ DEPLOYMENT_ORIGIN="$PRODUCTION_ORIGIN" npm run smoke:deployment -- production
 
 ## 남은 리뷰 항목과 처리 상태
 
-각 task의 로컬 review는 Critical/Important 0으로 종료했지만 최종 whole-branch review와 아래 Minor의 출시 영향 판정은 별도입니다. **미해결 P2를 0이라고 선언하거나 경고를 면제하지 않습니다.** 아래 ID는 기존 ledger를 합친 것이며 새로운 결함 판정을 만들어내지 않습니다.
+최종 whole-branch review는 Critical0 / Important2(I-1·I-2) / Minor1(M-1)을 발견했습니다. 세 항목은 최종 수정 commit에서 처리했으며 scoped rereview는 대기 중입니다. 아래 기존 Minor의 nonblocking merge 판정은 공개 승인과 별개입니다. **미해결 P2를 0이라고 선언하거나 경고를 면제하지 않습니다.** 아래 ID는 기존 ledger를 합친 것이며 새로운 결함 판정을 만들어내지 않습니다.
 
 | ID / 수준 | 실제 잔여 상태 | 다음 판단 / 책임 |
 |---|---|---|
-| B1-M1 / Minor | page500 sentinel로 page501 링크가 나타나 app이1로 되돌림; 공개 재고 >10,000 경계 | final reviewer가 영향/수정 여부 판정; 도달 규모 전 paging 개선 |
-| B1-M2 / Minor | direct search RPC의 invalid page501→500, app parser→1 규약 차이 | final reviewer; 통일 시 새 migration 및 경계 회귀 |
-| B1-M3 = C2 stream = D2-M1 / Minor | 최종27PASS에도 종료 전 stream 경고5건, 원인/사용자 영향 UNRESOLVED | final reviewer/개발 담당; actionable 재현 시 제한된 sanitized correlation, 무작정 전체 재실행/로그 억제 금지 |
-| C4 openness / Minor | owned job마다 `is_job_open` RPC, 한 요청 실패가 목록 실패로 전파 | final reviewer; 실제 규모/지연 근거가 있으면 batching, 동일 공개 predicate와 owner 이력 보존 |
+| B1-M1 / Minor | page500 sentinel로 page501 링크가 나타나 app이1로 되돌림; 공개 재고 >10,000 경계 | whole-branch review: nonblocking merge로 수용; 도달 규모 전 paging 개선 |
+| B1-M2 / Minor | direct search RPC의 invalid page501→500, app parser→1 규약 차이 | whole-branch review: nonblocking merge로 수용; B1-M1과 함께 추후 통일 |
+| B1-M3 = C2 stream = D2-M1 / Minor | 최종27PASS에도 종료 전 stream 경고5건, 원인/사용자 영향 UNRESOLVED | merge nonblocking; 공개 Go 전 담당 지정·영향받는 navigation/error response의 제한된 영향 평가와 판단 기록, 전체 재실행/로그 억제 금지 |
+| C4 openness / Minor | owned job마다 `is_job_open` RPC, 한 요청 실패가 목록 실패로 전파 | whole-branch review: launch 규모에서 nonblocking merge; 실제 규모/지연 근거 시 batching, 동일 predicate/이력 보존 |
 | DB-NOTICE / runner 정보 | pgTAP extension setup notice와 NO_COLOR/FORCE_COLOR 경고는 기존 알려진 setup/runner 출력 | assertion 실패나 stream 경고와 분리; 전체 로그 무음/원인 해결 주장 없음 |
 | D2-M2 / Minor 기록 보존 | attempt5 DNS 원문 로그를 나중 시도가 덮어써 소실; 당시 관측만 남음 | [향후 per-attempt 기록 절차](restore-drill.md#repeatable-local-procedure) 추가 완료; 소실 로그는 복구되지 않음 |
 | B2-M1 / 해결 | 만료 approved 공고의 owner public dead link | C4 `cec83805`가 authoritative openness 적용 |

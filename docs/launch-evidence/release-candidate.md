@@ -121,3 +121,56 @@ protection, migrations and operator sign-off remain external gates. Follow
 [browser evidence](browser-qa.md), [policy review](../legal/launch-policy-review.md)
 and [operational health](../OPERATIONAL_HEALTH.md). Passing local tests does not
 satisfy missing external rows.
+
+
+## Final review corrections and fresh local build — 2026-09-11
+
+The whole-branch review of `c8de0c8..2632255` found no Critical, two Important
+operational entry-point defects (I-1/I-2), and one Minor job-date display defect
+(M-1). Fix source **`63e4632d6f24ce77e4e42072a0e0b8621997c443`** contains the
+three corrections: staging preparation/apply stop on failures and bind the
+approved clean source, target, manifest and dry-run receipt; the general
+Production deploy shortcut is retired in favor of the sole ordered D3 procedure;
+job dates render in America/Los_Angeles, 24-hour PT, preserving ISO `dateTime`
+and the missing-publication fallback. Scoped rereview is **pending**; these are
+implemented/self-reviewed corrections, not a future review PASS.
+
+| Fresh verification on the final fix source | Actual result |
+|---|---|
+| Focused staging shell, job-page/structured data, Vercel identity | 49/49 PASS; 14 exact extracted staging-shell cases use temporary Git, real target guard/checksums and fake Supabase; 24 existing Vercel CLI cases retained |
+| `npm test` | 775 PASS + 6 opt-in skips; 68 passing files / 2 skipped; final run 6.45s on the current checkout, including D3 identity helper; browser runtime evidence remains D2 |
+| `npx next typegen`; `npm run typecheck`; `npm run lint` | PASS; two test fixture typing issues corrected before source commit; covering ESLint also PASS |
+| `npm run verify:beta`; `npm run verify:local-supabase` | 7/7 PASS each; offline only |
+| General deployment shell syntax / local doc links / migration manifest | 5 general bash blocks parse; links resolve; exact ordered 21 migrations and checksums unchanged; original plan counts remain 53 checked / 29 pending |
+| Configured ordinary `npm run build` | PASS, 2026-09-11 09:50:13.542733–09:50:17.186320 UTC; Next16.3.4; compiled and generated18/18 static pages |
+| Actual unconfigured `npm run build:release` | exit1, `Missing release setting: NEXT_PUBLIC_SITE_URL`; no Next build or hosted call |
+
+The new ordinary local build ID is **`p4JJKo0sM6tFRBxD9shd_`**, from the clean
+source SHA above. Its 889-file `.next` manifest SHA-256 is
+`9da0ca1d2fec4f36a1444254dc062735ad7b1c6c511747c96fbcc9e54f48814f`.
+Manifest definition: sorted file paths relative to `.next`, one SHA-256, two
+spaces, POSIX path and newline per file; omit `cache` paths and files whose names
+start with `trace`. This identifies the fresh local directory; it is **not** the
+D2 archive hash or a hosted immutable artifact. The later evidence-only commit
+does not change build source. Public build inputs are API55321, its local anon
+key, canonical `http://127.0.0.1:3100`, indexing=false. No `.env` files were
+present; the build received no service credential. Scanning all889 recorded
+files found no local service key. No application server/browser/DB/restore
+campaign was run for this presentation/runbook change.
+
+The earlier D2 `332f704` source, A/B archive identities, 27 browser passes,
+498+498 DB assertions, Auth/restore/rollback and audit records above remain
+unchanged historical evidence. They are not relabeled as tests of this new
+build. D2's original archives were disposed; this fresh `.next` remains local.
+All guard fixtures were disposed, original543xx/native5432 and owned553xx stacks
+were preserved, and no hosted DB/provider/deploy/email/public operation occurred.
+
+Whole-branch triage accepts B1 page-cap/invalid-page divergence and C4 per-owner
+openness fanout as nonblocking Minor follow-ups. The five pretermination stream
+warnings remain unresolved and nonblocking for merge; a named owner must assess
+affected navigation/error responses and record demonstrated impact/acceptance
+before public Go. No warning suppression or speculative pagination/SQL/stream
+work was added. Lost attempt5 raw DNS evidence remains lost, with forward-only
+per-attempt logging correction. Actual operator/support/domain/legal/provider,
+hosted protection/migrations/cron/delivery/recovery, physical-device evidence,
+real supply and representative public Go remain **NO-GO / UNVERIFIED**.
