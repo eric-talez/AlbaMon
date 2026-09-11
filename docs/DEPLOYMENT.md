@@ -11,7 +11,9 @@ and [local setup](LOCAL_SUPABASE.md).
 
 The [Korean owner handover and production execution record](launch-evidence/production-release.md)
 contains the exact candidate/migration identities, actual NO-GO gaps, staged
-Production/promotion commands and residual findings. After real public Go use
+Production/promotion commands and residual findings. Its ordered D3 procedure is
+the **only Production mutation path** for migrations, candidate creation and
+promotion; the staging procedure below is not a Production shortcut. After real public Go use
 the [first-30-days runbook](operations/first-30-days.md).
 
 ## Inventory before any hosted mutation
@@ -66,33 +68,65 @@ build. Never relabel a staging artifact as Production.
 Load only the selected environment's secrets through protected operator tooling;
 do not put values in shell history or print `supabase status -o env`. Use the
 repository root for hosted commands only after verifying the explicit link.
+Record the approved full clean source SHA and actual staging ref as
+`APPROVED_RELEASE_SHA` and `APPROVED_STAGING_PROJECT_REF`. Export `RECORD_DIR` as
+a new protected absolute path outside the repository for this attempt; never reuse an earlier directory.
+The subshell must stop on any guard, link, history or checksum failure.
 
 ```bash
-test -n "$STAGING_PROJECT_REF"
+(
+set -euo pipefail
+umask 077
+: "${RECORD_DIR:?}" "${APPROVED_RELEASE_SHA:?}" "${APPROVED_STAGING_PROJECT_REF:?}"
+mkdir -m 700 "$RECORD_DIR"
+test "$(git rev-parse HEAD)" = "$APPROVED_RELEASE_SHA"
+test -z "$(git status --porcelain)"
+test "$STAGING_PROJECT_REF" = "$APPROVED_STAGING_PROJECT_REF"
 npm run verify:deploy-target -- staging
 supabase link --project-ref "$STAGING_PROJECT_REF"
-supabase migration list --linked
-supabase db push --dry-run
+test "$(cat supabase/.temp/project-ref)" = "$APPROVED_STAGING_PROJECT_REF"
+supabase migration list --linked > "$RECORD_DIR/migrations-before.txt" 2>&1
+shasum -a 256 -c docs/launch-evidence/migrations.sha256
+supabase db push --dry-run > "$RECORD_DIR/dry-run.txt" 2>&1
+shasum -a 256 docs/launch-evidence/migrations.sha256 "$RECORD_DIR/dry-run.txt"
+)
 ```
 
 Compare the **entire current ordered migration directory**, not a historic count,
 with remote history and inspect the exact dry-run SQL. Stop on remote-only or
 missing history, destructive changes or an unexpected target. Do not use normal
 launch work to run migration repair, `--include-all`, `--db-url` or history edits.
-After reviewing the actual staging target and additive compatibility:
+After reviewing the actual staging target, backup, compatibility, before-history
+and dry-run output/exit, record the approved source SHA/ref, manifest file hash,
+dry-run file hash and reviewer/UTC. Export `APPROVED_MANIFEST_SHA256` and
+`APPROVED_DRY_RUN_SHA256` from that reviewed receipt, **never by recalculating
+approval from current files immediately before applying**. Keep the source,
+target and evidence fixed during this execution window. Any change, including
+another operator's DB change, requires fresh history/dry-run and review.
 
 ```bash
+(
+set -euo pipefail
+umask 077
+: "${RECORD_DIR:?}" "${APPROVED_RELEASE_SHA:?}" "${APPROVED_STAGING_PROJECT_REF:?}"
+: "${APPROVED_MANIFEST_SHA256:?}" "${APPROVED_DRY_RUN_SHA256:?}"
 npm run verify:deploy-target -- staging
-test "$(cat supabase/.temp/project-ref)" = "$STAGING_PROJECT_REF"
-supabase db push
-supabase migration list --linked
+test "$STAGING_PROJECT_REF" = "$APPROVED_STAGING_PROJECT_REF"
+test "$(cat supabase/.temp/project-ref)" = "$APPROVED_STAGING_PROJECT_REF"
+test "$(git rev-parse HEAD)" = "$APPROVED_RELEASE_SHA"
+test -z "$(git status --porcelain)"
+test "$(shasum -a 256 docs/launch-evidence/migrations.sha256 | cut -d ' ' -f 1)" = "$APPROVED_MANIFEST_SHA256"
+test "$(shasum -a 256 "$RECORD_DIR/dry-run.txt" | cut -d ' ' -f 1)" = "$APPROVED_DRY_RUN_SHA256"
+shasum -a 256 -c docs/launch-evidence/migrations.sha256
+supabase db push > "$RECORD_DIR/push.txt" 2>&1
+supabase migration list --linked > "$RECORD_DIR/migrations-after.txt" 2>&1
+)
 ```
 
 Never add `--include-seed`. New migrations remain additive; do not modify old
-migrations to make changed policy facts or old data fit. Production later uses
-its separately reviewed link/dry-run/push with `PRODUCTION_PROJECT_REF` and
-`npm run verify:deploy-target -- production` immediately before the operation.
-Do not reuse the staging link for a production push.
+migrations to make changed policy facts or old data fit. Production requires the
+separately approved [D3 existing-data, backup and guarded migration procedure](launch-evidence/production-release.md#2-production-additive-migration-d32).
+Do not adapt these staging commands or reuse its receipt/link for Production.
 
 ## OAuth, Preview protection and read-only smoke
 
@@ -125,14 +159,13 @@ DEPLOYMENT_ORIGIN="$STAGING_ORIGIN" npm run smoke:deployment -- staging
 
 `NEXT_PUBLIC_SITE_URL` must equal the artifact's compiled staging canonical
 origin. A **staged Production** artifact is fetched at its unique Vercel URL
-while retaining the future Production canonical domain:
-
-```bash
-npm run verify:deploy-target -- production
-npx --yes vercel@59.13.1 deploy --prod --skip-domain --scope "$VERCEL_TEAM"
-# Capture and inspect that actual deployment URL as STAGED_PRODUCTION_URL.
-DEPLOYMENT_ORIGIN="$STAGED_PRODUCTION_URL" npm run smoke:deployment -- production
-```
+while retaining the future Production canonical domain. Use only the ordered
+[D3 Production creation, identity and protection procedure](launch-evidence/production-release.md#3-새-production-build와-staged-url-d33),
+then its smoke and public Go/promotion steps. It requires approved clean source,
+actual linked org/project identity, release metadata, generated-URL Protection
+and cron/provider containment **before candidate creation**. `--skip-domain`
+alone supplies none of these controls. The former direct Production deploy
+recipe is retired; do not deploy from this general smoke section.
 
 Do not substitute the request URL into `NEXT_PUBLIC_SITE_URL` or rebuild with it.
 Promotion/domain assignment is a separately reviewed public launch action after

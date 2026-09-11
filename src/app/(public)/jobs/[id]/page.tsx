@@ -20,6 +20,15 @@ type Params = { id: string };
 
 export const dynamic = "force-dynamic";
 
+function formatJobTime(value: string): string {
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "America/Los_Angeles",
+    dateStyle: "medium",
+    timeStyle: "short",
+    hourCycle: "h23",
+  }).format(new Date(value)) + " PT";
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -139,7 +148,7 @@ export default async function JobDetailPage({
           </div>
         </dl>
 
-        <p className="mt-4 text-xs text-muted">게시일 / Posted: <time dateTime={job.postedAt}>{job.postedAt || "기록 없음"}</time><br />마감 / Expires: <time dateTime={job.expiresAt}>{job.expiresAt}</time></p>
+        <p className="mt-4 text-xs text-muted">게시일 / Posted: <time dateTime={job.postedAt}>{job.postedAt ? formatJobTime(job.postedAt) : "기록 없음"}</time><br />마감 / Expires: <time dateTime={job.expiresAt}>{formatJobTime(job.expiresAt)}</time></p>
 
         <section className="mt-6">
           <h2 className="text-base font-semibold">상세 설명</h2>

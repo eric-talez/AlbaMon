@@ -40,3 +40,22 @@ it("displays the actual locality used by JSON-LD even when a legacy public addre
   const html=renderToStaticMarkup(await JobDetailPage({params:Promise.resolve({id:job.id})}));
   expect(html).toContain('<dd class="text-sm">Oakland, CA</dd>');
 });
+
+it.each([
+  ["2026-01-02T00:30:00Z", "2026. 1. 1. 16:30 PT"],
+  ["2026-07-02T00:30:00Z", "2026. 7. 1. 17:30 PT"],
+])("displays publication and expiry in California time for %s, retaining ISO attributes", async (iso, visible) => {
+  vi.mocked(getApprovedJobById).mockResolvedValue({ ...job, postedAt: iso, expiresAt: iso });
+  const html = renderToStaticMarkup(await JobDetailPage({ params: Promise.resolve({ id: job.id }) }));
+  expect(html.match(/<time\b[^>]*>.*?<\/time>/g)).toEqual([
+    `<time dateTime="${iso}">${visible}</time>`,
+    `<time dateTime="${iso}">${visible}</time>`,
+  ]);
+});
+
+it("keeps the honest missing-publication fallback without inventing a date", async () => {
+  vi.mocked(getApprovedJobById).mockResolvedValue({ ...job, postedAt: "" });
+  const html = renderToStaticMarkup(await JobDetailPage({ params: Promise.resolve({ id: job.id }) }));
+  expect(html).toContain('<time dateTime="">기록 없음</time>');
+  expect(html).not.toContain('type="application/ld+json"');
+});
