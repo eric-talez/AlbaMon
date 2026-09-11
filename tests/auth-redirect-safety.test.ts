@@ -1,3 +1,4 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -105,14 +106,14 @@ describe("GET /auth/callback", () => {
   }
 
   beforeEach(() => {
-    mockProfile.mockResolvedValue({ role: "seeker", accountStatus: "active", displayName: "Kim" });
+    mockProfile.mockResolvedValue({ role: "seeker", ...acknowledgedPolicies, accountStatus: "active", displayName: "Kim" });
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", REAL_URL);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", REAL_KEY);
   });
 
   it("sends an incomplete profile through onboarding with the original safe apply path", async () => {
     useExchangeResult(null);
-    mockProfile.mockResolvedValue({ role: "seeker", accountStatus: "active", displayName: "  " });
+    mockProfile.mockResolvedValue({ role: "seeker", ...acknowledgedPolicies, accountStatus: "active", displayName: "  " });
     const response = await authCallback(request("?code=abc&next=/jobs/id/apply"));
     const url = new URL(response.headers.get("location")!, "http://localhost:3000");
     expect(url.pathname).toBe("/dashboard/profile");

@@ -1,5 +1,6 @@
 -- Disposable seeded Supabase only. Every fixture and mutation rolls back.
 begin;
+\ir ../helpers/policy-fixtures.inc
 create extension if not exists pgtap with schema extensions;
 select plan(20);
 insert into auth.users (id, email)
@@ -46,19 +47,23 @@ insert into public.jobs (
 
 select is((select count(*) from public.public_job_listings where id = 'd0000000-0000-4000-8000-000000000001'), 0::bigint, 'public view excludes legacy non-CA jobs');
 select set_config('request.jwt.claims', '{}', true);
+select pg_temp.acknowledge_test_actor();
 update public.jobs set expires_at=now()+interval '30 days' where id::text like 'd0000000-%' and moderation_status='approved' and state='CA';
 set local role anon;
 select is((select count(*) from public.jobs where id = 'd0000000-0000-4000-8000-000000000001'), 0::bigint, 'anonymous base-table policy excludes legacy non-CA jobs');
 reset role;
 select set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal1"}', true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 select is((select count(*) from public.jobs where id = 'd0000000-0000-4000-8000-000000000001'), 1::bigint, 'owner still sees own legacy non-CA job');
 reset role;
 select set_config('request.jwt.claims', '{"sub":"66666666-6666-4666-8666-666666666666","role":"authenticated","aal":"aal2"}', true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 select is((select count(*) from public.jobs where id = 'd0000000-0000-4000-8000-000000000001'), 1::bigint, 'admin still sees legacy non-CA job');
 reset role;
 select set_config('request.jwt.claims', '{}', true);
+select pg_temp.acknowledge_test_actor();
 select is((select array_agg(city order by city) from public.list_public_job_cities() where city in ('Las Vegas','Sacramento','San Diego','San Jose')), array['Sacramento','San Diego','San Jose']::text[], 'city RPC lists distinct public CA cities only');
 select is((select array_agg(id order by id) from public.search_public_jobs(search_query => 'B1 pay', search_pay_unit => 'hour', search_pay_min => 20)), array['d0000000-0000-4000-8000-000000000012'::uuid], 'minimum pay compares pay_min within one unit');
 select is((select count(*) from public.search_public_jobs(search_query => '*')), 2::bigint, 'asterisk search is literal');

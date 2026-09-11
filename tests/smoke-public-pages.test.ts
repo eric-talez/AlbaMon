@@ -1,3 +1,4 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -48,7 +49,7 @@ beforeEach(() => {
     email: "user@example.com",
     role: "seeker",
     isDev: true,
-    aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
+    aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
   });
 });
 
@@ -167,7 +168,7 @@ describe("apply flow guard", () => {
       email: "employer@example.com",
       role: "employer",
       isDev: true,
-      aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
+      aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
     });
     const html = renderToStaticMarkup(
       await ApplyPage({ params: Promise.resolve({ id: approvedJob.id }) }),
@@ -200,12 +201,12 @@ describe("policy pages", () => {
   it.each([
     ["terms", TermsPage, "이용약관", "법률 검토"],
     ["privacy", PrivacyPage, "개인정보처리방침", "법률 검토"],
-    ["posting-policy", PostingPolicyPage, "공고 등록 정책", "허용되지 않습니다"],
+    ["posting-policy", PostingPolicyPage, "공고 등록 정책", "허용하지 않습니다"],
     [
       "work-authorization-info",
       WorkAuthorizationInfoPage,
       "근로자격 안내",
-      "법률 자문이 아닙니다",
+      "법률 자문이나 판정이 아닙니다",
     ],
   ] as const)("renders /%s with an h1 and informational copy", (_route, Page, title, copy) => {
     const html = renderToStaticMarkup(Page());

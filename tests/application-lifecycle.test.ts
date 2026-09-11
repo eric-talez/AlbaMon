@@ -1,3 +1,4 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { expect, it, vi } from "vitest";
 import * as actions from "@/lib/applications/status-action";
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -16,7 +17,7 @@ import { requireUser } from "@/lib/auth/guards";
 import { withdrawApplication } from "@/lib/db/applications";
 import { revalidatePath } from "next/cache";
 import { normalizePage } from "@/lib/pagination";
-beforeEach(() => vi.mocked(requireUser).mockResolvedValue({ id: "applicant", role: "seeker", accountStatus: "active", aal: "aal1", email: "applicant@example.invalid", displayName: null, isDev: false }));
+beforeEach(() => vi.mocked(requireUser).mockResolvedValue({ id: "applicant", role: "seeker", ...acknowledgedPolicies, accountStatus: "active", aal: "aal1", email: "applicant@example.invalid", displayName: null, isDev: false }));
 afterEach(()=>vi.clearAllMocks());
 
 function withdrawalForm() {

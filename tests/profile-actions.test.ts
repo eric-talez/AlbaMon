@@ -1,3 +1,4 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { beforeEach, expect, test, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ user: vi.fn(), update: vi.fn(), eq: vi.fn(), single: vi.fn() }));
 vi.mock("@/lib/auth/guards", async (original) => ({ ...await original<object>(), requireUser: mocks.user }));
@@ -10,7 +11,7 @@ function form(values: Record<string, string>) {
 }
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.user.mockResolvedValue({ id: "self", isDev: false });
+  mocks.user.mockResolvedValue({ ...acknowledgedPolicies, id: "self", isDev: false });
   mocks.update.mockReturnValue({ eq: mocks.eq });
   mocks.eq.mockReturnValue({ select: () => ({ maybeSingle: mocks.single }) });
   mocks.single.mockResolvedValue({ data: { id: "self" }, error: null });
@@ -40,4 +41,10 @@ test("saves only own notification preference and ignores forged suppression", as
   expect(await updateOwnProfile(form({ displayName: "Kim", emailNotificationsEnabled: "false", suppressed_email: "false", id: "other" }))).toMatchObject({ status: "success" });
   expect(mocks.update).toHaveBeenCalledWith({ display_name: "Kim", email_notifications_enabled: false });
   expect(mocks.eq).toHaveBeenCalledWith("id", "self");
+});
+
+test.each([{}, { agreeTerms: "ca-launch-v1" }, { agreeTerms: "old", confirmPrivacyNotice: "ca-launch-v1" }])("missing or old explicit confirmations cannot update a new profile", async (values) => {
+  mocks.user.mockResolvedValue({ id: "self", isDev: false });
+  expect((await updateOwnProfile(form({ displayName: "Kim", ...values } as Record<string,string>))).status).toBe("error");
+  expect(mocks.update).not.toHaveBeenCalled();
 });

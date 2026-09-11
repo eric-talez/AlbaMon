@@ -1,3 +1,4 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
@@ -24,13 +25,13 @@ const mockSeekerApplications = vi.mocked(getSeekerApplications);
 const mockEmployerApplications = vi.mocked(getEmployerApplications);
 
 beforeEach(() => {
-  vi.mocked(requireUser).mockResolvedValue({id:"user-1",role:"employer",email:"user@example.com",isDev:false,aal:"aal1",accountStatus:"active",displayName:null});
+  vi.mocked(requireUser).mockResolvedValue({id:"user-1",role:"employer",email:"user@example.com",isDev:false,aal:"aal1",...acknowledgedPolicies, accountStatus:"active",displayName:null});
   mockRequireRole.mockResolvedValue({
     id: "user-1",
     email: "user@example.com",
     role: "seeker",
     isDev: false,
-    aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
+    aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
   });
   mockSeekerApplications.mockResolvedValue({ status: "ok", hasNext: false, applications: [] });
   mockEmployerApplications.mockResolvedValue({ status: "ok", hasNext: false, applications: [] });

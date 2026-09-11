@@ -28,6 +28,7 @@ async function setup(context?: BrowserContext) {
   const owner=createServerClient(url,anonKey,{cookies:{getAll:()=>[...cookies].map(([name,value])=>({name,value})),setAll:items=>{for(const item of items) cookies.set(item.name,item.value);}}});
   const login=await owner.auth.signInWithPassword({email,password});
   if(login.error) throw new Error("Lifecycle login failed");
+  if ((await owner.rpc("acknowledge_policies", { terms: "ca-launch-v1", agree_terms: true, privacy_notice: "ca-launch-v1", confirm_privacy_notice: true })).error) throw new Error("Fixture self acknowledgement failed");
   if(context) await context.addCookies([...cookies].map(([name,value])=>({name,value,domain:"127.0.0.1",path:"/"})));
   return {service,owner,ownerId,jobId,companyId,async cleanup(){
     const notifications=await service.from("notification_outbox").delete().eq("entity_id",jobId);
@@ -93,7 +94,7 @@ test("a real INSERT waiting behind close rechecks the committed state",async()=>
     closer.stderr!.resume();
     closer.stdin!.write(`begin; select set_config('request.jwt.claims','{"sub":"${fixture.ownerId}","role":"authenticated","aal":"aal1"}',true); set local role authenticated; select status from public.transition_job('${fixture.jobId}','close',(select updated_at from public.jobs where id='${fixture.jobId}')); select 'LOCKED';\n`);
     await locked;
-    const insert=run(`select set_config('application_name','b2-admission-waiter',false); begin; select set_config('request.jwt.claims','{"sub":"${seeker.data.user.id}","role":"authenticated","aal":"aal1"}',true); set local role authenticated; insert into public.applications(job_id,seeker_id) values('${fixture.jobId}','${seeker.data.user.id}'); commit;`);
+    const insert=run(`select set_config('application_name','b2-admission-waiter',false); begin; select set_config('request.jwt.claims','{"sub":"${seeker.data.user.id}","role":"authenticated","aal":"aal1"}',true); set local role authenticated; select public.acknowledge_policies('ca-launch-v1',true,'ca-launch-v1',true); insert into public.applications(job_id,seeker_id) values('${fixture.jobId}','${seeker.data.user.id}'); commit;`);
     await expect.poll(async()=>{
       const state=await run("select count(*) from pg_stat_activity where application_name='b2-admission-waiter' and wait_event_type='Lock';");
       return state.output.trim();

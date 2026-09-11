@@ -1,3 +1,4 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -20,7 +21,7 @@ const mockThread = vi.mocked(getApplicationThread);
 const applicationId = "11111111-1111-4111-8111-111111111111";
 
 beforeEach(() => {
-  mockRequireUser.mockResolvedValue({id:"promoted-1",email:"user@example.com",role:"employer",isDev:false,aal:"aal1",accountStatus:"active",displayName:null});
+  mockRequireUser.mockResolvedValue({id:"promoted-1",email:"user@example.com",role:"employer",isDev:false,aal:"aal1",...acknowledgedPolicies, accountStatus:"active",displayName:null});
   mockThread.mockResolvedValue({
     status: "ok",
     thread: {

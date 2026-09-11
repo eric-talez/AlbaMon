@@ -1,3 +1,4 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/auth/guards", async (original) => ({ ...await original<object>(),
@@ -34,7 +35,7 @@ function seeker() {
     email: "seeker@example.com",
     role: "seeker" as const,
     isDev: false,
-    aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
+    aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
   };
 }
 
@@ -57,7 +58,7 @@ beforeEach(() => {
     email: "admin@example.com",
     role: "admin",
     isDev: false,
-    aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
+    aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
   });
 });
 

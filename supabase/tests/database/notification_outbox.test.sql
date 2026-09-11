@@ -1,4 +1,5 @@
 begin;
+\ir ../helpers/policy-fixtures.inc
 create extension if not exists pgtap with schema extensions;
 select no_plan();
 select has_table('public','notification_outbox','transactional outbox exists');
@@ -58,16 +59,19 @@ select ok(not has_function_privilege('authenticated','public.claim_notification_
 select ok(not has_function_privilege('anon','public.record_email_webhook(text,text,text,uuid)','EXECUTE'),'webhook DB write is service only');
 select ok(not has_table_privilege('authenticated','public.email_webhook_receipts','SELECT'),'webhook receipts private');
 select set_config('request.jwt.claims','{"sub":"c1000000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}',true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 select lives_ok($$update public.profiles set email_notifications_enabled=false where id='c1000000-0000-4000-8000-000000000001'$$,'own notification opt out allowed');
 select throws_ok($$update public.profiles set suppressed_email=true where id='c1000000-0000-4000-8000-000000000001'$$,'42501','suppressed_email is a trusted field','user cannot forge trusted suppression');
 select throws_ok($$select * from public.get_notification_queue_health()$$,'42501','Admin AAL2 required','seeker cannot query aggregate');
 reset role;
 select set_config('request.jwt.claims','{"sub":"c1000000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal1"}',true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 select throws_ok($$select * from public.get_notification_queue_health()$$,'42501','Admin AAL2 required','admin AAL1 cannot query aggregate');
 reset role;
 select set_config('request.jwt.claims','{}',true);
+select pg_temp.acknowledge_test_actor();
 
 -- Exercise claims without touching preexisting rows: all other rows are deferred
 -- only inside this rollback transaction.
@@ -129,13 +133,16 @@ select is(public.record_email_webhook('c1-webhook-conflict','email.bounced','dif
 select is(public.record_email_webhook('c1-webhook-missing','email.bounced','unknown',null),false,'uncorrelated event stays retryable');
 select is((select count(*) from public.email_webhook_receipts where event_id='c1-webhook-missing'),0::bigint,'unmatched event never consumed');
 select set_config('request.jwt.claims','{"sub":"c1000000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal2"}',true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 select is((select failed from public.get_notification_queue_health()),3::bigint,'active AAL2 admin sees terminal failures');
 select throws_ok($$update public.profiles set suppressed_email=false where id='c1000000-0000-4000-8000-000000000001'$$,'42501','suppressed_email is a trusted field','even admin REST cannot undo webhook suppression');
 reset role;
 select set_config('request.jwt.claims','{}',true);
+select pg_temp.acknowledge_test_actor();
 update public.profiles set account_status='suspended' where id='c1000000-0000-4000-8000-000000000002';
 select set_config('request.jwt.claims','{"sub":"c1000000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal2"}',true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 select throws_ok($$select * from public.get_notification_queue_health()$$,'42501','Admin AAL2 required','suspended AAL2 admin denied aggregate');
 reset role;

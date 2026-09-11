@@ -33,16 +33,18 @@ begin
       ('c2110000-0000-4000-8000-000000000001','c2-race-owner@example.invalid'),
       ('c2110000-0000-4000-8000-000000000002','c2-race-seeker@example.invalid'),
       ('c2110000-0000-4000-8000-000000000003','c2-race-admin@example.invalid');
+    update public.profiles set terms_version='ca-launch-v1',terms_accepted_at=now(),privacy_notice_version='ca-launch-v1',privacy_notice_acknowledged_at=now() where id in ('c2110000-0000-4000-8000-000000000001','c2110000-0000-4000-8000-000000000002','c2110000-0000-4000-8000-000000000003');
     update public.profiles set role='employer' where id='c2110000-0000-4000-8000-000000000001';
     update public.profiles set role='admin' where id='c2110000-0000-4000-8000-000000000003';
     insert into public.companies(id,owner_id,name,city) values('c2110000-0000-4000-8000-000000000004','c2110000-0000-4000-8000-000000000001','C2 race','Oakland');
     insert into public.jobs(id,company_id,title,category,job_type,city,pay_min,pay_max,pay_unit,schedule_days,schedule_time_range,language_requirement,description,moderation_status,expires_at)
       values('c2110000-0000-4000-8000-000000000005','c2110000-0000-4000-8000-000000000004','Race','other','part_time','Oakland',20,25,'hour','Mon','9-5','english_required','Fixture','approved',now()+interval '30 days');
+    update public.jobs set posting_policy_version='ca-launch-v1',posting_policy_acknowledged_at=now() where id='c2110000-0000-4000-8000-000000000005';
     insert into public.applications(id,job_id,seeker_id) values('c2110000-0000-4000-8000-000000000006','c2110000-0000-4000-8000-000000000005','c2110000-0000-4000-8000-000000000002');
     insert into public.messages(application_id,sender_id,body) select 'c2110000-0000-4000-8000-000000000006','c2110000-0000-4000-8000-000000000002','Initial' from generate_series(1,19);
   $setup$);
   insert_message := format('insert into public.messages(application_id,sender_id,body) values(%L,%L,''Racer'')',application_id,seeker_id);
-  insert_job := format('insert into public.jobs(company_id,title,category,job_type,city,pay_min,pay_max,pay_unit,schedule_days,schedule_time_range,language_requirement,description) values(%L,''Inserted racer'',''other'',''part_time'',''Oakland'',20,25,''hour'',''Mon'',''9-5'',''english_required'',''Fixture'')',company_id);
+  insert_job := format('insert into public.jobs(company_id,title,category,job_type,city,pay_min,pay_max,pay_unit,schedule_days,schedule_time_range,language_requirement,description,posting_policy_version) values(%L,''Inserted racer'',''other'',''part_time'',''Oakland'',20,25,''hour'',''Mon'',''9-5'',''english_required'',''Fixture'',''ca-launch-v1'')',company_id);
   for scenario in 1..7 loop
     if scenario>1 then
       perform extensions.dblink_exec('c2_setup',format('update public.profiles set account_status=''active'' where id=%L; update public.jobs set moderation_status=''approved'' where id=%L',owner_id,job_id));

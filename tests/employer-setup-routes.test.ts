@@ -1,3 +1,4 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
@@ -31,7 +32,7 @@ beforeEach(() => {
     email: "employer@example.com",
     role: "employer",
     isDev: false,
-    aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
+    aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
   });
   mockCompanies.mockResolvedValue({ status: "ok", companies: [] });
   mockJobs.mockResolvedValue({ status: "ok", jobs: [] });

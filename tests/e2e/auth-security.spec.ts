@@ -116,6 +116,8 @@ test("local profile save returns to apply, preserves identity, and refreshes an 
       await page.getByLabel("표시 이름 / Display name").fill("Same display name");
       await page.getByLabel("도시 (선택) / City (optional)").fill("Los Angeles");
       await page.getByLabel("이메일 알림 / Email notifications").selectOption("false");
+      await page.locator('[name="agreeTerms"]').check();
+      await page.locator('[name="confirmPrivacyNotice"]').check();
       await page.getByRole("button", { name: "저장하고 계속 / Save and continue" }).click();
       await expect(page).toHaveURL(new RegExp(`${destination}$`));
       const profile = await admin.from("profiles").select("display_name, role, city, email_notifications_enabled").eq("id", data.user.id).single();
@@ -197,6 +199,8 @@ test("local PKCE callback exchanges a real code and sends an incomplete profile 
     await page.goto(location.href);
     await expect(page.getByRole("heading", { name: "프로필 / Profile" })).toBeVisible();
     await page.getByLabel("표시 이름 / Display name").fill("Callback test");
+    await page.locator('[name="agreeTerms"]').check();
+    await page.locator('[name="confirmPrivacyNotice"]').check();
     await page.getByRole("button", { name: "저장하고 계속 / Save and continue" }).click();
     await expect(page).toHaveURL(new RegExp(`${destination}$`));
   } finally {

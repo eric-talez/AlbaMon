@@ -20,7 +20,7 @@ const maxDnsHostname = [
 ].join(".");
 
 function checkReleaseEnv(overrides: Record<string, string> = {}) {
-  return spawnSync(process.execPath, ["scripts/check-release-env.mjs"], {
+  return spawnSync(process.execPath, ["--input-type=module", "-e", 'import { checkReleaseEnv } from "./scripts/check-release-env.mjs"; import { syntheticPublication } from "./tests/fixtures/policy-publication.mjs"; checkReleaseEnv(process.env, syntheticPublication());'], {
     cwd: process.cwd(),
     encoding: "utf8",
     env: { ...process.env, ...releaseEnv, ...overrides },
@@ -110,4 +110,11 @@ it.each(["https://jobs.k-work.test/path", "https://user:pass@jobs.k-work.test", 
 
 it.each(["development", "test", ""])("standalone release config preflight works before Next sets production runtime: %s", (runtime) => {
   expect(checkReleaseEnv({ NODE_ENV: runtime }).status).toBe(0);
+});
+
+// The actual CLI must reject the checked-in unresolved facts even with synthetic infrastructure settings.
+it("actual release CLI blocks the unresolved policy manifest", () => {
+  const result = spawnSync(process.execPath, ["scripts/check-release-env.mjs"], { encoding: "utf8", env: { ...process.env, ...releaseEnv } });
+  expect(result.status).not.toBe(0);
+  expect(result.stderr).toContain("Policy publication blocked:");
 });

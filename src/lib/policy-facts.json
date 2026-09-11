@@ -1,0 +1,25 @@
+{
+  "version": "ca-launch-v1",
+  "status": "draft",
+  "facts": {
+    "operatorLegalName": null,
+    "mailingAddress": null,
+    "supportEmail": null,
+    "effectiveDate": null,
+    "controllingLanguage": null,
+    "minimumAgePolicy": null,
+    "appealsAndTermination": null,
+    "disputeTerms": null,
+    "changeNotice": null,
+    "retentionSchedule": null,
+    "privacyRequestProcess": null,
+    "trackingAndSignals": null,
+    "processorDeployment": null,
+    "legalApplicability": null
+  },
+  "review": {
+    "completedAt": null,
+    "evidenceReference": null,
+    "bundleSha256": null
+  }
+}

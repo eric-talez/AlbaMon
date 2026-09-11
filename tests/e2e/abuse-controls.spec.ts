@@ -33,6 +33,7 @@ test("local moderation rehearsal: report pause, account suspension, old JWT deni
     const client=createServerClient(url,anon,{cookies:{getAll:()=>[...cookies].map(([name,value])=>({name,value})),setAll:items=>{for(const item of items) cookies.set(item.name,item.value);}}});
     if((await client.auth.signInWithPassword({email,password})).error) throw new Error("C2 Auth login failed");
     async function sync() {if(target) await target.addCookies([...cookies].map(([name,value])=>({name,value,domain:"127.0.0.1",path:"/"})));}
+    if ((await client.rpc("acknowledge_policies", { terms: "ca-launch-v1", agree_terms: true, privacy_notice: "ca-launch-v1", confirm_privacy_notice: true })).error) throw new Error("Fixture self acknowledgement failed");
     await sync();return {id,email,client,sync};
   }
   try {

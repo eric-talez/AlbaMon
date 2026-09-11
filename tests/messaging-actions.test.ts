@@ -1,3 +1,4 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -19,7 +20,7 @@ const applicationId = "11111111-1111-4111-8111-111111111111";
 const idle = { status: "idle", message: "" } as const;
 
 beforeEach(() => {
-  mockRequireUser.mockResolvedValue({id:"promoted-1",email:"user@example.com",role:"employer",isDev:false,aal:"aal1",accountStatus:"active",displayName:null});
+  mockRequireUser.mockResolvedValue({id:"promoted-1",email:"user@example.com",role:"employer",isDev:false,aal:"aal1",...acknowledgedPolicies, accountStatus:"active",displayName:null});
   mockSend.mockResolvedValue({ status: "sent", messageId: "message-1", recipientId:"owner-1", recipientSide:"employer" });
 });
 

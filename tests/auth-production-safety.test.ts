@@ -1,3 +1,4 @@
+import { unacknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, describe, it, expect, vi } from "vitest";
 import {
   isSupabaseConfigured,
@@ -107,7 +108,7 @@ describe("dev cookie cannot authenticate in production", () => {
       email: "admin@dev.local",
       role: "admin",
       isDev: true,
-      aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
+      aal: "aal2" as const, ...unacknowledgedPolicies, accountStatus: "active" as const, displayName: null,
     });
   });
 
@@ -126,6 +127,6 @@ describe("dev cookie cannot authenticate in production", () => {
 it("non-admin dev sessions do not synthesize aal2", () => {
   for (const role of ["seeker", "employer"] as const) {
     expect(decodeDevSession(encodeDevSession({ id: `dev-${role}`, email: `${role}@dev.local`, role }), true))
-      .toMatchObject({ aal: "aal1", accountStatus: "active", displayName: null });
+      .toMatchObject({ aal: "aal1", ...unacknowledgedPolicies, accountStatus: "active", displayName: null });
   }
 });

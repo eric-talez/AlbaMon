@@ -39,6 +39,7 @@ function validJobForm(): FormData {
   form.set("requirements", "친절한 서비스");
   form.set("benefits", "식사 제공");
   form.set("complianceAcknowledgement", "on");
+  form.set("postingPolicyVersion", "ca-launch-v1");
   return form;
 }
 

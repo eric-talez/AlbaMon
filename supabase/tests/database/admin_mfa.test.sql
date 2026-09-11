@@ -1,5 +1,6 @@
 -- Disposable seeded local database only; all fixtures and changes roll back.
 begin;
+\ir ../helpers/policy-fixtures.inc
 create extension if not exists pgtap with schema extensions;
 select plan(45);
 insert into auth.users (id, email, email_confirmed_at) values
@@ -23,8 +24,10 @@ select is((select count(*) from public.employer_access_requests where id = 'eeee
 
 reset role;
 select set_config('request.jwt.claims', '{}', true);
+select pg_temp.acknowledge_test_actor();
 update public.profiles set account_status = 'active' where id = '77777777-7777-4777-8777-777777777777';
 select set_config('request.jwt.claims', '{"sub":"77777777-7777-4777-8777-777777777777","role":"authenticated","aal":"aal1"}', true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 select is(public.is_admin(), false, 'active admin aal1 privilege gate');
 select is(public.can_access_application_thread('cccccccc-1111-4111-8111-000000000001'), false, 'active admin aal1 thread helper');
@@ -42,8 +45,10 @@ select throws_ok($$update public.profiles set account_status = 'suspended' where
 
 reset role;
 select set_config('request.jwt.claims', '{}', true);
+select pg_temp.acknowledge_test_actor();
 update public.profiles set account_status = 'suspended' where id = '77777777-7777-4777-8777-777777777777';
 select set_config('request.jwt.claims', '{"sub":"77777777-7777-4777-8777-777777777777","role":"authenticated","aal":"aal2"}', true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 select is(public.is_admin(), false, 'suspended admin aal2 privilege gate');
 select is(public.can_access_application_thread('cccccccc-1111-4111-8111-000000000001'), false, 'suspended admin aal2 thread helper');
@@ -61,8 +66,10 @@ select throws_ok($$update public.profiles set account_status = 'active' where id
 
 reset role;
 select set_config('request.jwt.claims', '{}', true);
+select pg_temp.acknowledge_test_actor();
 update public.profiles set account_status = 'active' where id = '77777777-7777-4777-8777-777777777777';
 select set_config('request.jwt.claims', '{"sub":"77777777-7777-4777-8777-777777777777","role":"authenticated","aal":"aal2"}', true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 select is(public.is_admin(), true, 'active admin aal2 privilege gate');
 select is(public.can_access_application_thread('cccccccc-1111-4111-8111-000000000001'), true, 'active admin aal2 thread helper');
@@ -78,12 +85,14 @@ select is(public.review_employer_access_request('eeeeeeee-1111-4111-8111-0000000
 
 reset role;
 select set_config('request.jwt.claims', '{"sub":"88888888-8888-4888-8888-888888888888","role":"authenticated","aal":"aal1"}', true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 select throws_ok($$update public.profiles set account_status = 'suspended' where id = '88888888-8888-4888-8888-888888888888'$$, '42501', 'account_status is a trusted field', 'seeker cannot change own trusted status');
 select lives_ok($$update public.profiles set display_name = 'Same name', city = 'Los Angeles' where id = '88888888-8888-4888-8888-888888888888'$$, 'seeker can update own display fields');
 select is(public.can_access_application_thread('cccccccc-1111-4111-8111-000000000001'), true, 'seeker participant access preserved');
 reset role;
 select set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal1"}', true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 select is(public.can_access_application_thread('cccccccc-1111-4111-8111-000000000001'), true, 'employer participant access preserved');
 select is((select applicant_email from public.list_employer_applications() where application_id = 'cccccccc-1111-4111-8111-000000000001'), 'confirmed-auth@example.invalid', 'applicant contact comes from confirmed Auth email, never profile email');
@@ -91,20 +100,25 @@ select is((select applicant_email from public.list_employer_applications() where
 select is((select count(*) from public.list_employer_applications() where applicant_display_name = 'Same name'), 2::bigint, 'same display names remain separate applicants');
 reset role;
 select set_config('request.jwt.claims', '{}', true);
+select pg_temp.acknowledge_test_actor();
 update auth.users set email = 'updated-auth@example.invalid' where id = '88888888-8888-4888-8888-888888888888';
 select set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal1"}', true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 select is((select applicant_email from public.list_employer_applications() where application_id = 'cccccccc-1111-4111-8111-000000000001'), 'updated-auth@example.invalid', 'contact follows current confirmed Auth email');
 reset role;
 select set_config('request.jwt.claims', '{"sub":"77777777-7777-4777-8777-777777777777","role":"authenticated"}', true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 select is(public.is_admin(), false, 'missing aal defaults to aal1');
 reset role;
 select set_config('request.jwt.claims', '{"role":"authenticated","aal":"aal2"}', true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 select is(public.is_admin(), false, 'missing subject cannot become admin');
 reset role;
 select set_config('request.jwt.claims', '{"sub":"77777777-7777-4777-8777-777777777777","role":"service_role","aal":"aal1"}', true);
+select pg_temp.acknowledge_test_actor();
 set local role service_role;
 select lives_ok($$update public.profiles set account_status = 'active' where id = '99999999-9999-4999-8999-999999999999'$$, 'trusted service-role operations can change status');
 select * from finish();

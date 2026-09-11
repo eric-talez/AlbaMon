@@ -1,3 +1,4 @@
+import { unacknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -89,7 +90,7 @@ describe("session.ts source guard", () => {
 describe("getAuthProfileForUser", () => {
   it("returns the role from the profiles row", async () => {
     useClient({ profile: { role: "employer", account_status: "active", display_name: "Kim" } });
-    expect(await getAuthProfileForUser("u1")).toEqual({ role: "employer", accountStatus: "active", displayName: "Kim" });
+    expect(await getAuthProfileForUser("u1")).toEqual({ role: "employer", ...unacknowledgedPolicies, accountStatus: "active", displayName: "Kim" });
   });
 
   it("returns null when the profile row is missing", async () => {
@@ -119,7 +120,7 @@ describe("getCurrentUser — Supabase configured", () => {
       email: "e@x.com",
       role: "employer",
       isDev: false,
-      aal: "aal1", accountStatus: "active", displayName: "Kim",
+      aal: "aal1", ...unacknowledgedPolicies, accountStatus: "active", displayName: "Kim",
     });
   });
 

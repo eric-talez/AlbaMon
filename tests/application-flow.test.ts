@@ -1,3 +1,4 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -34,7 +35,7 @@ beforeEach(() => {
     email: "s@example.com",
     role: "seeker",
     isDev: false,
-    aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
+    aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
   });
   mockConfigured.mockReturnValue(true);
   // Only truthiness matters to the action.
@@ -71,7 +72,7 @@ describe("submitApplication", () => {
       email: `${role}@example.com`,
       role,
       isDev: false,
-      aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
+      aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
     });
     const state = await submitApplication("job-1", idle, form(""));
     expect(state.status).toBe("error");

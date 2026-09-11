@@ -57,7 +57,7 @@ export function decodeDevSession(
       id: json.id, email: json.email, role: json.role, isDev: true,
       // Explicit local dev-admin only; the production kill-switch runs above.
       aal: json.role === "admin" ? "aal2" : "aal1",
-      accountStatus: "active", displayName: null,
+      accountStatus: "active", displayName: null, termsVersion: null, termsAcceptedAt: null, privacyNoticeVersion: null, privacyNoticeAcknowledgedAt: null,
     };
   } catch {
     return null;

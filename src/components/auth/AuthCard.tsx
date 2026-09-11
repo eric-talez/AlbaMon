@@ -51,6 +51,7 @@ export function AuthCard({ mode, next, error }: AuthCardProps) {
         </p>
       ) : null}
 
+      <p className="mt-4 text-sm">인증 후 프로필에서 <Link href="/terms" className="underline">이용약관 동의</Link>와 <Link href="/privacy" className="underline">개인정보 안내 확인</Link>을 각각 받습니다. (Authentication alone does not record agreement.)</p>
       <div className="mt-5">
         <SocialAuthButtons providers={getSocialProviders()} next={next} />
       </div>

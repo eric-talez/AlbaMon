@@ -1,3 +1,4 @@
+import { hasCurrentPolicies } from "@/lib/policies";
 import { NextResponse, type NextRequest } from "next/server";
 import { sanitizeNextPath } from "@/lib/auth/redirect";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (!error && data.user) {
       const profile = await getAuthProfileForUser(data.user.id);
       if (profile) {
-        const destination = profile.displayName?.trim()
+        const destination = profile.displayName?.trim() && hasCurrentPolicies(profile)
           ? next : `/dashboard/profile?next=${encodeURIComponent(next)}`;
         return privateRedirect(destination);
       }

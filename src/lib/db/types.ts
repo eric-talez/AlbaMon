@@ -36,6 +36,10 @@ export type {
 export type AddressDisplayMode = "full" | "city_only";
 
 export interface ProfileRow {
+  terms_version: string | null;
+  terms_accepted_at: string | null;
+  privacy_notice_version: string | null;
+  privacy_notice_acknowledged_at: string | null;
   id: string;
   account_status: "active" | "suspended";
   email_notifications_enabled: boolean;
@@ -66,6 +70,8 @@ export interface CompanyRow {
 }
 
 export interface JobRow {
+  posting_policy_version: string | null;
+  posting_policy_acknowledged_at: string | null;
   id: string;
   company_id: string;
   title: string;

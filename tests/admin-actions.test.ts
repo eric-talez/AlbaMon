@@ -1,3 +1,4 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -29,7 +30,7 @@ beforeEach(() => {
     email: "admin@example.com",
     role: "admin",
     isDev: false,
-    aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
+    aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
   });
   mockModerateJob.mockResolvedValue({ status: "updated" });
   mockVerification.mockResolvedValue({ status: "updated" });

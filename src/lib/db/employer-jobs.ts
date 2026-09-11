@@ -1,3 +1,4 @@
+import { POSTING_POLICY_VERSION } from "@/lib/policies";
 import { writeFailure } from "@/lib/db/write-errors";
 import "server-only";
 
@@ -113,6 +114,7 @@ export async function createEmployerJob(
 
 function toEmployerJobColumns(input: EmployerJobInput) {
   return {
+    posting_policy_version: POSTING_POLICY_VERSION,
     title: input.title,
     category: input.category,
     job_type: input.jobType,

@@ -1,5 +1,7 @@
 "use client";
 
+import { POSTING_POLICY_VERSION } from "@/lib/policies";
+
 import Link from "next/link";
 import { useActionState } from "react";
 import type { JobRow } from "@/lib/db/types";
@@ -128,7 +130,9 @@ export function JobForm({ companies, job }: { companies: EmployerCompany[]; job?
           required
           className="mt-1"
         />
+        <input type="hidden" name="postingPolicyVersion" value={POSTING_POLICY_VERSION} />
         <span>
+          <a href="/posting-policy" target="_blank" className="underline">공고 등록 정책 / Job posting policy</a>를 확인하고 동의합니다. (I acknowledge and agree.)
           I understand that I am responsible for accurate job information and
           compliance with applicable wage, labor, tax, and work-authorization
           laws.

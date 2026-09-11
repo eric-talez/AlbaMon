@@ -1,3 +1,4 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -61,6 +62,7 @@ function jobForm(companyId = "company-1"): FormData {
   form.set("languageRequirement", "korean_helpful");
   form.set("description", "고객 응대 업무");
   form.set("complianceAcknowledgement", "on");
+  form.set("postingPolicyVersion", "ca-launch-v1");
   form.set("moderation_status", "approved");
   form.set("boost", "featured");
   form.set("owner_id", "forged-owner");
@@ -73,7 +75,7 @@ beforeEach(() => {
     email: "employer@example.com",
     role: "employer",
     isDev: false,
-    aal: "aal2" as const, accountStatus: "active" as const, displayName: null,
+    aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
   });
   mockConfigured.mockReturnValue(true);
   mockCreateCompany.mockResolvedValue({ status: "created", companyId: "company-1" });

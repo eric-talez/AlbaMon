@@ -1,3 +1,4 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, expect, it, vi } from "vitest";
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -8,7 +9,7 @@ import { activeWriterError, requireRole } from "@/lib/auth/guards";
 import { suspendAccount, restoreAccount } from "@/app/admin/users/actions";
 import type { AuthUser } from "@/lib/auth/types";
 
-const admin = { id: "c2000000-0000-4000-8000-000000000001", role: "admin", aal: "aal2", accountStatus: "active" } as AuthUser;
+const admin = { id: "c2000000-0000-4000-8000-000000000001", role: "admin", aal: "aal2", ...acknowledgedPolicies, accountStatus: "active" } as AuthUser;
 afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
 it("matches only the exact database quota and suspension errors", () => {
   expect(writeFailure({ code: "P0001", message: "write_rate_limited" })).toBe("rate_limited");
@@ -19,7 +20,7 @@ it("matches only the exact database quota and suspension errors", () => {
 });
 it("provides a friendly write-only failure without changing read guards", () => {
   expect(activeWriterError(admin)).toBeNull();
-  expect(activeWriterError({ ...admin, accountStatus: "suspended" })).toEqual({ status: "error", message: expect.stringContaining("정지") });
+  expect(activeWriterError({ ...admin, ...acknowledgedPolicies, accountStatus: "suspended" })).toEqual({ status: "error", message: expect.stringContaining("정지") });
 });
 it.each([[suspendAccount, "suspend_account"], [restoreAccount, "restore_account"]] as const)("uses a distinct account RPC through the user session", async (action, rpcName) => {
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:55321");

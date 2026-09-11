@@ -1,3 +1,4 @@
+import { POSTING_POLICY_VERSION } from "@/lib/policies";
 import {
   JOB_CATEGORIES,
   JOB_TYPES,
@@ -368,7 +369,7 @@ export function parseEmployerCompanyForm(formData: FormData): ValidationResult<E
 }
 
 export function parseEmployerJobForm(formData: FormData): ValidationResult<EmployerJobInput> {
-  if (formData.get("complianceAcknowledgement") !== "on") {
+  if (formData.get("complianceAcknowledgement") !== "on" || formData.get("postingPolicyVersion") !== POSTING_POLICY_VERSION) {
     return {
       ok: false,
       message:

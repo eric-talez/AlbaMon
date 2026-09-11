@@ -1,4 +1,5 @@
 begin;
+\ir ../helpers/policy-fixtures.inc
 create extension if not exists pgtap with schema extensions;
 select no_plan();
 update public.jobs set expires_at = now() - interval '1 second' where id = 'bbbbbbbb-0000-0000-0000-000000000001';
@@ -9,17 +10,21 @@ reset role;
 insert into auth.users(id,email) values ('44444444-4444-4444-8444-444444444441','lifecycle@example.invalid'),('66666666-6666-4666-8666-666666666661','lifecycle-admin@example.invalid');
 update public.profiles set role = 'admin' where id = '66666666-6666-4666-8666-666666666661';
 select set_config('request.jwt.claims','{"sub":"44444444-4444-4444-8444-444444444441","role":"authenticated","aal":"aal1"}',true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 select throws_ok($$insert into public.applications(job_id,seeker_id) values('bbbbbbbb-0000-0000-0000-000000000001','44444444-4444-4444-8444-444444444441')$$,'42501',null,'expiry blocks direct application');
 reset role;
 select set_config('request.jwt.claims','{}',true);
+select pg_temp.acknowledge_test_actor();
 update public.jobs set moderation_status='pending',boost=null where id='bbbbbbbb-0000-0000-0000-000000000001';
 create temp table revision as select updated_at from public.jobs where id='bbbbbbbb-0000-0000-0000-000000000001';
 grant select on revision to authenticated;
 select set_config('request.jwt.claims','{"sub":"66666666-6666-4666-8666-666666666661","role":"authenticated","aal":"aal1"}',true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 select is((select status from public.transition_job('bbbbbbbb-0000-0000-0000-000000000001','approve',(select updated_at from revision))), 'not_allowed','admin AAL1 denied');
 select set_config('request.jwt.claims','{"sub":"66666666-6666-4666-8666-666666666661","role":"authenticated","aal":"aal2"}',true);
+select pg_temp.acknowledge_test_actor();
 select is((select status from public.transition_job('bbbbbbbb-0000-0000-0000-000000000001','approve',(select updated_at from revision))), 'updated','admin approves pending');
 select ok((select updated_at > (select updated_at from revision) and posted_at=now() and expires_at=now()+interval '30 days' from public.jobs where id='bbbbbbbb-0000-0000-0000-000000000001'),'approval sets server publication expiry and advances token');
 select is((select status from public.transition_job('bbbbbbbb-0000-0000-0000-000000000001','pause',(select updated_at from revision),'Reason')), 'conflict','same transaction old token conflicts on otherwise valid pause');
@@ -27,6 +32,7 @@ select is((select status from public.transition_job('bbbbbbbb-0000-0000-0000-000
 select is((select status from public.transition_job('bbbbbbbb-0000-0000-0000-000000000001','pause',(select updated_at from public.jobs where id='bbbbbbbb-0000-0000-0000-000000000001'),'Policy review')), 'updated','admin pause');
 select is((select count(*) from public.audit_logs where entity_id='bbbbbbbb-0000-0000-0000-000000000001' and action='job.paused'),1::bigint,'RPC has exactly one audit row');
 select set_config('request.jwt.claims','{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal1"}',true);
+select pg_temp.acknowledge_test_actor();
 select is((select reason from public.get_job_review_note('bbbbbbbb-0000-0000-0000-000000000001')),'Policy review','owner sees reason only');
 select is((select status from public.transition_job('bbbbbbbb-0000-0000-0000-000000000001','resubmit',(select updated_at from public.jobs where id='bbbbbbbb-0000-0000-0000-000000000001'))),'updated','owner resubmits paused for review');
 select throws_ok($$update public.jobs set posted_at=now()+interval '1 day' where id='bbbbbbbb-0000-0000-0000-000000000001'$$,'42501',null,'REST cannot forge publication');
@@ -37,16 +43,20 @@ select is((select status from public.transition_job('bbbbbbbb-0000-0000-0000-000
 select is((select status from public.transition_job('bbbbbbbb-0000-0000-0000-000000000001','close',(select updated_at from public.jobs where id='bbbbbbbb-0000-0000-0000-000000000001'))),'updated','owner closes paused job');
 select ok((select moderation_status='expired' and expires_at=now() from public.jobs where id='bbbbbbbb-0000-0000-0000-000000000001'),'close expires immediately');
 select set_config('request.jwt.claims','{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated","aal":"aal1"}',true);
+select pg_temp.acknowledge_test_actor();
 select is((select count(*) from public.get_job_review_note('bbbbbbbb-0000-0000-0000-000000000001')),0::bigint,'other employer sees no review reason');
 select is((select status from public.transition_job('bbbbbbbb-0000-0000-0000-000000000001','resubmit',now())),'not_allowed','other employer cannot transition');
 with changed as (update public.jobs set title='Intrusion',moderation_status='pending' where id='bbbbbbbb-0000-0000-0000-000000000001' returning id) select is((select count(*) from changed),0::bigint,'other employer cannot edit');
 select set_config('request.jwt.claims','{"sub":"44444444-4444-4444-8444-444444444441","role":"authenticated","aal":"aal1"}',true);
+select pg_temp.acknowledge_test_actor();
 select throws_ok($$insert into public.applications(job_id,seeker_id) values('bbbbbbbb-0000-0000-0000-000000000001','44444444-4444-4444-8444-444444444441')$$,'42501',null,'closed job blocks application');
 reset role;
 
 select set_config('request.jwt.claims','{}',true);
+select pg_temp.acknowledge_test_actor();
 -- New pending rows have no publication timestamp, including owner REST inserts.
 select set_config('request.jwt.claims','{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal1"}',true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 insert into public.jobs(id,company_id,title,category,job_type,city,pay_min,pay_max,pay_unit,schedule_days,schedule_time_range,language_requirement,description,created_at)
 values('b2000000-0000-4000-8000-000000000001','aaaaaaaa-0000-0000-0000-000000000001','New pending','other','part_time','Oakland',20,25,'hour','Mon','9-5','english_required','New posting','1900-01-01');
@@ -54,23 +64,28 @@ select ok((select posted_at is null and expires_at is null and created_at>=now()
 select throws_ok($$update public.jobs set created_at='1900-01-01' where id='b2000000-0000-4000-8000-000000000001'$$,'42501',null,'owner cannot backdate creation');
 reset role;
 select set_config('request.jwt.claims','{}',true);
+select pg_temp.acknowledge_test_actor();
 update public.jobs set moderation_status='approved',posted_at=now(),expires_at=now()+interval '30 days' where id='b2000000-0000-4000-8000-000000000001';
 create temp table edit_revision as select updated_at from public.jobs where id='b2000000-0000-4000-8000-000000000001';
 grant select on edit_revision to authenticated;
 select set_config('request.jwt.claims','{"sub":"44444444-4444-4444-8444-444444444441","role":"authenticated","aal":"aal1"}',true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 insert into public.applications(job_id,seeker_id) values('b2000000-0000-4000-8000-000000000001','44444444-4444-4444-8444-444444444441');
 select set_config('request.jwt.claims','{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal1"}',true);
+select pg_temp.acknowledge_test_actor();
 update public.jobs set title='Edited approved posting',moderation_status='pending' where id='b2000000-0000-4000-8000-000000000001' and updated_at=(select updated_at from edit_revision);
 select ok((select moderation_status='pending' and posted_at=now() from public.jobs where id='b2000000-0000-4000-8000-000000000001'),'content edit returns to review and retains actual approval time');
 with changed as (update public.jobs set title='Stale edit',moderation_status='pending' where id='b2000000-0000-4000-8000-000000000001' and updated_at=(select updated_at from edit_revision) returning id)
 select is((select count(*) from changed),0::bigint,'repeated direct-edit token cannot update twice');
 select is((select job_is_public from public.list_employer_applications() where job_id='b2000000-0000-4000-8000-000000000001'),false,'employer history remains with canonical closed flag');
 select set_config('request.jwt.claims','{"sub":"44444444-4444-4444-8444-444444444441","role":"authenticated","aal":"aal1"}',true);
+select pg_temp.acknowledge_test_actor();
 select is((select job_is_public from public.list_seeker_applications() where job_id='b2000000-0000-4000-8000-000000000001'),false,'seeker history remains with canonical closed flag');
 select throws_ok($$insert into public.reports(reporter_id,job_id,reason) values('44444444-4444-4444-8444-444444444441','b2000000-0000-4000-8000-000000000001','spam')$$,'42501',null,'reports require the same open predicate');
 reset role;
 select set_config('request.jwt.claims','{}',true);
+select pg_temp.acknowledge_test_actor();
 update public.jobs set moderation_status='approved',expires_at=now()+interval '30 days' where id='b2000000-0000-4000-8000-000000000001';
 update public.profiles set account_status='suspended' where id='11111111-1111-1111-1111-111111111111';
 select is(public.is_job_open('b2000000-0000-4000-8000-000000000001'),false,'suspended owner immediately hides job');
@@ -162,9 +177,11 @@ select pg_temp.check_transition('owner','expired','pause','not_allowed');
 select pg_temp.check_transition('owner','expired','close','not_allowed');
 select pg_temp.check_transition('owner','expired','resubmit','updated');
 select set_config('request.jwt.claims','{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal1"}',true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 select is((select status from public.transition_job('b2000000-0000-4000-8000-000000000001','close',(select updated_at from public.jobs where id='b2000000-0000-4000-8000-000000000001'))),'updated','close after resubmission succeeds');
 select set_config('request.jwt.claims','{"sub":"44444444-4444-4444-8444-444444444441","role":"authenticated","aal":"aal1"}',true);
+select pg_temp.acknowledge_test_actor();
 select is((select count(*) from public.list_seeker_applications() where job_id='b2000000-0000-4000-8000-000000000001' and not job_is_public),1::bigint,'close retains existing application history');
 select throws_ok($$insert into public.applications(job_id,seeker_id) values('b2000000-0000-4000-8000-000000000001','44444444-4444-4444-8444-444444444441')$$,'42501',null,'closed condition wins over duplicate on reapplication');
 select ok(not has_function_privilege('anon','public.transition_job(uuid,text,timestamptz,text)','EXECUTE'),'anon cannot execute transition');
