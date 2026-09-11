@@ -71,10 +71,10 @@ export default async function EmployerJobsPage({ searchParams }: { searchParams?
                 {["draft", "rejected", "paused", "expired"].includes(job.moderationStatus) ? <button name="command" value="resubmit">재심사 요청 / Resubmit</button> : null}
               </form>
               <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4 text-sm">
-                {job.moderationStatus === "approved" ? (
+                {job.isOpen ? (
                   <Link href={`/jobs/${encodeURIComponent(job.id)}`} className="font-medium text-brand hover:underline">공개 공고 보기</Link>
                 ) : (
-                  <span className="text-muted">승인 전에는 공개되지 않습니다.</span>
+                  <span className="text-muted">현재 공개 중이 아닙니다. 편집 및 지원 기록은 계속 확인할 수 있습니다.</span>
                 )}
               </div>
             </li>

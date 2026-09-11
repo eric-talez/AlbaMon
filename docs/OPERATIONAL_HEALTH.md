@@ -185,3 +185,17 @@ Deliberately out of scope for this slice — the beta runs zero-dependency:
 When a provider slice lands, keep `/api/health` as the cheap public layer:
 provider SDKs stay out of `src/lib/ops/health.ts` so the endpoint keeps its
 no-network, no-secrets contract.
+
+
+## CA publication signals (C4)
+
+`/admin/analytics` calls `admin_marketplace_signals(reference_date)` as the verified session. The database requires a currently active AAL2 admin; it returns aggregates only, without applicant/message bodies. Existing all-status moderation totals remain separate.
+
+- `cohortCount`: CA workplace jobs whose latest actual `posted_at` is in the inclusive interval `[referenceDate − 28 days, referenceDate − 7 days]`. Closed, expired and paused historical publications remain eligible. No owner-status exclusion. Unknown historical publication timestamps are excluded and belong to the D1 inventory; never fabricate a backfill. Reposting uses the current/latest publication timestamp.
+- `appliedWithin7Days`: cohort jobs with at least one application in the inclusive interval `[posted_at, posted_at + 7 days]`, excluding currently withdrawn applications and applicants whose profile is currently suspended. The headline percentage is `100 × appliedWithin7Days / cohortCount`; no cohort renders “관찰 가능한 공고 없음”, not 0%.
+- `medianFirstEmployerReplyHours`: use the same eligible applications. For each, take the first message whose sender is the current company owner and whose timestamp is in `[application.created_at, referenceDate]`. Compute elapsed hours from application creation; median only among answered applications. No answered samples means null, not zero hours.
+- `unansweredApplicationCount`: eligible applications with no qualifying reply. Seeker/admin/nonowner messages do not count. Ownership transfer is not currently a product flow; if introduced, historical attribution needs an immutable ownership record.
+
+The aggregate runs inside Postgres, so the REST 1,000-row limit does not truncate the population. These are publication/application/reply signals, not visit conversion, retention, or completed hires. `offered` means an offer status only. External product analytics and visit collection remain deferred.
+
+Public SEO uses the canonical open-job view (`is_job_open`) through an anonymous cookie-free dynamic sitemap, reading every stable-ID range of 1,000. Database/configuration failure fails the sitemap safely; it never emits mocks or a partial success response. Split sitemaps before 50,000 total URLs (including static pages). JobPosting includes only visible facts and full paragraph-formatted employer content, with HTML escaping followed by separate script serialization escaping. Unknown posted_at yields no JobPosting. Closed/expired jobs return 404 and disappear from the sitemap. [Google’s JobPosting guidance](https://developers.google.com/search/docs/appearance/structured-data/job-posting) does not guarantee search exposure; deployed-domain Search Console and URL Inspection are external release gates.

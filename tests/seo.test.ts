@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import robots from "@/app/robots";
-import sitemap from "@/app/sitemap";
+vi.mock("@/lib/db/sitemap", () => ({ getSitemapJobs: vi.fn(async () => [{ id: "real/job", updatedAt: "2026-09-10T00:00:00Z" }]) }));
+import sitemap, { dynamic } from "@/app/sitemap";
 import { metadata as rootMetadata } from "@/app/layout";
 import { metadata as jobsMetadata } from "@/app/(public)/jobs/page";
 import { metadata as applyMetadata } from "@/app/(public)/jobs/[id]/apply/page";
@@ -35,9 +36,9 @@ describe("robots.txt", () => {
 });
 
 describe("sitemap.xml", () => {
-  it("lists exactly the static public pages as absolute URLs", () => {
+  it("lists static pages plus current public job URLs", async () => {
     const base = getSiteUrl();
-    const urls = sitemap().map((entry) => entry.url);
+    const urls = (await sitemap()).map((entry) => entry.url);
     expect(urls).toEqual([
       `${base}/`,
       `${base}/jobs`,
@@ -45,18 +46,21 @@ describe("sitemap.xml", () => {
       `${base}/posting-policy`,
       `${base}/terms`,
       `${base}/privacy`,
+      `${base}/jobs/real%2Fjob`,
     ]);
   });
 
-  it("contains no per-job URLs (build-time sitemap must not go stale or leak)", () => {
-    const urls = sitemap().map((entry) => entry.url);
-    expect(urls.some((url) => /\/jobs\/.+/.test(url))).toBe(false);
+  it("is dynamic and preserves real modification dates without private/filter URLs", async () => {
+    expect(dynamic).toBe("force-dynamic");
+    const entries = await sitemap();
+    expect(entries.at(-1)).toMatchObject({lastModified:"2026-09-10T00:00:00Z"});
+    expect(entries.some(({url}) => /apply|report|admin|dashboard|\?/.test(url))).toBe(false);
   });
 
-  it("uses NEXT_PUBLIC_SITE_URL when configured", () => {
+  it("uses NEXT_PUBLIC_SITE_URL when configured", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://beta.example.org/");
     expect(robots().sitemap).toBe("https://beta.example.org/sitemap.xml");
-    expect(sitemap()[0].url).toBe("https://beta.example.org/");
+    expect((await sitemap())[0].url).toBe("https://beta.example.org/");
   });
 });
 

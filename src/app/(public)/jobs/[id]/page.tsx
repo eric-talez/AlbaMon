@@ -1,3 +1,4 @@
+import { buildJobPosting, serializeJobPosting } from "@/lib/jobs/structured-data";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -69,6 +70,7 @@ export default async function JobDetailPage({
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-6">
+      {job.postedAt && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJobPosting(buildJobPosting(job)) }} />}
       <Link
         href="/jobs"
         className="text-sm text-muted transition-colors hover:text-brand"
@@ -119,7 +121,7 @@ export default async function JobDetailPage({
           </div>
           <div>
             <dt className="text-xs text-muted">근무지</dt>
-            <dd className="text-sm">{job.addressDisplay}</dd>
+            <dd className="text-sm">{job.addressDisplayMode === "full" && job.addressDisplay ? `${job.addressDisplay}, ${job.city}, ${job.state}` : `${job.city}, ${job.state}`}</dd>
           </div>
           <div>
             <dt className="text-xs text-muted">근무 요일</dt>
@@ -136,6 +138,8 @@ export default async function JobDetailPage({
             </dd>
           </div>
         </dl>
+
+        <p className="mt-4 text-xs text-muted">게시일 / Posted: <time dateTime={job.postedAt}>{job.postedAt || "기록 없음"}</time><br />마감 / Expires: <time dateTime={job.expiresAt}>{job.expiresAt}</time></p>
 
         <section className="mt-6">
           <h2 className="text-base font-semibold">상세 설명</h2>

@@ -84,6 +84,19 @@ describe("admin moderation routes", () => {
     expect(mockRequireRole).toHaveBeenCalledWith("admin", "/admin/analytics");
   });
 
+  it("distinguishes empty samples from zero and displays numerator/denominator with the exact CA window", async () => {
+    const empty = renderToStaticMarkup(await AdminAnalyticsPage());
+    expect(empty).toContain("관찰 가능한 공고 없음");
+    expect(empty).toContain("No answered samples");
+    mockAnalytics.mockResolvedValue({status:"ok",analytics:{...analyticsFixture(),cohortCount:4,appliedWithin7Days:2,medianFirstEmployerReplyHours:4,unansweredApplicationCount:1}});
+    const populated=renderToStaticMarkup(await AdminAnalyticsPage());
+    expect(populated).toContain("50.0%");
+    expect(populated).toContain("2 / 4개 공고");
+    expect(populated).toContain("4.0시간 / hours");
+    expect(populated).toContain("28일 전부터 7일 전까지");
+    expect(populated).toContain("채용 완료를 뜻하지 않습니다");
+  });
+
   it("blocks non-admin callers before loading analytics", async () => {
     mockRequireRole.mockRejectedValueOnce(new Error("REDIRECT:/forbidden"));
 
@@ -280,6 +293,7 @@ function adminJob(id: string, status: "pending" | "approved", title: string) {
 
 function analyticsFixture() {
   return {
+    cohortCount: 0, appliedWithin7Days: 0, medianFirstEmployerReplyHours: null, unansweredApplicationCount: 0, referenceDate: "2026-09-10T00:00:00Z",
     jobs: {
       total: 10,
       byStatus: {

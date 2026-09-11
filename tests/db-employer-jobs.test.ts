@@ -47,7 +47,7 @@ describe("getEmployerJobs", () => {
       data: [
         { id: "job-1", company_id: "company-1", title: "Pending", moderation_status: "pending", created_at: "2026-06-21T00:00:00Z" },
         { id: "job-2", company_id: "company-1", title: "Draft", moderation_status: "draft", created_at: "2026-06-20T00:00:00Z" },
-        { id: "job-3", company_id: "company-1", title: "Rejected", moderation_status: "rejected", created_at: "2026-06-19T00:00:00Z" },
+        { id: "job-3", expires_at:"2000-01-01", company_id: "company-1", title: "Expired approved", moderation_status: "approved", created_at: "2026-06-19T00:00:00Z" },
       ],
       error: null,
     });
@@ -60,7 +60,7 @@ describe("getEmployerJobs", () => {
           in: vi.fn(() => ({ order: jobOrder })),
         })),
       });
-    mockClient.mockResolvedValue({ from } as never);
+    mockClient.mockResolvedValue({ from, rpc: vi.fn(async () => ({data:false,error:null})) } as never);
 
     const result = await getEmployerJobs("employer-1");
     expect(companyEq).toHaveBeenCalledWith("owner_id", "employer-1");
@@ -69,8 +69,9 @@ describe("getEmployerJobs", () => {
       expect(result.jobs.map((job) => job.moderationStatus)).toEqual([
         "pending",
         "draft",
-        "rejected",
+        "approved",
       ]);
+      expect(result.jobs[2].isOpen).toBe(false);
       expect(result.jobs.every((job) => job.companyName === "K-Work Cafe")).toBe(true);
     }
   });

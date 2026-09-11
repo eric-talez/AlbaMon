@@ -80,14 +80,17 @@ describe("employer setup routes", () => {
     mockJobs.mockResolvedValue({
       status: "ok",
       jobs: [
-        { id: "approved-1", companyId: "company-1", companyName: "Cafe", title: "Approved", moderationStatus: "approved", updatedAt: "2026-06-21T00:00:00.000001Z", createdAt: "2026-06-21T00:00:00Z" },
-        { id: "pending-1", companyId: "company-1", companyName: "Cafe", title: "Pending", moderationStatus: "pending", updatedAt: "2026-06-21T00:00:00.000001Z", createdAt: "2026-06-20T00:00:00Z" },
+        { id: "approved-1", companyId: "company-1", companyName: "Cafe", title: "Approved", moderationStatus: "approved", isOpen:true, updatedAt: "2026-06-21T00:00:00.000001Z", createdAt: "2026-06-21T00:00:00Z" },
+        { id: "pending-1", companyId: "company-1", companyName: "Cafe", title: "Pending", moderationStatus: "pending", isOpen:false, updatedAt: "2026-06-21T00:00:00.000001Z", createdAt: "2026-06-20T00:00:00Z" },
+        { id: "expired-approved", companyId: "company-1", companyName: "Cafe", title: "Expired approved", moderationStatus: "approved", isOpen:false, updatedAt: "2026-06-21T00:00:00Z", createdAt: "2026-06-21T00:00:00Z" },
       ],
     });
     const html = renderToStaticMarkup(await EmployerJobsPage({}));
     expect(html).toContain('/jobs/approved-1');
     expect(html).not.toContain('href="/jobs/pending-1"');
-    expect(html).toContain("승인 전에는 공개되지 않습니다.");
+    expect(html).not.toContain('href="/jobs/expired-approved"');
+    expect(html).toContain('href="/employer/jobs/expired-approved/edit"');
+    expect(html).toContain("현재 공개 중이 아닙니다.");
   });
 
   it("wires multiple-company editing, posting, jobs, and applications", () => {

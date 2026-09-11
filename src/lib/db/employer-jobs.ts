@@ -14,6 +14,7 @@ export interface EmployerJobSummary {
   companyName: string;
   title: string;
   moderationStatus: ModerationStatus;
+  isOpen: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -51,6 +52,11 @@ export async function getEmployerJobs(ownerId: string): Promise<EmployerJobListR
       .order("created_at", { ascending: false });
     if (jobError) throw jobError;
 
+    const openness = new Map(await Promise.all((jobs ?? []).map(async (job) => {
+      const { data, error } = await supabase.rpc("is_job_open", { target_job_id: job.id });
+      if (error) throw error;
+      return [job.id, data === true] as const;
+    })));
     return {
       status: "ok",
       jobs: ((jobs ?? []) as unknown as JobRow[]).map((job) => ({
@@ -59,6 +65,7 @@ export async function getEmployerJobs(ownerId: string): Promise<EmployerJobListR
         companyName: names.get(job.company_id) ?? "회사 정보 없음",
         title: job.title,
         moderationStatus: job.moderation_status,
+        isOpen: openness.get(job.id) ?? false,
         createdAt: job.created_at,
         updatedAt: job.updated_at,
       })),
