@@ -144,9 +144,12 @@ Preview does **not** receive Vercel's platform cron: that scheduler targets the
 project's Production deployment. The one-minute entry in `vercel.json` proves
 only configured scheduling intent. Actual plan support/frequency, invocations,
 leases and delivery remain to verify. A manually authorized staging worker test
-does not prove scheduled operation. A separately selected staging Vercel project
-could use Production deployments with `EMAIL_ENVIRONMENT=staging`, isolated
-staging DB/origin, indexing=false and protection; its creation/cost is unselected.
+does not prove scheduled operation. The selected one-project mapping strictly
+requires Vercel Preview → staging and Vercel Production → production, even when
+a copied staging configuration is internally consistent. A separate staging
+Vercel project is unselected and unsupported by this gate; using that topology
+would require an explicit verified project decision and a project-bound mapping
+extension before deployment, not a different email setting or a bypass switch.
 [Vercel Cron Jobs](https://vercel.com/docs/cron-jobs) documents the Production target.
 
 ## Policy publication and founding administrator

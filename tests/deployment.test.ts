@@ -40,3 +40,17 @@ test("production retains public robots and emits no blanket noindex", async () =
   expect(robots().sitemap).toBeTruthy();
   expect(await nextConfig.headers!()).toEqual([]);
 });
+
+test("Vercel Production rejects a coherently copied Preview environment", () => {
+  const copiedPreview = { ...mapping, VERCEL_ENV: "production" };
+  expect(() => checkDeployTarget(copiedPreview.EMAIL_ENVIRONMENT, copiedPreview)).toThrow("Vercel Production must use production");
+});
+
+test("the selected Vercel project maps Preview to staging and Production to production", () => {
+  expect(checkDeployTarget("staging", { ...mapping, VERCEL_ENV: "preview" })?.target).toBe("staging");
+  const production = { ...mapping, EMAIL_ENVIRONMENT: "production", NEXT_PUBLIC_INDEXING_ENABLED: "true",
+    NEXT_PUBLIC_SITE_URL: mapping.PRODUCTION_ORIGIN,
+    NEXT_PUBLIC_SUPABASE_URL: "https://uvwxyzabcdefghijklmn.supabase.co" };
+  expect(checkDeployTarget("production", { ...production, VERCEL_ENV: "production" })?.target).toBe("production");
+  expect(() => checkDeployTarget("production", { ...production, VERCEL_ENV: "preview" })).toThrow("Vercel Preview must use staging");
+});

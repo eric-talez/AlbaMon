@@ -28,6 +28,7 @@ export function checkDeployTarget(target, env = process.env) {
   if (publicOrigin(env.NEXT_PUBLIC_SITE_URL) !== selected.origin || publicOrigin(env.NEXT_PUBLIC_SUPABASE_URL) !== `https://${selected.projectRef}.supabase.co`) throw new Error("Deployment origin or Supabase project mismatch");
   if (target !== "recovery" && (env.EMAIL_ENVIRONMENT !== target || env.NEXT_PUBLIC_INDEXING_ENABLED !== String(target === "production"))) throw new Error("Deployment email or indexing environment mismatch");
   if (env.VERCEL_ENV === "preview" && target !== "staging") throw new Error("Vercel Preview must use staging");
+  if (env.VERCEL_ENV === "production" && target !== "production") throw new Error("Vercel Production must use production");
   return selected;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
