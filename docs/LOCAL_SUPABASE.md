@@ -67,7 +67,8 @@ secrets even though they target loopback.
 The public job-flow recovery uses the separately named `albamon-job-flow`
 workspace at `~/.codex/local-stacks/albamon-job-flow`. It has the complete 26
 migrations and current fictional seed. Its API is **56321**, DB is **56322** and
-Studio is **56323**; companion services use 56324–56327. Configure the app with
+Studio is **56323**; enabled companion services use 56324–56326. Analytics on
+56327 is disabled. Configure the app with
 the API URL on 56321. Studio on 56323 is an operator UI and is not a Supabase API
 endpoint.
 
@@ -87,16 +88,22 @@ supabase start --workdir "$HOME/.codex/local-stacks/albamon-job-flow"
 ```
 
 That private workspace disables Analytics in its local config because the
-optional Docker port binding conflicts with another local service; public job
-reads do not depend on it. The CLI `--exclude` flag did not bypass the Analytics
-binding during the verified recovery startup, so use the command above.
+optional Docker port could not be bound; the owner was not identified. Public
+job reads do not depend on Analytics. The CLI `--exclude` flag did not bypass
+the Analytics binding during the verified recovery startup, so use the command
+above.
 After startup, pair the 56321 URL with the anon key reported for that same stack
-in the private app environment, then restart the app from the recovery worktree:
+in the private app environment, then restart the app from the checkout carrying
+that private environment. During recovery this is:
 
 ```bash
 cd /Users/rinny/IdeaProjects/AlbaMon/.worktrees/restore-job-flow
 npm run dev
 ```
+
+After merging, the normal repository checkout can run the same command from
+`/Users/rinny/IdeaProjects/AlbaMon` once its private environment selects the
+56321 stack.
 
 Never pair a URL from one local project with a key from another, and do not paste
 generated keys into this guide.

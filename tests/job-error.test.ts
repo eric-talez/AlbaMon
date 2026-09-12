@@ -18,7 +18,12 @@ it("renders an accessible jobs outage recovery and retries", () => {
   const markup = renderToStaticMarkup(element);
 
   expect(markup).toContain('role="alert"');
-  expect(markup).toContain("공고를 불러오지 못했습니다.");
+  expect(markup).toMatch(
+    /<h1[^>]*>공고를 불러오지 못했습니다\.<\/h1>/,
+  );
+  expect(markup).toContain(
+    "일시적인 문제일 수 있습니다. 잠시 후 다시 시도해 주세요.",
+  );
   expect(markup).toContain("다시 시도 / Retry");
   expect(markup).toContain('href="/jobs"');
   expect(markup).not.toContain("지원 현황");

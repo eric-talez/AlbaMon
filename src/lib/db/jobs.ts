@@ -27,8 +27,8 @@ import type {
  * - Supabase NOT configured in dev/test/build: deterministic approved mocks.
  * - Supabase configured: reads the approved-only public view, including safe
  *   company identity fields for verified and unverified companies.
- * - Production runtime configuration/query failures are surfaced; they never
- *   silently replace real listings with mock data.
+ * - Configured runtime query/connection failures are surfaced in every
+ *   environment; they never silently replace real listings with mock data.
  *
  * This is intentionally read-only and approved-only. Employer and admin write
  * paths arrive in later slices.

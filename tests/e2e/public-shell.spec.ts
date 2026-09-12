@@ -69,6 +69,9 @@ test.describe("public shell", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: APPROVED_JOB.title }),
     ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "지원하기 (Apply)" }),
+    ).toBeVisible();
   });
 });
 
