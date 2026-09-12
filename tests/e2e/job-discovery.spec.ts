@@ -1,4 +1,4 @@
-import { test, expect, IRVINE_JOB } from "./helpers";
+import { test, expect, APPROVED_JOB, IRVINE_JOB } from "./helpers";
 
 /**
  * Scenario 2 — job discovery filters through the real (native GET) UI. The
@@ -6,6 +6,21 @@ import { test, expect, IRVINE_JOB } from "./helpers";
  * source of truth. Matching, empty, and reset states are all exercised.
  */
 test.describe("job discovery filters", () => {
+  test("a visible job card opens its matching detail and apply entry", async ({ page }) => {
+    await page.goto("/jobs");
+    await page
+      .getByRole("link", { name: new RegExp(APPROVED_JOB.titleFragment) })
+      .click();
+
+    await expect(page).toHaveURL(new RegExp(`/jobs/${APPROVED_JOB.id}$`));
+    await expect(
+      page.getByRole("heading", { level: 1, name: APPROVED_JOB.title }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "지원하기 (Apply)" }),
+    ).toBeVisible();
+  });
+
   test("city filter narrows results and preserves URL query state", async ({
     page,
   }) => {

@@ -62,6 +62,45 @@ may reveal local keys; capture them only through protected local tooling and
 never paste the output into a task, log, document or commit. Values are still
 secrets even though they target loopback.
 
+### Selecting the recovery stack
+
+The public job-flow recovery uses the separately named `albamon-job-flow`
+workspace at `~/.codex/local-stacks/albamon-job-flow`. It has the complete 26
+migrations and current fictional seed. Its API is **56321**, DB is **56322** and
+Studio is **56323**; companion services use 56324–56327. Configure the app with
+the API URL on 56321. Studio on 56323 is an operator UI and is not a Supabase API
+endpoint.
+
+The recovered stack has all 26 migrations applied and 13 fictional jobs. Its
+anonymous public listing view returns the 11 approved, unexpired rows; the
+verified seed result included `bbbbbbbb-0000-0000-0000-000000000006`. All 11
+public rows have expiry values. These checks used the API and anon key from this
+same stack.
+
+The retained `k-work-us` 543xx stack still has 14 migrations, ten jobs and null
+expiry values. The retained `albalmon-ca-launch` 553xx stack is also unchanged.
+Neither stack was reset or upgraded during recovery. Start the recovery source
+without taking ownership of those retained stacks:
+
+```bash
+supabase start --workdir "$HOME/.codex/local-stacks/albamon-job-flow"
+```
+
+That private workspace disables Analytics in its local config because the
+optional Docker port binding conflicts with another local service; public job
+reads do not depend on it. The CLI `--exclude` flag did not bypass the Analytics
+binding during the verified recovery startup, so use the command above.
+After startup, pair the 56321 URL with the anon key reported for that same stack
+in the private app environment, then restart the app from the recovery worktree:
+
+```bash
+cd /Users/rinny/IdeaProjects/AlbaMon/.worktrees/restore-job-flow
+npm run dev
+```
+
+Never pair a URL from one local project with a key from another, and do not paste
+generated keys into this guide.
+
 ## 5. Applying migrations and seed
 
 Only a newly created, explicitly disposable stack may use:
@@ -159,6 +198,13 @@ expired, non-California and suspended-owner listings must be absent, and private
 company contact fields must not be public. Check the actual stored dates and
 history when a populated stack differs from the fresh seed; an empty list is
 not permission to reset it.
+
+The recovered 56321 source returned ready/200 at `/api/ready`, 11 cards at
+`/jobs`, one Irvine filter match and the expected empty-search message. Browser
+navigation matched list and detail headings for every one of the 11 seed UUIDs;
+a missing canonical UUID returned 404, and signed-out Apply redirected through
+login. This verifies anonymous public reads and navigation, not OAuth, phone
+authentication or provider delivery.
 
 ## 11. Employer journey
 

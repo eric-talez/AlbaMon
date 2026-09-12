@@ -58,7 +58,7 @@ function mayFallbackToMockJobs(): boolean {
 }
 
 const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Map a DB row (snake_case + joined company) to the app's `Job` view type. */
 function mapRow(row: PublicJobListingRow): Job {
@@ -110,9 +110,7 @@ export async function getApprovedJobs(): Promise<Job[]> {
     return rows.map(mapRow);
   } catch (err) {
     console.error("[db] getApprovedJobs failed:", err);
-    if (!mayFallbackToMockJobs()) throw err;
-    console.warn("[db] getApprovedJobs falling back to mock data");
-    return getMockJobs();
+    throw err;
   }
 }
 
@@ -140,9 +138,7 @@ export async function getApprovedJobById(id: string): Promise<Job | undefined> {
     return data ? mapRow(data as unknown as PublicJobListingRow) : undefined;
   } catch (err) {
     console.error("[db] getApprovedJobById failed:", err);
-    if (!mayFallbackToMockJobs()) throw err;
-    console.warn("[db] getApprovedJobById falling back to mock data");
-    return getMockJobById(id);
+    throw err;
   }
 }
 
@@ -262,15 +258,12 @@ export async function getPublicJobCities(): Promise<string[]> {
     return ((data ?? []) as PublicJobCityRow[]).map(({ city }) => city);
   } catch (err) {
     console.error("[db] getPublicJobCities failed:", err);
-    if (!mayFallbackToMockJobs()) throw err;
-    console.warn("[db] getPublicJobCities falling back to mock data");
-    return mockPublicJobCities();
+    throw err;
   }
 }
 
 /**
- * Filter and sort approved mock jobs in memory. Shared by the Supabase-
- * unconfigured path and the query-error fallback so both behave identically.
+ * Filter and sort approved mock jobs in memory for the unconfigured path.
  * `getMockJobs()` already returns approved-only.
  */
 export function filterAndSortMockJobs(params: JobSearchParams): Job[] {
@@ -339,8 +332,7 @@ function mockSearchResult(
  *
  * - Supabase NOT configured: filter/sort the mock data in memory (approved-only).
  * - Supabase configured: query the approved-only `public_job_listings` view and
- *   apply each structured filter. Non-production errors may use the same mock
- *   filter; production runtime errors are rethrown.
+ *   apply each structured filter. Configured runtime errors are rethrown.
  *
  * Pending/draft/rejected jobs are never returned (RLS + the explicit filter).
  */
@@ -388,8 +380,6 @@ export async function searchApprovedJobs(
     };
   } catch (err) {
     console.error("[db] searchApprovedJobs failed:", err);
-    if (!mayFallbackToMockJobs()) throw err;
-    console.warn("[db] searchApprovedJobs falling back to mock data");
-    return mockSearchResult(effectiveParams, page);
+    throw err;
   }
 }
