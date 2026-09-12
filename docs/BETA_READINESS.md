@@ -29,8 +29,9 @@ Hard gates this runbook enforces:
 
 - Private beta can proceed **only if** production contains **no seed/demo
   users, companies, jobs, applications, messages, or reports** (§6).
-- `draft`, `pending`, `rejected`, `paused`, and `expired` jobs must never be
-  publicly visible — only `approved` jobs are (§9).
+- `draft`, `pending`, `rejected`, `paused`, and `expired`-status jobs must never
+  be publicly visible, and neither may an `approved` job past its `expires_at` —
+  only `approved` **and unexpired** jobs are (§9).
 - Service-role usage stays restricted to trusted server flows — its only app
   consumer is the Slice 28 rate limiter's private `consume_rate_limit` RPC,
   never OTP send/verify and never a business mutation (§3).
@@ -99,7 +100,7 @@ Migrations are verified separately in §5.
 
 ## 5. Migration verification
 
-The 13-migration order table lives in
+The 14-migration order table lives in
 [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project). Verify in the
 Supabase SQL editor:
 
@@ -107,7 +108,7 @@ Supabase SQL editor:
 select version from supabase_migrations.schema_migrations order by version;
 ```
 
-Expected: 13 rows, `20260621000000` through `20260714010000`, in order.
+Expected: 14 rows, `20260621000000` through `20260715000000`, in order.
 
 If migrations were applied by pasting files into the SQL editor (no CLI), that
 table may be empty — fall back to object checks; all three must hold:
@@ -120,8 +121,8 @@ select count(*) from pg_views
 ```
 
 Pass: the version list matches exactly, or all three object checks return the
-expected counts (8 tables, RLS enabled on all 8, approved-only public view
-present).
+expected counts (8 tables, RLS enabled on all 8, approved-and-unexpired public
+view present).
 
 Also probe the explicit API-role grants
 (`20260707000000_explicit_table_grants.sql`) — on current Supabase a schema
@@ -226,14 +227,18 @@ Signed out, against the production URL:
       that the CSP `connect-src` names your Supabase origin (code-level headers
       ship in `next.config.ts`; live-domain confirmation is this step).
 
-**Visibility invariant: only `approved` jobs are ever publicly visible.**
-`draft`, `pending`, `rejected`, `paused`, and `expired` jobs must not appear
-on `/jobs`, and their detail URLs must 404 for signed-out visitors — enforced
-by the `jobs_select_public_approved` RLS policy and the `public_job_listings`
-view.
+**Visibility invariant: only `approved` AND unexpired jobs are ever publicly
+visible.** `draft`, `pending`, `rejected`, `paused`, and `expired`-status jobs —
+and any `approved` job whose `expires_at` has passed — must not appear on
+`/jobs`, and their detail URLs must 404 for signed-out visitors, enforced by the
+`jobs_select_public_approved` RLS policy and the `public_job_listings` view
+(both require `expires_at is null or expires_at > now()`). An expired job stays
+in employer/admin history and can still receive **no new applications** — the
+seeker insert policy applies the same predicate.
 
 - [ ] After §12 creates a pending job, re-run this section: that job is absent
-      from `/jobs` and its direct URL 404s while signed out.
+      from `/jobs` and its direct URL 404s while signed out. An `approved` job
+      past its `expires_at` behaves identically (absent from `/jobs`, URL 404s).
 
 The exhaustive click-path list is in
 [`LAUNCH_CHECKLIST.md §10`](LAUNCH_CHECKLIST.md#10-qa--verification).
@@ -364,10 +369,10 @@ the sign-off of record; this one is the execution summary feeding it.
 | CI green + `npm run verify:beta` pass on the release commit | §2 | ☐ | Hard |
 | Required env vars set and valid, no placeholder fragments | §3 | ☐ | Hard |
 | Supabase configured (auth URLs, backups) | §4 | ☐ | Hard |
-| All 13 migrations verified (incl. explicit API-role grants) | §5 | ☐ | Hard |
+| All 14 migrations verified (incl. explicit API-role grants) | §5 | ☐ | Hard |
 | Zero seed/demo data (users, companies, jobs, applications, messages, reports) | §6 | ☐ | Hard |
 | Founding admin verified; no unintended admins | §7 | ☐ | Hard |
-| Public visibility invariant (approved-only) proven | §9 | ☐ | Hard |
+| Public visibility invariant (approved and unexpired) proven | §9 | ☐ | Hard |
 | Role guards hold for all roles | §10–§13 | ☐ | Hard |
 | Mobile/desktop QA passed | §14 | ☐ | Hard |
 | Attorney review of legal copy | §15 | ☐ | Conditional — accepted-pending for private beta; hard blocker for public launch |

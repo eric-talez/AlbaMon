@@ -74,6 +74,10 @@ describe("jobs browse page", () => {
     // Explicit label association on the filter controls.
     expect(html).toContain('for="filter-q"');
     expect(html).toContain('id="filter-q"');
+    // Expired / malformed-expiry approved jobs never reach the public list.
+    expect(html).not.toContain("/jobs/kw-011");
+    expect(html).not.toContain("/jobs/kw-012");
+    expect(html).not.toContain("마감된 물류 창고");
   });
 });
 
@@ -91,6 +95,17 @@ describe("job detail page", () => {
   it("404s for a job id that is not an approved listing", async () => {
     await expect(
       JobDetailPage({ params: Promise.resolve({ id: "kw-does-not-exist" }) }),
+    ).rejects.toThrow("NOT_FOUND");
+  });
+
+  it("404s for an approved-but-expired job, exactly like a non-public job", async () => {
+    // kw-011 is approved but past its expiry; kw-012 is approved with a
+    // malformed expiry. Both must resolve to the same 404 as an unknown id.
+    await expect(
+      JobDetailPage({ params: Promise.resolve({ id: "kw-011" }) }),
+    ).rejects.toThrow("NOT_FOUND");
+    await expect(
+      JobDetailPage({ params: Promise.resolve({ id: "kw-012" }) }),
     ).rejects.toThrow("NOT_FOUND");
   });
 

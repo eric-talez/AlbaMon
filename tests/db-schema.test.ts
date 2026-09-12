@@ -42,6 +42,24 @@ function latestPolicy(sql: string, name: string): string | undefined {
 }
 
 /**
+ * The net/latest definition of a view, matching both `create view` and
+ * `create or replace view`. Like `latestPolicy`, it returns the LAST occurrence
+ * so assertions verify the current definition (e.g. the Slice 31 redefinition),
+ * not an earlier historical one still present in the concatenated stream.
+ */
+function latestView(sql: string, name: string): string | undefined {
+  const matches = [
+    ...sql.matchAll(
+      new RegExp(
+        `create\\s+(?:or\\s+replace\\s+)?view\\s+public\\.${name}\\b[\\s\\S]*?;`,
+        "gi",
+      ),
+    ),
+  ];
+  return matches.at(-1)?.[0];
+}
+
+/**
  * Net table-level privileges a grantee effectively holds after every GRANT and
  * REVOKE on `table` is applied across all migrations in filename (chronological)
  * order, statement by statement. Unlike a GRANT-text scan, this nets out later
@@ -203,13 +221,17 @@ describe("no unsafe RLS patterns", () => {
     expect(fn).toMatch(/raise\s+exception/i);
   });
 
-  it("only seeker-role profiles may insert applications", () => {
+  it("only seeker-role profiles may insert applications, and only to approved, unexpired jobs", () => {
     const policy = latestPolicy(sql, "applications_insert_seeker");
     expect(policy).toBeTruthy();
     expect(policy).toMatch(/seeker_id\s*=\s*auth\.uid\(\)/i);
     expect(policy).toMatch(/current_profile_role\(\)\s*=\s*'seeker'/i);
     expect(policy).toMatch(/moderation_status\s*=\s*'approved'/i);
     expect(policy).toMatch(/status\s*=\s*'submitted'/i);
+    // Slice 31: an expired job cannot receive a new application via RLS insert.
+    expect(policy).toMatch(
+      /expires_at\s+is\s+null\s+or\s+j\.expires_at\s*>\s*now\(\)/i,
+    );
   });
 
   it("bounds cover notes and preserves one application per seeker/job", () => {
@@ -251,17 +273,41 @@ describe("no unsafe RLS patterns", () => {
     }
   });
 
-  it("exposes approved jobs through a read-only view with safe company identity", () => {
-    const view = sql.match(
-      /create\s+view\s+public\.public_job_listings[\s\S]*?where\s+j\.moderation_status\s*=\s*'approved'\s*;/i,
-    )?.[0];
+  it("exposes only approved AND unexpired jobs through the net read-only view", () => {
+    // Inspect the LATEST view definition (Slice 31's create-or-replace), not the
+    // historical Slice 4 create-view still present earlier in the stream.
+    const view = latestView(sql, "public_job_listings");
     expect(view).toBeTruthy();
+    // Public-visibility invariant: approved AND (expires_at null or future).
+    expect(view).toMatch(/moderation_status\s*=\s*'approved'/i);
+    expect(view).toMatch(
+      /expires_at\s+is\s+null\s+or\s+j\.expires_at\s*>\s*now\(\)/i,
+    );
+    // security_barrier, safe company identity, and no private company columns.
+    expect(view).toMatch(/security_barrier\s*=\s*true/i);
     expect(view).toMatch(/c\.name\s+as\s+company_name/i);
     expect(view).toMatch(/c\.is_verified\s+as\s+company_is_verified/i);
     expect(view).not.toMatch(/c\.(?:phone|website|address_display)/i);
+    // expires_at stays a filter predicate only — never an exposed column.
+    expect(view).not.toMatch(/j\.expires_at\s+as\b/i);
+    // anon/authenticated SELECT grant is present and unchanged (not broadened).
     expect(sql).toMatch(
       /grant\s+select\s+on\s+public\.public_job_listings\s+to\s+anon,\s*authenticated/i,
     );
+  });
+
+  it("gates the net public jobs read policy on approved AND unexpired", () => {
+    const policy = latestPolicy(sql, "jobs_select_public_approved");
+    expect(policy).toBeTruthy();
+    expect(policy).toMatch(/moderation_status\s*=\s*'approved'/i);
+    expect(policy).toMatch(/expires_at\s+is\s+null\s+or\s+expires_at\s*>\s*now\(\)/i);
+  });
+
+  it("keeps owner/admin job reads unaffected by expiry (history stays visible)", () => {
+    // Expired jobs must remain manageable for their owner and admins, so these
+    // policies must NOT reference expiry.
+    expect(latestPolicy(sql, "jobs_select_owner")).not.toMatch(/expires_at/i);
+    expect(latestPolicy(sql, "jobs_select_admin")).not.toMatch(/expires_at/i);
   });
 
   it("restricts seeker and employer application listing RPCs to their callers", () => {
