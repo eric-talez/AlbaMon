@@ -1,5 +1,5 @@
 import type { Provider } from "@supabase/supabase-js";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { isSupabaseConfigured, isProductionRuntime } from "@/lib/supabase/config";
 
 /**
  * Social auth provider registry — the single allowlist between the UI and
@@ -93,9 +93,10 @@ export function resolveOAuthProvider(key: string): Provider | null {
   return key;
 }
 
-/** Phone OTP sign-in requires its flag plus a configured Supabase project. */
+/** Phone OTP is development-only during public launch, including its server actions. */
 export function isPhoneAuthEnabled(): boolean {
   return (
+    !isProductionRuntime() &&
     process.env.NEXT_PUBLIC_AUTH_PHONE_ENABLED === "true" &&
     isSupabaseConfigured()
   );

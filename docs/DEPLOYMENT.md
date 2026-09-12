@@ -63,6 +63,51 @@ regressions and cannot establish public readiness. `NEXT_PUBLIC_*` and headers
 are compiled: any public-origin/indexing/provider/policy change requires a fresh
 build. Never relabel a staging artifact as Production.
 
+## Current migration inventory
+
+The current source contains 25 migrations, in this exact filename order.
+The checksum manifest is `docs/launch-evidence/migrations.sha256`; dated prior
+execution reports retain the inventory that was actually tested then. New
+upstream July files are historical relative to the September launch files, so
+an existing September database must stop at a history mismatch. Do not rewrite
+history, reset, seed or use `--include-all` as a hosted launch shortcut.
+
+| Order | Migration |
+| --- | --- |
+| 1 | `20260621000000_init_schema.sql` |
+| 2 | `20260622000000_audit_hardening.sql` |
+| 3 | `20260623000000_application_submission.sql` |
+| 4 | `20260624000000_application_listing_functions.sql` |
+| 5 | `20260625000000_employer_write_hardening.sql` |
+| 6 | `20260626000000_application_messages.sql` |
+| 7 | `20260627000000_application_status_workflow.sql` |
+| 8 | `20260628000000_report_queue_hardening.sql` |
+| 9 | `20260706000000_employer_access_requests.sql` |
+| 10 | `20260707000000_explicit_table_grants.sql` |
+| 11 | `20260713000000_restrict_company_public_reads.sql` |
+| 12 | `20260714000000_transactional_admin_audit_logs.sql` |
+| 13 | `20260714010000_server_rate_limiting.sql` |
+| 14 | `20260909000050_private_company_access.sql` |
+| 15 | `20260909000100_profile_and_admin_security.sql` |
+| 16 | `20260909000200_ca_job_search.sql` |
+| 17 | `20260909000300_job_lifecycle.sql` |
+| 18 | `20260909000400_application_lifecycle.sql` |
+| 19 | `20260909000500_notification_outbox.sql` |
+| 20 | `20260909000510_notification_claim_recovery.sql` |
+| 21 | `20260909000600_abuse_controls.sql` |
+| 22 | `20260909000700_policy_acknowledgements.sql` |
+| 23 | `20260909000710_policy_publication_identity.sql` |
+| 24 | `20260909000800_marketplace_signals.sql` |
+| 25 | `20260911000000_main_launch_compatibility.sql` |
+
+The final compatibility migration retires `moderate_pending_job`, retains
+`transition_job` revision/reason checks, and makes existing September triggers
+the sole audit writers for company/report/employer-access decisions. Active
+AAL2/current-policy checks and transaction locks remain in the admin RPCs.
+Replay all files in order on a fresh disposable local stack before relying on
+this inventory. Existing local data requires a separately recorded, non-reset
+upgrade rehearsal; see [local migration handling](LOCAL_SUPABASE.md#5-applying-migrations-and-seed).
+
 ## Staging migrations
 
 Load only the selected environment's secrets through protected operator tooling;
@@ -243,7 +288,15 @@ npm run lint
 npm run verify:beta
 npm run verify:local-supabase
 npm run check:production-artifact
+npm run test:e2e:dev
 ```
+
+`test:e2e:dev` uses `playwright.dev.config.ts` and development-only fixtures;
+`test:e2e` separately exercises the production build with real local Auth/DB.
+Neither establishes hosted Google, inbox delivery or physical-device evidence.
+Production security headers and Preview noindex are compiled together; inspect
+actual response headers and client hydration after deployment. The optional OTP
+HMAC secret is not required while phone sign-in remains disabled in production.
 
 CI owns its disposable stack lifecycle; original543xx/native5432 are untouched.
 D2's completed local database/browser/fault/restore results and their measured

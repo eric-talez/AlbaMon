@@ -8,6 +8,7 @@ if (process.env.NEXT_PUBLIC_SUPABASE_URL !== "http://127.0.0.1:55321" ||
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  testIgnore: /(auth-guards|health|job-discovery|public-shell|responsive-nav)\.spec\.ts/,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,

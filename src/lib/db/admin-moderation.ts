@@ -282,14 +282,25 @@ export async function setCompanyVerification(
   if (!isSupabaseConfigured()) return { status: "unavailable" };
   try {
     const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("companies")
-      .update({ is_verified: isVerified })
-      .eq("id", companyId)
-      .select("id")
-      .maybeSingle();
-    if (error) throw error;
-    return data ? { status: "updated" } : { status: "conflict" };
+    // Admin-only SQL function: flips verification and records the audit entry
+    // in one transaction. A company already in the requested state returns
+    // conflict and writes nothing.
+    const { data, error } = await supabase.rpc("set_company_verification", {
+      company_id: companyId,
+      verified: isVerified,
+    });
+    if (error) {
+      if (error.code === "P0001" || error.code === "42501") {
+        console.error("[db] setCompanyVerification blocked:", error.code);
+        return { status: "error" };
+      }
+      throw error;
+    }
+    if (data === "conflict") return { status: "conflict" };
+    if (data === "verified" || data === "unverified") {
+      return { status: "updated" };
+    }
+    throw new Error(`Unexpected verification result: ${String(data)}`);
   } catch {
     console.error("[db] setCompanyVerification failed");
     return { status: "error" };

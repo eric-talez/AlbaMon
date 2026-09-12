@@ -1,6 +1,6 @@
 -- Disposable seeded local database only; all fixtures and changes roll back.
 begin;
-\ir ../helpers/policy-fixtures.inc
+\ir helpers/policy-fixtures.inc
 create extension if not exists pgtap with schema extensions;
 select plan(45);
 insert into auth.users (id, email, email_confirmed_at) values

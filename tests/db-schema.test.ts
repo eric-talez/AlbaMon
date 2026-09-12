@@ -41,6 +41,40 @@ function latestPolicy(sql: string, name: string): string | undefined {
   return matches.at(-1)?.[0];
 }
 
+/**
+ * Net table-level privileges a grantee effectively holds after every GRANT and
+ * REVOKE on `table` is applied across all migrations in filename (chronological)
+ * order, statement by statement. Unlike a GRANT-text scan, this nets out later
+ * REVOKEs — a grant followed by a later revoke reads as no privilege — so the
+ * assertion reflects the *effective* grant, not merely that grant text exists.
+ * `all` expands to the four DML privileges. Roles are matched by exact name
+ * (the migrations always list anon/authenticated/public explicitly).
+ */
+function netTableGrants(table: string, grantee: string): string[] {
+  const ALL = ["select", "insert", "update", "delete"];
+  const stmtRe = new RegExp(
+    `(grant|revoke)\\s+([a-z,\\s]+?)\\s+on\\s+(?:table\\s+)?public\\.${table}\\s+(?:to|from)\\s+([a-z_,\\s]+);`,
+    "gi",
+  );
+  const held = new Set<string>();
+  for (const file of migrationFiles().sort()) {
+    const text = readFileSync(join(MIGRATIONS_DIR, file), "utf8").toLowerCase();
+    for (const m of text.matchAll(stmtRe)) {
+      const roles = m[3].split(",").map((r) => r.trim());
+      if (!roles.includes(grantee)) continue;
+      const privileges =
+        m[2].trim() === "all"
+          ? [...ALL]
+          : m[2].split(",").map((p) => p.trim()).filter((p) => ALL.includes(p));
+      for (const p of privileges) {
+        if (m[1] === "grant") held.add(p);
+        else held.delete(p);
+      }
+    }
+  }
+  return [...held].sort();
+}
+
 describe("migration exists and enables RLS", () => {
   it("ships a timestamp-named initial migration", () => {
     const files = migrationFiles();
@@ -58,6 +92,7 @@ describe("migration exists and enables RLS", () => {
       "messages",
       "reports",
       "audit_logs",
+      "employer_access_requests",
     ];
     for (const t of tables) {
       expect(sql).toContain(`alter table public.${t} enable row level security`);
@@ -323,12 +358,13 @@ describe("explicit table grants for API roles", () => {
     expect(grantsFor("audit_logs", "authenticated")).toContain("select");
   });
 
-  it("keeps anon read-only and off the private tables entirely", () => {
-    for (const table of ["jobs", "companies"]) {
-      const privileges = grantsFor(table, "anon");
-      expect(privileges, table).toEqual(["select"]);
-    }
+  it("keeps anon read-only on jobs and off companies + every private table", () => {
+    // anon reads approved jobs only. Company identity reaches the public
+    // through the public_job_listings view, never the companies base table
+    // (Slice 25 revoked the anon SELECT and dropped the public verified policy).
+    expect(netTableGrants("jobs", "anon")).toEqual(["select"]);
     for (const table of [
+      "companies",
       "profiles",
       "applications",
       "reports",
@@ -336,7 +372,7 @@ describe("explicit table grants for API roles", () => {
       "audit_logs",
       "messages",
     ]) {
-      expect(grantsFor(table, "anon"), table).toEqual([]);
+      expect(netTableGrants(table, "anon"), table).toEqual([]);
     }
   });
 
@@ -356,6 +392,63 @@ describe("explicit table grants for API roles", () => {
         expect(privileges, `${table}: ${privilege}`).toContain(privilege);
       }
     }
+  });
+});
+
+describe("companies base table is not publicly or seeker readable (Slice 25)", () => {
+  const sql = migrationSql();
+
+  it("drops the public verified-company SELECT policy and leaves it dropped", () => {
+    expect(sql).toMatch(
+      /drop\s+policy\s+if\s+exists\s+companies_select_public_verified\s+on\s+public\.companies/i,
+    );
+    // The init migration still CREATEs it, so a plain text scan can't prove it
+    // is gone. Walk create/drop events in filename (chronological) order: the
+    // final event for this policy must be the drop, i.e. it ends up removed.
+    const events: string[] = [];
+    for (const file of migrationFiles().sort()) {
+      const text = readFileSync(join(MIGRATIONS_DIR, file), "utf8");
+      for (const m of text.matchAll(
+        /(create|drop)\s+policy\s+(?:if\s+exists\s+)?companies_select_public_verified/gi,
+      )) {
+        events.push(m[1].toLowerCase());
+      }
+    }
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.at(-1)).toBe("drop");
+  });
+
+  it("revokes anon SELECT on the companies base table (net: no anon grant)", () => {
+    expect(sql).toMatch(
+      /revoke\s+select\s+on\s+(?:table\s+)?public\.companies\s+from\s+[^;]*\banon\b/i,
+    );
+    expect(netTableGrants("companies", "anon")).toEqual([]);
+    expect(netTableGrants("companies", "public")).toEqual([]);
+  });
+
+  it("retains owner and admin company SELECT policies", () => {
+    const owner = latestPolicy(sql, "companies_select_owner");
+    const admin = latestPolicy(sql, "companies_select_admin");
+    expect(owner).toBeTruthy();
+    expect(owner).toMatch(/owner_id\s*=\s*auth\.uid\(\)/i);
+    expect(admin).toBeTruthy();
+    expect(admin).toMatch(/public\.is_admin\(\)/i);
+  });
+
+  it("keeps the authenticated grant so owner/admin RLS can still return rows, without broadening mutation", () => {
+    // authenticated needs SELECT for the owner/admin policies to expose rows;
+    // insert/update are unchanged and there is still no DELETE.
+    expect(netTableGrants("companies", "authenticated")).toEqual([
+      "insert",
+      "select",
+      "update",
+    ]);
+  });
+
+  it("still exposes safe company identity via public_job_listings to anon + authenticated", () => {
+    expect(sql).toMatch(
+      /grant\s+select\s+on\s+public\.public_job_listings\s+to\s+anon,\s*authenticated/i,
+    );
   });
 });
 

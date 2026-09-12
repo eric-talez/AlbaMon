@@ -6,10 +6,13 @@ import { GET } from "@/app/api/health/route";
  * so ambient shell/CI values can never change an outcome. */
 const HEALTH_ENV_VARS = [
   "NODE_ENV",
+  "VERCEL_ENV",
+  "NEXT_PUBLIC_AUTH_PHONE_ENABLED",
   "NEXT_PUBLIC_SITE_URL",
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
+  "RATE_LIMIT_HMAC_SECRET",
   "EMAIL_PROVIDER",
   "RESEND_API_KEY",
   "SENDGRID_API_KEY",
@@ -17,16 +20,24 @@ const HEALTH_ENV_VARS = [
   "NEXT_PUBLIC_POSTHOG_KEY",
 ] as const;
 
+/** A valid RATE_LIMIT_HMAC_SECRET is exactly 64 hex chars (→ 32 bytes). Built by
+ * repetition so no 64-hex literal appears in this source file (tests/security.test.ts
+ * scans every tracked file for secret shapes). */
+const VALID_HMAC_SECRET = "0f".repeat(32);
+
 /** Realistic-but-fake values. Deliberately short tails so the repo-wide
  * secret-pattern scan (tests/security.test.ts) never mistakes them for real
  * credentials, and free of the placeholder fragments the app treats as
  * unconfigured (`your-`, `xxx`, `example`, `placeholder`). */
 const CONFIGURED_ENV: Record<(typeof HEALTH_ENV_VARS)[number], string> = {
   NODE_ENV: "production",
+  VERCEL_ENV: "",
+  NEXT_PUBLIC_AUTH_PHONE_ENABLED: "false",
   NEXT_PUBLIC_SITE_URL: "https://beta-health.test",
   NEXT_PUBLIC_SUPABASE_URL: "https://kwus-health.supabase.co",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key-for-health-tests",
   SUPABASE_SERVICE_ROLE_KEY: "service-role-for-health-tests",
+  RATE_LIMIT_HMAC_SECRET: VALID_HMAC_SECRET,
   EMAIL_PROVIDER: "resend",
   EMAIL_NOTIFICATIONS_ENABLED: "true", EMAIL_ENVIRONMENT: "production", EMAIL_FROM: "sender@health.test", EMAIL_STAGING_ALLOWLIST: "", RESEND_WEBHOOK_SECRET: "whsec_health", CRON_SECRET: "cron-health",
   RESEND_API_KEY: "re_health",
@@ -66,6 +77,7 @@ describe("buildHealthReport envelope", () => {
     expect(report.checks).toEqual({
       siteUrl: "missing",
       supabase: "missing",
+      rateLimit: "deferred",
       email: "deferred",
       analytics: "deferred",
     });
@@ -76,6 +88,7 @@ describe("buildHealthReport envelope", () => {
     expect(buildHealthReport().checks).toEqual({
       siteUrl: "configured",
       supabase: "configured",
+      rateLimit: "deferred",
       email: "configured",
       analytics: "configured",
     });
@@ -113,6 +126,35 @@ describe("supabase check", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://kwus-health.supabase.co");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-for-health-tests");
     expect(buildHealthReport().checks.supabase).toBe("partial");
+  });
+});
+
+describe("rateLimit check", () => {
+  function enableDevelopmentOtp(): void {
+    stubAllConfigured();
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("NEXT_PUBLIC_AUTH_PHONE_ENABLED", "true");
+  }
+
+  it("defers the private counter when phone OTP is unavailable", () => {
+    stubAllUnset();
+    expect(buildHealthReport().checks.rateLimit).toBe("deferred");
+    stubAllConfigured();
+    vi.stubEnv("NEXT_PUBLIC_AUTH_PHONE_ENABLED", "true");
+    vi.stubEnv("RATE_LIMIT_HMAC_SECRET", "");
+    expect(buildHealthReport().checks.rateLimit).toBe("deferred");
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect(buildHealthReport().checks.rateLimit).toBe("deferred");
+  });
+
+  it("reports the HMAC secret only for enabled development OTP", () => {
+    enableDevelopmentOtp();
+    expect(buildHealthReport().checks.rateLimit).toBe("configured");
+    for (const bad of ["", "generate-with-openssl-rand-hex-32", "g" + "0".repeat(63), "0".repeat(63), "0".repeat(65), "   "]) {
+      vi.stubEnv("RATE_LIMIT_HMAC_SECRET", bad);
+      expect(buildHealthReport().checks.rateLimit).toBe("missing");
+    }
   });
 });
 
@@ -186,6 +228,7 @@ describe("GET /api/health", () => {
       checks: {
         siteUrl: "missing",
         supabase: "missing",
+        rateLimit: "deferred",
         email: "deferred",
         analytics: "deferred",
       },

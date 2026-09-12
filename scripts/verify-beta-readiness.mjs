@@ -32,6 +32,7 @@ const root = resolve(
 
 const REQUIRED_FILES = [
   "docs/DEPLOYMENT.md",
+  "docs/BETA_READINESS.md",
   "docs/LAUNCH_CHECKLIST.md",
   "docs/launch-evidence/environments.md",
   "docs/legal/launch-policy-review.md",
@@ -47,7 +48,38 @@ const REQUIRED_ENV_VAR_NAMES = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
+  "RATE_LIMIT_HMAC_SECRET",
 ];
+
+// Operational runbooks whose CURRENT "N migrations" counts must track the real
+// on-disk inventory. Historical, Slice/PR-labeled lines are exempt (see
+// checkMigrationInventory) so accurate history is preserved.
+const MIGRATION_COUNT_DOCS = [
+  "docs/DEPLOYMENT.md",
+  "docs/LAUNCH_CHECKLIST.md",
+  "docs/BETA_READINESS.md",
+  "docs/OPERATIONAL_HEALTH.md",
+];
+
+// Operational docs must describe real privileged consumers without confusing
+// trusted workers with ordinary caller-authenticated business mutations.
+const SERVICE_ROLE_DOCS = [
+  "docs/DEPLOYMENT.md",
+  "docs/LAUNCH_CHECKLIST.md",
+  "docs/BETA_READINESS.md",
+  "docs/PRODUCTION_ENV_VARS.md",
+  "docs/OPERATIONAL_HEALTH.md",
+  "docs/LOCAL_SUPABASE.md",
+];
+
+// Match the obsolete global claim, not scoped descriptions of user flows.
+const SERVICE_ROLE_NO_CONSUMER_RE =
+  /no app code path\s+(?:currently\s+)?uses\s+(?:the\s+service[-\s]role\s+client|it)\b/i;
+
+// A line is treated as historical (exempt from migration count-sync) when it
+// carries a Slice/PR marker — e.g. "Slice 24 ... 10 migrations".
+const HISTORICAL_MARKER_RE = /\bslice\s+\d+|\bpr\s*#?\d+/i;
+const MIGRATIONS_COUNT_RE = /\b(\d+)\s+migrations\b/i;
 
 // Launch topics the checklist must keep covering. Each topic passes when ANY
 // of its patterns matches: a keyword heading (section numbers are \d+, so
@@ -187,12 +219,88 @@ function checkNpmScriptWiring() {
   return [];
 }
 
+function listMigrationSqlNames() {
+  const dir = join(root, "supabase", "migrations");
+  if (!existsSync(dir) || !statSync(dir).isDirectory()) return null;
+  return readdirSync(dir)
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
+}
+
+// Inventory-driven, renumbering-tolerant migration check. The count is derived
+// from disk (never hard-coded): DEPLOYMENT.md's order table must name every
+// migration file, and any current "N migrations" claim in the runbooks must
+// match that count.
+function checkMigrationInventory() {
+  const migrations = listMigrationSqlNames();
+  if (migrations === null) return ["supabase/migrations/ directory is missing"];
+  if (migrations.length === 0) {
+    return ["supabase/migrations/ contains no .sql migration files"];
+  }
+  const failures = [];
+
+  const deployment = tryRead("docs/DEPLOYMENT.md");
+  if (deployment === null) {
+    failures.push("docs/DEPLOYMENT.md is missing (see required-files check)");
+  } else {
+    for (const file of migrations) {
+      if (!deployment.includes(file)) {
+        failures.push(`docs/DEPLOYMENT.md does not document migration: ${file}`);
+      }
+    }
+  }
+
+  const expected = migrations.length;
+  for (const doc of MIGRATION_COUNT_DOCS) {
+    const content = tryRead(doc);
+    if (content === null) continue;
+    for (const line of content.split("\n")) {
+      if (HISTORICAL_MARKER_RE.test(line)) continue; // labeled history — preserve
+      const match = line.match(MIGRATIONS_COUNT_RE);
+      if (match && Number(match[1]) !== expected) {
+        failures.push(
+          `${doc}: current claim of ${match[1]} migrations does not match the ${expected} on disk`,
+        );
+      }
+    }
+  }
+  return failures;
+}
+
+// Launch notification workers use the service role; the optional local OTP
+// limiter is a separate retained consumer. Fail obsolete global claims and
+// require the active notification boundary to be documented.
+function checkServiceRoleConsumerClaim() {
+  const failures = [];
+  for (const doc of SERVICE_ROLE_DOCS) {
+    const content = tryRead(doc);
+    if (content === null) continue;
+    if (SERVICE_ROLE_NO_CONSUMER_RE.test(content)) {
+      failures.push(
+        `${doc}: stale claim that no app code path uses the service-role client (trusted notification workers use it)`,
+      );
+    }
+  }
+  const documentsConsumer = SERVICE_ROLE_DOCS.some((doc) => {
+    const content = tryRead(doc);
+    return content !== null && content.includes("notification_outbox");
+  });
+  if (!documentsConsumer) {
+    failures.push(
+      "no operational doc documents the trusted notification service-role consumer (notification_outbox)",
+    );
+  }
+  return failures;
+}
+
 const checks = [
   { name: "required files exist", run: checkRequiredFilesExist },
   { name: "launch checklist covers required topics", run: checkChecklistTopics },
   { name: "current migration history names", run: checkCurrentMigrations },
   { name: "native Vercel release build", run: checkNativeReleaseBuild },
   { name: "env var reference completeness", run: checkEnvVarReference },
+  { name: "migration inventory documented", run: checkMigrationInventory },
+  { name: "service-role consumer documented", run: checkServiceRoleConsumerClaim },
   { name: "no secret-shaped values in docs", run: checkNoSecretsInDocs },
   { name: "npm script wiring", run: checkNpmScriptWiring },
 ];

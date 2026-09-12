@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/auth/guards", async (original) => ({ ...await original<object>(), requireRole: vi.fn() }));
-vi.mock("@/lib/supabase/config", () => ({ isSupabaseConfigured: vi.fn() }));
+vi.mock("@/lib/supabase/config", async (original) => ({ ...await original<object>(), isSupabaseConfigured: vi.fn() }));
 vi.mock("@/lib/db/companies", () => ({
   createEmployerCompany: vi.fn(),
   getOwnedEmployerCompany: vi.fn(),

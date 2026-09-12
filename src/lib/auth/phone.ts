@@ -51,13 +51,14 @@ export interface PhoneOtpAuthClient {
  * plausible E.164 number.
  */
 export function normalizePhoneNumber(raw: string): string | null {
+  if (typeof raw !== "string") return null;
   const compact = raw.replace(/[\s\-().]/g, "");
   return E164_RE.test(compact) ? compact : null;
 }
 
 /** True for exactly six ASCII digits. */
 export function isValidOtpToken(raw: string): boolean {
-  return OTP_TOKEN_RE.test(raw.trim());
+  return typeof raw === "string" && OTP_TOKEN_RE.test(raw.trim());
 }
 
 /**

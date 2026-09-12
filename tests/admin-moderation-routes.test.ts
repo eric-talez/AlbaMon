@@ -237,7 +237,9 @@ describe("admin moderation static security boundaries", () => {
     expect(dbSource).not.toMatch(/service.?role/i);
     expect(dbSource).toContain('.rpc("transition_job",');
     expect(dbSource).toContain('.eq("moderation_status", "pending")');
-    expect(dbSource).toContain('{ is_verified: isVerified }');
+    expect(dbSource).toContain('.rpc("set_company_verification"');
+    expect(dbSource).not.toMatch(/from\("jobs"\)\s*\.update/);
+    expect(dbSource).not.toMatch(/from\("companies"\)\s*\.update/);
   });
 
   it("relies on existing admin policies, trusted triggers, and approved-only public view", () => {

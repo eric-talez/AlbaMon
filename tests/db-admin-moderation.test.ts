@@ -195,16 +195,45 @@ describe("admin moderation writes", () => {
     expect(rpc).toHaveBeenLastCalledWith("transition_job", {target_job_id:"job-1",command:"reject",expected_updated_at:"2026-06-21T12:00:00Z",reason:"Policy review"});
   });
 
-  it("updates only the company verification field", async () => {
-    const maybeSingle = vi.fn().mockResolvedValue({ data: { id: "company-1" }, error: null });
-    const select = vi.fn(() => ({ maybeSingle }));
-    const eq = vi.fn(() => ({ select }));
-    const update = vi.fn(() => ({ eq }));
-    mockClient.mockResolvedValue({ from: vi.fn(() => ({ update })) } as never);
+  it("maps the job function's admin gate to a generic error", async () => {
+    for (const code of ["P0001", "42501"]) {
+      const rpc = vi.fn().mockResolvedValue({ data: null, error: { code } });
+      mockClient.mockResolvedValue({ rpc } as never);
+      await expect(moderatePendingJob("job-1", "approve", "2026-06-21T12:00:00Z")).resolves.toEqual({
+        status: "error",
+      });
+    }
+  });
 
-    await expect(setCompanyVerification("company-1", true)).resolves.toEqual({ status: "updated" });
-    expect(update).toHaveBeenCalledWith({ is_verified: true });
-    expect(eq).toHaveBeenCalledWith("id", "company-1");
+  it("delegates company verification to the transactional SQL function", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "verified", error: null });
+    mockClient.mockResolvedValue({ rpc } as never);
+
+    await expect(setCompanyVerification("company-1", true)).resolves.toEqual({
+      status: "updated",
+    });
+    expect(rpc).toHaveBeenCalledWith("set_company_verification", {
+      company_id: "company-1",
+      verified: true,
+    });
+  });
+
+  it("maps unverification and a no-op company state to updated/conflict", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "unverified", error: null });
+    mockClient.mockResolvedValue({ rpc } as never);
+    await expect(setCompanyVerification("company-1", false)).resolves.toEqual({
+      status: "updated",
+    });
+    expect(rpc).toHaveBeenCalledWith("set_company_verification", {
+      company_id: "company-1",
+      verified: false,
+    });
+
+    const conflictRpc = vi.fn().mockResolvedValue({ data: "conflict", error: null });
+    mockClient.mockResolvedValue({ rpc: conflictRpc } as never);
+    await expect(setCompanyVerification("company-1", false)).resolves.toEqual({
+      status: "conflict",
+    });
   });
 });
 

@@ -12,6 +12,7 @@ declare
   company_id text := 'c2110000-0000-4000-8000-000000000004';
   job_id text := 'c2110000-0000-4000-8000-000000000005';
   application_id text := 'c2110000-0000-4000-8000-000000000006';
+  connection_string text;
   insert_job text;
   insert_message text;
   actor_a text; actor_b text; query_a text; query_b text; observed text;
@@ -26,7 +27,15 @@ declare
     delete from auth.users where id in ('c2110000-0000-4000-8000-000000000001','c2110000-0000-4000-8000-000000000002','c2110000-0000-4000-8000-000000000003');
   $clean$;
 begin
-  perform extensions.dblink_connect('c2_setup','host=supabase_db_albalmon-ca-launch user=postgres password=postgres dbname='||current_database());
+  -- Reconnect to this same container over its active TCP address. Loopback has
+  -- trust HBA in local Supabase, which dblink forbids for non-superusers even
+  -- when a password was supplied. Never weaken HBA or name another project.
+  if inet_server_addr() is null or inet_server_port() is null then
+    raise exception 'Concurrency tests require a TCP database connection';
+  end if;
+  connection_string := format('host=%s port=%s user=postgres password=postgres dbname=%L',
+    host(inet_server_addr()),inet_server_port(),current_database());
+  perform extensions.dblink_connect('c2_setup',connection_string);
   perform extensions.dblink_exec('c2_setup',cleanup);
   perform extensions.dblink_exec('c2_setup',$setup$
     insert into auth.users(id,email) values
@@ -61,8 +70,8 @@ begin
       when scenario in (2,4,6) then format('select public.suspend_account(%L,''Race suspension'')',owner_id)
       when scenario=5 then format('update public.jobs set title=''Later edit'',moderation_status=''pending'' where id=%L',job_id)
       when scenario=7 then format('select status from public.transition_job(%L,''resubmit'',(select updated_at from public.jobs where id=%L))',job_id,job_id) end;
-    perform extensions.dblink_connect('c2_a','host=supabase_db_albalmon-ca-launch user=postgres password=postgres dbname='||current_database());
-    perform extensions.dblink_connect('c2_b','host=supabase_db_albalmon-ca-launch user=postgres password=postgres dbname='||current_database());
+    perform extensions.dblink_connect('c2_a',connection_string);
+    perform extensions.dblink_connect('c2_b',connection_string);
     -- Temp invoker test helper exposes the actual SQLSTATE, never bypasses RLS.
     perform extensions.dblink_exec('c2_a',$helper$create function pg_temp.run(q text) returns text language plpgsql as $$ begin execute q; return 'ok'; exception when others then return sqlstate||':'||sqlerrm; end $$; set statement_timeout='8s'; set lock_timeout='6s';$helper$);
     perform extensions.dblink_exec('c2_b',$helper$create function pg_temp.run(q text) returns text language plpgsql as $$ declare result text; begin if q like 'select status%' then execute q into result; return result; end if; execute q; return 'ok'; exception when others then return sqlstate||':'||sqlerrm; end $$; set statement_timeout='8s'; set lock_timeout='6s';$helper$);

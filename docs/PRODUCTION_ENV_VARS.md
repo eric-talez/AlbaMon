@@ -12,10 +12,11 @@ Vercel variables per scope; do not commit, log, or put keys in command arguments
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://<staging-ref>.supabase.co` | `https://<production-ref>.supabase.co` | Public, compiled project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | staging anon/publishable key | production anon/publishable key | Public, RLS enforced |
 | `SUPABASE_SERVICE_ROLE_KEY` | staging service role only | production service role only | **Server-only secret**, worker/trusted operations |
+| `RATE_LIMIT_HMAC_SECRET` | Optional local OTP limiter rehearsal only; unset for launch | Unset while phone sign-in is disabled | **Server-only secret**; if used, generate 32 random bytes as 64 hex characters |
 | `STAGING_PROJECT_REF`, `PRODUCTION_PROJECT_REF` | actual distinct console refs | same verified mapping | Server-only configuration, no keys |
 | `STAGING_ORIGIN`, `PRODUCTION_ORIGIN` | actual distinct HTTPS origins | same verified mapping | Server-only configuration, no keys |
 | `NEXT_PUBLIC_AUTH_GOOGLE_ENABLED` | `true` after real setup/test | `true` after real setup/test | Public build-time flag, not verification evidence |
-| `NEXT_PUBLIC_AUTH_KAKAO_ENABLED`, `NEXT_PUBLIC_AUTH_NAVER_ENABLED`, `NEXT_PUBLIC_AUTH_PHONE_ENABLED` | `false` until verified | `false` until verified | Public build-time flags |
+| `NEXT_PUBLIC_AUTH_KAKAO_ENABLED`, `NEXT_PUBLIC_AUTH_NAVER_ENABLED`, `NEXT_PUBLIC_AUTH_PHONE_ENABLED` | `false` for this launch | `false` for this launch | Public build-time flags; phone is rejected in production runtime |
 | `NEXT_PUBLIC_AUTH_NAVER_PROVIDER_ID` | unset while disabled | unset while disabled | Public custom OIDC slug if selected |
 | `EMAIL_PROVIDER` | `resend` | `resend` | Server-only configuration |
 | `EMAIL_NOTIFICATIONS_ENABLED` | `true` only after provider setup | `true` only after provider setup | Server-only, independent runtime delivery guard |
@@ -52,3 +53,10 @@ Policy publication uses checked-in `src/lib/policy-facts.json` and
 absolute file dependency. Follow [review and activation](legal/launch-policy-review.md)
 for real facts, digest, immutable archives, CAS pointer and notices. Current facts
 are draft/unresolved, so actual public readiness remains blocked.
+
+Business write quotas are enforced by database triggers as the verified caller;
+they do not require the service-role client or `RATE_LIMIT_HMAC_SECRET`. The
+retained `consume_rate_limit` RPC is service-only infrastructure for local OTP
+rehearsal. Trusted notification processing uses `notification_outbox` and the
+service role independently. A missing optional OTP secret is not a public launch
+blocker while phone sign-in is disabled. Never commit or print a generated value.

@@ -13,13 +13,15 @@
     "test:watch": "vitest",
     "verify:beta": "node scripts/verify-beta-readiness.mjs",
     "verify:local-supabase": "node scripts/verify-local-supabase-readiness.mjs",
-    "test:db": "supabase test db --local",
+    "test:db": "node scripts/test-database.mjs",
     "test:e2e": "playwright test",
     "test:notifications:local": "RUN_NOTIFICATION_LOCAL=true vitest run tests/notification-local.test.ts",
     "verify:deploy-target": "node scripts/check-deploy-target.mjs",
     "smoke:deployment": "node scripts/smoke-deployment.mjs",
     "setup:local-policy": "node scripts/activate-local-policy.mjs",
-    "check:production-artifact": "node scripts/check-production-artifact.mjs"
+    "check:production-artifact": "node scripts/check-production-artifact.mjs",
+    "verify:rate-limit": "node scripts/verify-rate-limit-concurrency.mjs",
+    "test:e2e:dev": "playwright test --config=playwright.dev.config.ts"
   },
   "dependencies": {
     "@next/env": "16.3.4",

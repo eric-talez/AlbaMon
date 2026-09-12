@@ -23,7 +23,7 @@ function checkReleaseEnv(overrides: Record<string, string> = {}) {
   return spawnSync(process.execPath, ["--input-type=module", "-e", 'import { checkReleaseEnv } from "./scripts/check-release-env.mjs"; import { syntheticPublication } from "./tests/fixtures/policy-publication.mjs"; import { policyAcceptanceIdentity } from "./src/lib/policy-publication.mjs"; checkReleaseEnv(process.env, syntheticPublication(), policyAcceptanceIdentity(syntheticPublication()));'], {
     cwd: process.cwd(),
     encoding: "utf8",
-    env: { ...process.env, ...releaseEnv, ...overrides },
+    env: { ...process.env, NEXT_PUBLIC_AUTH_PHONE_ENABLED: "false", ...releaseEnv, ...overrides },
   });
 }
 
@@ -148,4 +148,10 @@ it("database identity read uses only the anonymous key and fixed errors", async 
     malformed=true;
     await expect(readDatabasePolicyIdentity(env)).rejects.toThrow(/^Policy publication blocked: database identity unavailable$/);
   } finally { await new Promise<void>((resolve,reject)=>server.close(error=>error?reject(error):resolve())); }
+});
+
+it("release rejects the development-only phone OTP capability", () => {
+  const result = checkReleaseEnv({ NEXT_PUBLIC_AUTH_PHONE_ENABLED: "true" });
+  expect(result.status).not.toBe(0);
+  expect(result.stderr).toContain("Phone OTP is disabled for public launch");
 });

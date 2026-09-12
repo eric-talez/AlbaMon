@@ -7,6 +7,8 @@ import {
   isSupabaseConfigured,
 } from "@/lib/supabase/config";
 import { isSupabaseServiceRoleConfigured } from "@/lib/supabase/service";
+import { isPhoneAuthEnabled } from "@/lib/auth/providers";
+import { hmacConfigured } from "@/lib/rate-limit/keys";
 
 /**
  * Operational health report for the private beta, served by `GET /api/health`.
@@ -36,6 +38,7 @@ export type HealthCheckStatus =
 export interface HealthChecks {
   siteUrl: HealthCheckStatus;
   supabase: HealthCheckStatus;
+  rateLimit: HealthCheckStatus;
   email: HealthCheckStatus;
   analytics: HealthCheckStatus;
 }
@@ -67,14 +70,20 @@ function checkSiteUrl(): HealthCheckStatus {
   }
 }
 
-/** Anon (auth) credentials plus the server-only service-role key reserved for
- * trusted server-side workflows. Placeholder values from `.env.example` count
- * as missing. */
+/** Auth credentials plus the service-role key reserved for notification workers,
+ * verified webhooks, and controlled operations in the public launch. */
 function checkSupabase(): HealthCheckStatus {
   const present = [isSupabaseConfigured(), isSupabaseServiceRoleConfigured()];
   if (present.every(Boolean)) return "configured";
   if (present.some(Boolean)) return "partial";
   return "missing";
+}
+
+/** The private counter is optional while OTP is development-only. Authenticated
+ * launch writes use the database's actor quotas, without this HMAC secret. */
+function checkRateLimit(): HealthCheckStatus {
+  if (!isPhoneAuthEnabled()) return "deferred";
+  return hmacConfigured() ? "configured" : "missing";
 }
 
 /** A key alone is partial. Configured means the delivery path is enabled with
@@ -101,6 +110,7 @@ export function buildHealthReport(now: Date = new Date()): HealthReport {
     checks: {
       siteUrl: checkSiteUrl(),
       supabase: checkSupabase(),
+      rateLimit: checkRateLimit(),
       email: checkEmail(),
       analytics: checkAnalytics(),
     },

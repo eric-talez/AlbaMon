@@ -47,6 +47,10 @@ export function checkReleaseSettings(env = process.env, facts = policyFacts) {
     throw new Error("Release requires tested Google authentication");
   }
 
+  if (env.NEXT_PUBLIC_AUTH_PHONE_ENABLED === "true") {
+    throw new Error("Phone OTP is disabled for public launch");
+  }
+
   if (env.EMAIL_PROVIDER !== "resend" || env.EMAIL_NOTIFICATIONS_ENABLED !== "true" ||
       !["staging", "production"].includes(env.EMAIL_ENVIRONMENT)) {
     throw new Error("Release requires enabled Resend notifications and an explicit email environment");

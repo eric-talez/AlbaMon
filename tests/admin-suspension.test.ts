@@ -78,15 +78,17 @@ it("resolves the report's job, pauses with B2 CAS/reason, then marks reviewed", 
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:55321");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "sb_publishable_realish_key_value_1234567890");
   const query = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), update: vi.fn().mockReturnThis(), maybeSingle: vi.fn().mockResolvedValue({ data: { job_id: "related-job" }, error: null }) };
-  const rpc = vi.fn().mockResolvedValue({ data: [{status:"updated"}], error: null });
+  const rpc = vi.fn()
+    .mockResolvedValueOnce({ data: [{status:"updated"}], error: null })
+    .mockResolvedValueOnce({ data: "reviewed", error: null });
   vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: vi.fn(() => query), rpc } as never);
   expect((await pauseReportedJob("report", "raw-revision", "Evidence reason")).status).toBe("updated");
   expect(rpc).toHaveBeenCalledWith("transition_job", {target_job_id:"related-job",command:"pause",expected_updated_at:"raw-revision",reason:"Evidence reason"});
-  expect(query.update).toHaveBeenCalledWith({status:"reviewed"});
-  expect(rpc.mock.invocationCallOrder[0]).toBeLessThan(query.update.mock.invocationCallOrder[0]);
-  query.update.mockClear(); rpc.mockResolvedValue({data:[{status:"conflict"}],error:null});
-  expect((await pauseReportedJob("report","stale","Reason")).status).toBe("conflict");
+  expect(rpc).toHaveBeenNthCalledWith(2, "review_report", {report_id:"report",decision:"reviewed"});
   expect(query.update).not.toHaveBeenCalled();
+  rpc.mockClear(); rpc.mockResolvedValue({data:[{status:"conflict"}],error:null});
+  expect((await pauseReportedJob("report","stale","Reason")).status).toBe("conflict");
+  expect(rpc).toHaveBeenCalledTimes(1);
 });
 it("opens a report's exact job in the private admin queue even after publication ends", async () => {
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:55321");

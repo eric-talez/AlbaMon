@@ -36,6 +36,8 @@ function setEnv(opts: {
   configured: boolean;
   flags?: Partial<Record<(typeof AUTH_FLAG_VARS)[number], string>>;
 }): void {
+  vi.stubEnv("NODE_ENV", "test");
+  vi.stubEnv("VERCEL_ENV", "");
   vi.stubEnv(
     "NEXT_PUBLIC_SUPABASE_URL",
     opts.configured ? REAL_URL : PLACEHOLDER_URL,
@@ -297,4 +299,16 @@ describe("startOAuthSignIn", () => {
       message: SOCIAL_AUTH_MESSAGES.startFailed,
     });
   });
+});
+
+// Launch OTP remains unavailable even when a deployment flag is accidentally enabled.
+it.each([
+  ["production", ""],
+  ["development", "preview"],
+  ["test", "production"],
+])("blocks phone OTP in %s / %s", (runtime, deployment) => {
+  setEnv({ configured: true, flags: { NEXT_PUBLIC_AUTH_PHONE_ENABLED: "true" } });
+  vi.stubEnv("NODE_ENV", runtime);
+  vi.stubEnv("VERCEL_ENV", deployment);
+  expect(isPhoneAuthEnabled()).toBe(false);
 });

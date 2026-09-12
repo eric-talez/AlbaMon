@@ -33,12 +33,18 @@ test("recovery identity must differ from both hosted environments", () => {
 test("staging suppresses crawl discovery and all response indexing", async () => {
   vi.stubEnv("NEXT_PUBLIC_INDEXING_ENABLED","false");
   expect(robots()).toEqual({rules:{userAgent:"*",disallow:"/"}});
-  expect(await nextConfig.headers!()).toContainEqual({source:"/:path*",headers:[{key:"X-Robots-Tag",value:"noindex, nofollow"}]});
+  const rules = await nextConfig.headers!();
+  expect(rules).toContainEqual(expect.objectContaining({source:"/:path*",headers:expect.arrayContaining([
+    {key:"X-Robots-Tag",value:"noindex, nofollow"}, {key:"X-Frame-Options",value:"DENY"},
+  ])}));
 });
 test("production retains public robots and emits no blanket noindex", async () => {
   vi.stubEnv("NEXT_PUBLIC_INDEXING_ENABLED","true");
   expect(robots().sitemap).toBeTruthy();
-  expect(await nextConfig.headers!()).toEqual([]);
+  vi.stubEnv("NODE_ENV", "production");
+  const headers = (await nextConfig.headers!()).flatMap(rule => rule.headers);
+  expect(headers.some(header => header.key === "X-Robots-Tag")).toBe(false);
+  expect(headers).toContainEqual(expect.objectContaining({key:"Content-Security-Policy"}));
 });
 
 test("Vercel Production rejects a coherently copied Preview environment", () => {

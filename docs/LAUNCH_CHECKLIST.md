@@ -36,7 +36,9 @@ Use [first 30 days](operations/first-30-days.md) only after an actual public T0.
 
 ## 5. RLS and full journeys
 
-- [ ] Final candidate unit/type/lint/offline, live RLS/RPC/CAS matrix and browser tests pass with exact counts and retained evidence.
+- [ ] Final candidate unit/type/lint/offline, live RLS/RPC/CAS matrix and both production/DB and separate hermetic development browser suites pass with exact counts and retained evidence.
+- [ ] Actual production CSP/HSTS/browser hardening headers and Preview noindex coexist; hydration and redirects are verified.
+- [ ] Database write quotas remain enforced for authenticated callers; disabled production phone sign-in does not require the optional local OTP HMAC secret.
 - [ ] 390px/1440px and required physical devices, keyboard/assistive interaction, session/callback/expiry, owner/job/app/message/report/suspension journeys and real performance measured.
 - [ ] Cookie-free sitemap public predicate, real publication/expiry/location, request-origin versus canonical-origin and no production noindex verified.
 

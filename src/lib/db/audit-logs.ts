@@ -8,9 +8,10 @@ import type { AuditLogRow } from "@/lib/db/types";
  * Read-only access to audit_logs for the admin dashboard (Slice 22).
  *
  * Reads run through the caller's authenticated session; the
- * audit_logs_select_admin RLS policy is the gate. This slice adds no audit
- * writes — nothing writes the table yet, so an empty result is the expected
- * healthy state until a later slice records admin actions.
+ * audit_logs_select_admin RLS policy is the gate. Rows are written only by
+ * the admin-only SECURITY DEFINER review functions (Slice 27), which record
+ * each moderation decision atomically with its entity change — this module
+ * stays read-only. An empty result simply means no admin decisions yet.
  */
 
 export interface AdminAuditLogEntry {

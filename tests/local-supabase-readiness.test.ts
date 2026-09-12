@@ -71,6 +71,7 @@ function writeFixture(): string {
       "NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co",
       "NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key",
       "SUPABASE_SERVICE_ROLE_KEY=your-service-role-key",
+      "RATE_LIMIT_HMAC_SECRET=generate-with-openssl-rand-hex-32",
       "NEXT_PUBLIC_AUTH_GOOGLE_ENABLED=false",
       "NEXT_PUBLIC_AUTH_PHONE_ENABLED=false",
       "",
@@ -192,6 +193,19 @@ describe("verify-local-supabase-readiness script", () => {
     const { status, output } = runScript(root);
     expect(status).toBe(1);
     expect(output).toContain("hosted supabase project ref");
+  });
+
+  it("fails when a real RATE_LIMIT_HMAC_SECRET is committed to .env.example", () => {
+    const root = writeFixture();
+    // 64-hex value built by repetition so no secret-shaped literal exists in this
+    // source file (tests/security.test.ts scans every tracked file for shapes).
+    appendFileSync(
+      join(root, ".env.example"),
+      `\nRATE_LIMIT_HMAC_SECRET=${"0f".repeat(32)}\n`,
+    );
+    const { status, output } = runScript(root);
+    expect(status).toBe(1);
+    expect(output).toContain("rate-limit HMAC secret");
   });
 
   it("fails when a test_otp block is committed to supabase/config.toml", () => {

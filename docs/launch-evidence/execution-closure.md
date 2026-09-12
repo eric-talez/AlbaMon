@@ -2,6 +2,8 @@
 
 작성일: 2026-09-11. **로컬 구현과 최종 수정 검토 완료. 실제 공개는 NO-GO.**
 
+후속 최신 main 통합과 새 검증은 [main 통합 기록](main-integration.md)을 참고하세요. 아래는 통합 전 소스의 종료 기록입니다.
+
 ## 검증된 코드와 문서
 
 - 작업 브랜치: `codex/california-public-launch`. 원본 main 기준: `c8de0c83b9bbf6d3c34488eaf030e0df3ac630ef`.

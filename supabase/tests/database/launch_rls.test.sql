@@ -1,6 +1,6 @@
 -- Disposable seeded Supabase only. Every fixture and mutation rolls back.
 begin;
-\ir ../helpers/policy-fixtures.inc
+\ir helpers/policy-fixtures.inc
 create extension if not exists pgtap with schema extensions;
 select plan(103);
 insert into auth.users (id, email) values ('44444444-4444-4444-8444-444444444444', 'rls-seeker-a@example.invalid'), ('55555555-5555-4555-8555-555555555555', 'rls-seeker-b@example.invalid'), ('66666666-6666-4666-8666-666666666666', 'rls-admin@example.invalid');

@@ -44,13 +44,17 @@ npm run verify:local-supabase
 npm run test:db
 npm run build
 npm run test:e2e
+npm run test:e2e:dev
 ```
 
 `verify:beta` is retained as an offline **California launch documentation** alias;
 it is not a private-beta waiver or hosted readiness proof. DB/browser tests need
 the isolated stack. `npm run check:production-artifact` builds and checks the
 unconfigured production artifact without sample exposure. CI runs unit, offline,
-local RLS, local provider-double and production browser checks.
+local RLS, local provider-double and production browser checks. The separate
+`test:e2e:dev` suite uses `playwright.dev.config.ts`, a development-only role
+picker and fictional jobs without a DB. Its results do not prove persistence,
+production auth or provider delivery. Production browser checks remain separate.
 
 ## Current product and security
 
@@ -61,6 +65,10 @@ session validation and current DB roles, RLS/RPC ownership, active+AAL2 admin,
 CAS transitions and retained audits enforce authorization. Normal user flows never
 use a service-role key. Resend outbox worker/signed webhook tools are implemented;
 actual provider delivery and Production cron scheduling need independent evidence.
+Production responses also carry CSP/HSTS and browser hardening headers; Preview
+keeps its independent noindex policy. Business write quotas execute inside
+Postgres without a service-role preflight. The retained private OTP limiter is
+for development rehearsal while phone sign-in remains disabled in production.
 No payments, boosts, resume uploads or realtime chat in this launch.
 
 ## Deploy and operate

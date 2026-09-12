@@ -107,6 +107,13 @@ const SECRET_PATTERNS = [
     name: "hosted supabase project ref",
     re: /[a-z0-9]{16,}\.supabase\.co/,
   },
+  {
+    // A real RATE_LIMIT_HMAC_SECRET is exactly 64 hex chars. Anchored to the var
+    // name so example subject-hash values in docs don't trip it; the shipped
+    // non-hex placeholder (generate-with-openssl-rand-hex-32) stays green.
+    name: "committed rate-limit HMAC secret",
+    re: /RATE_LIMIT_HMAC_SECRET\s*=\s*["']?[0-9a-fA-F]{64}\b/,
+  },
 ];
 
 function tryRead(relPath) {
@@ -164,6 +171,10 @@ function checkEnvExamplePlaceholders() {
     { name: "NEXT_PUBLIC_SUPABASE_URL", fragment: "your-project" },
     { name: "NEXT_PUBLIC_SUPABASE_ANON_KEY", fragment: "your-anon-key" },
     { name: "SUPABASE_SERVICE_ROLE_KEY", fragment: "your-service-role-key" },
+    {
+      name: "RATE_LIMIT_HMAC_SECRET",
+      fragment: "generate-with-openssl-rand-hex-32",
+    },
   ];
   for (const { name, fragment } of placeholders) {
     const line = example

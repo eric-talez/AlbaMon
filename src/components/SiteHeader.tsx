@@ -22,7 +22,7 @@ export function SiteHeader({ user }: { user: AuthUser | null }) {
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden items-center gap-1 sm:flex">
+        <nav data-testid="desktop-nav" className="hidden items-center gap-1 sm:flex">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}

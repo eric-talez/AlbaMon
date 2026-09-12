@@ -27,7 +27,11 @@ stack. Verified sessions and current database roles authorize callers; form role
 values and user metadata do not. Writes enforce ownership, active status, policy
 identity, concurrency and audit rules at the database boundary. Production builds
 and runtimes never publish samples. Trusted notification workers use the outbox,
-Resend and signed webhooks; real provider delivery is still unverified.
+Resend and signed webhooks; real provider delivery is still unverified. Production
+security headers complement the database authorization boundary. Ordinary
+business writes use database quotas without a service-role preflight; phone
+sign-in remains disabled for this launch. Separate hermetic development browser
+coverage supplements the real local production/Auth/DB journeys.
 
 Policies use version `ca-launch-v1` plus a draft/reviewed bundle identity. Operator
 facts, complete prose and external review must align with a service-controlled CAS

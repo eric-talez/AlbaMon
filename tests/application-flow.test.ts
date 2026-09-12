@@ -6,7 +6,10 @@ import { join } from "node:path";
 vi.mock("@/lib/auth/guards", async (original) => ({ ...await original<object>(), requireUser: vi.fn() }));
 vi.mock("@/lib/db/jobs", () => ({ getApprovedJobById: vi.fn() }));
 vi.mock("@/lib/db/applications", () => ({ createApplication: vi.fn() }));
-vi.mock("@/lib/supabase/config", () => ({ isSupabaseConfigured: vi.fn() }));
+vi.mock("@/lib/supabase/config", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/supabase/config")>();
+  return { ...actual, isSupabaseConfigured: vi.fn() };
+});
 vi.mock("@/lib/notifications/dev", () => ({ notifyApplicationSubmitted: vi.fn() }));
 
 import { requireUser } from "@/lib/auth/guards";
@@ -44,7 +47,7 @@ beforeEach(() => {
   mockCreate.mockResolvedValue({ status: "created", applicationId: "application-1" });
 });
 
-afterEach(() => vi.clearAllMocks());
+afterEach(() => { vi.clearAllMocks(); vi.unstubAllEnvs(); });
 
 describe("submitApplication", () => {
   it("reauthenticates with the preserved apply destination", async () => {
@@ -139,4 +142,15 @@ describe("application route wiring", () => {
     expect(applyPage).toContain("getApprovedJobById(id)");
     expect(applyPage).toContain("requireUser(applyPath)");
   });
+});
+
+it("uses the launch database quota without operational counter credentials", async () => {
+  vi.stubEnv("NODE_ENV", "production");
+  vi.stubEnv("RATE_LIMIT_HMAC_SECRET", "");
+  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+  expect((await submitApplication("job-1", idle, form("Hello"))).status).toBe("success");
+  mockCreate.mockResolvedValue({ status: "rate_limited" });
+  const denied = await submitApplication("job-1", idle, form("Hello"));
+  expect(denied.status).toBe("error");
+  expect(denied.message).toContain("잠시 후");
 });

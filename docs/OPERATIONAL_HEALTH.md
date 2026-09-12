@@ -18,7 +18,10 @@ It reports coarse configuration presence only; it never connects to Supabase.
 `GET /api/ready` is the bounded anonymous database dependency check; require 200
 and its ready result, and alert on 503, timeout or unexpected response. Neither
 endpoint proves Google login, real mail, correct RLS or legal review. A service
-key is required only by trusted notification/operational paths, never user flows.
+key is required by trusted notification/operational paths, never ordinary
+business writes. The optional private `consume_rate_limit` path is retained for
+local OTP rehearsal, while phone sign-in is disabled in production. The coarse
+`rateLimit` status does not probe its DB function and is deferred when disabled.
 
 Configure the selected external monitor for both endpoints and a public `/jobs`
 render: check every 1–5 minutes and alert the actual on-call destination after two
@@ -120,3 +123,17 @@ inspect active cron separately because deployment rollback does not update it.
 The aggregate runs inside Postgres, so the REST 1,000-row limit does not truncate the population. These are publication/application/reply signals, not visit conversion, retention, or completed hires. `offered` means an offer status only. External product analytics and visit collection remain deferred.
 
 Public SEO uses the canonical open-job view (`is_job_open`) through an anonymous cookie-free dynamic sitemap, reading every stable-ID range of 1,000. Database/configuration failure fails the sitemap safely; it never emits mocks or a partial success response. Split sitemaps before 50,000 total URLs (including static pages). JobPosting includes only visible facts and full paragraph-formatted employer content, with HTML escaping followed by separate script serialization escaping. Unknown posted_at yields no JobPosting. Closed/expired jobs return 404 and disappear from the sitemap. [Google’s JobPosting guidance](https://developers.google.com/search/docs/appearance/structured-data/job-posting) does not guarantee search exposure; deployed-domain Search Console and URL Inspection are external release gates.
+
+## Browser security and write limits
+
+Production responses use CSP/HSTS and browser hardening headers from the shared
+security helper; Preview additionally keeps noindex. Verify the actual deployed
+headers and client hydration after a config change. The credential-free
+`test:e2e:dev` suite exercises the development shell only; use the separate
+production browser suite for the real local Auth/DB journeys.
+
+Applications, reports, messages, employer-access requests and company/job
+creation enforce quotas in Postgres alongside caller authorization. A quota
+denial must not be worked around with a service-role mutation. The optional OTP
+limiter stores HMAC subjects only, never phone/IP/OTP values. No production phone
+provider is enabled by its presence.

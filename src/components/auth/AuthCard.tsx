@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSocialProviders, isPhoneAuthEnabled } from "@/lib/auth/providers";
+import { requestPhoneOtp, verifyPhoneOtpAction } from "@/lib/auth/otp-actions";
 import { DevAuthForm } from "@/components/auth/DevAuthForm";
 import { PhoneOtpForm } from "@/components/auth/PhoneOtpForm";
 import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
@@ -59,7 +60,7 @@ export function AuthCard({ mode, next, error }: AuthCardProps) {
       {isPhoneAuthEnabled() ? (
         <section className="mt-5">
           <h2 className="text-sm font-semibold">휴대폰으로 로그인 (Sign in with phone)</h2>
-          <PhoneOtpForm next={next} />
+          <PhoneOtpForm next={next} requestOtp={requestPhoneOtp} verifyOtp={verifyPhoneOtpAction} />
         </section>
       ) : null}
 

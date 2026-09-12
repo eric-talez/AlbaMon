@@ -1,5 +1,5 @@
 begin;
-\ir ../helpers/policy-fixtures.inc
+\ir helpers/policy-fixtures.inc
 create extension if not exists pgtap with schema extensions;
 select no_plan();
 update public.jobs set expires_at = now() - interval '1 second' where id = 'bbbbbbbb-0000-0000-0000-000000000001';

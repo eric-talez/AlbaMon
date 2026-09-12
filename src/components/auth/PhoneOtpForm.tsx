@@ -1,26 +1,32 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { sanitizeNextPath } from "@/lib/auth/redirect";
-import {
-  remainingCooldownSeconds,
-  sendPhoneOtp,
-  verifyPhoneOtp,
-} from "@/lib/auth/phone";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { remainingCooldownSeconds } from "@/lib/auth/phone";
+import type { RequestOtpResult, VerifyOtpResult } from "@/lib/auth/otp-types";
 
 interface PhoneOtpFormProps {
   next?: string;
+  /**
+   * Cookie-aware Server Actions, injected from the `AuthCard` Server Component.
+   * The browser never touches Supabase Auth directly, and this Client Component
+   * never imports the server-only OTP module.
+   */
+  requestOtp: (rawPhone: string) => Promise<RequestOtpResult>;
+  verifyOtp: (
+    rawPhone: string,
+    rawToken: string,
+    rawNext?: string,
+  ) => Promise<VerifyOtpResult>;
 }
 
 /**
  * Two-step phone OTP flow: enter number → enter the 6-digit code.
- * Sending and verifying go through Supabase Phone Auth only (see
- * `@/lib/auth/phone`); codes are never stored here and neither the number nor
- * the code is ever logged. Rendered only when phone auth is enabled —
- * `AuthCard` shows a setup-required note otherwise.
+ * Sending and verifying now go through server-boundary actions (durable rate
+ * limiting + Supabase Phone Auth on the server); codes are never stored here and
+ * neither the number nor the code is ever logged. Rendered only when phone auth
+ * is enabled — `AuthCard` shows a setup-required note otherwise.
  */
-export function PhoneOtpForm({ next }: PhoneOtpFormProps) {
+export function PhoneOtpForm({ next, requestOtp, verifyOtp }: PhoneOtpFormProps) {
   const [step, setStep] = useState<"phone" | "token">("phone");
   const [phone, setPhone] = useState("");
   const [token, setToken] = useState("");
@@ -29,6 +35,9 @@ export function PhoneOtpForm({ next }: PhoneOtpFormProps) {
   const [lastSentAt, setLastSentAt] = useState<number | null>(null);
   const [cooldown, setCooldown] = useState(0);
 
+  // The 60-second resend cooldown is UX feedback ONLY — it is not a security
+  // control. Real enforcement is the durable per-phone / per-IP rate-limit
+  // buckets consumed server-side in `requestOtp`.
   useEffect(() => {
     if (lastSentAt === null) return;
     const update = () =>
@@ -42,14 +51,14 @@ export function PhoneOtpForm({ next }: PhoneOtpFormProps) {
     if (pending) return;
     setError(null);
     setPending(true);
-    const supabase = createSupabaseBrowserClient();
-    const result = await sendPhoneOtp(supabase.auth, phone);
+    const result = await requestOtp(phone);
     setPending(false);
-    if (result.ok) {
+    if (result.status === "ok") {
       setStep("token");
       setToken("");
       setLastSentAt(Date.now());
     } else {
+      // Both "error" and "rate_limited" carry a fixed, PII-free message.
       setError(result.message);
     }
   }
@@ -58,12 +67,12 @@ export function PhoneOtpForm({ next }: PhoneOtpFormProps) {
     if (pending) return;
     setError(null);
     setPending(true);
-    const supabase = createSupabaseBrowserClient();
-    const result = await verifyPhoneOtp(supabase.auth, phone, token);
-    if (result.ok) {
-      // Full navigation (not router.push): the verified session cookies must
-      // be picked up by the server-side guards on the destination page.
-      window.location.assign(sanitizeNextPath(next));
+    const result = await verifyOtp(phone, token, next);
+    if (result.status === "ok") {
+      // Full navigation (not router.push): the verified session cookies must be
+      // picked up by the server-side guards on the destination page. The path is
+      // sanitized on the server; the client only navigates to what it returns.
+      window.location.assign(result.next);
       return;
     }
     setPending(false);

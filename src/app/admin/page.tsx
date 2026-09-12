@@ -15,6 +15,12 @@ import {
 } from "@/lib/ops/health";
 import { getNotificationQueueHealth } from "@/lib/db/notifications";
 import { Badge } from "@/components/Badge";
+import {
+  AUDIT_ACTION_LABELS,
+  AUDIT_ENTITY_TYPE_LABELS,
+  type AdminAuditAction,
+  type AdminAuditEntityType,
+} from "@/lib/types";
 
 export const metadata: Metadata = { title: "Admin console / 관리자 콘솔" };
 
@@ -43,9 +49,20 @@ const HEALTH_TONES: Record<
 const HEALTH_CHECK_LABELS: Record<keyof HealthChecks, string> = {
   siteUrl: "Site URL",
   supabase: "Supabase",
+  rateLimit: "Rate limiting",
   email: "Email",
   analytics: "Analytics",
 };
+
+// Stable audit action/entity values map to Korean-first labels; unknown values
+// (older or future taxonomies) fall back to the raw string so nothing hides.
+function auditActionLabel(action: string): string {
+  return AUDIT_ACTION_LABELS[action as AdminAuditAction] ?? action;
+}
+
+function auditEntityLabel(entityType: string): string {
+  return AUDIT_ENTITY_TYPE_LABELS[entityType as AdminAuditEntityType] ?? entityType;
+}
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -302,8 +319,12 @@ export default async function AdminHomePage() {
                   className="flex flex-col gap-1 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{entry.action}</span>
-                    <Badge tone="neutral">{entry.entityType}</Badge>
+                    <span className="text-sm font-medium">
+                      {auditActionLabel(entry.action)}
+                    </span>
+                    <Badge tone="neutral">
+                      {auditEntityLabel(entry.entityType)}
+                    </Badge>
                   </div>
                   <p className="text-xs text-muted">
                     {formatDate(entry.createdAt)}

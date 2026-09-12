@@ -1,5 +1,5 @@
 begin;
-\ir ../helpers/policy-fixtures.inc
+\ir helpers/policy-fixtures.inc
 create extension if not exists pgtap with schema extensions;
 select no_plan();
 -- Dedicated future reference isolates this rolled-back fixture from seed dates.
