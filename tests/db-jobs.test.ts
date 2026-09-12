@@ -1,5 +1,10 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
-import { getApprovedJobs, getApprovedJobById } from "@/lib/db/jobs";
+import {
+  getApprovedJobs,
+  getApprovedJobById,
+  getPublicJobCities,
+  searchApprovedJobs,
+} from "@/lib/db/jobs";
 
 /**
  * With Supabase unconfigured (the default for dev/test/build), the DB access
@@ -53,5 +58,11 @@ describe("production mock safety", () => {
       /mock job fallback is disabled/i,
     );
     expect(await getApprovedJobById("kw-001")).toBeUndefined();
+    await expect(getPublicJobCities()).rejects.toThrow(
+      /mock job fallback is disabled/i,
+    );
+    await expect(searchApprovedJobs({})).rejects.toThrow(
+      /mock job fallback is disabled/i,
+    );
   });
 });

@@ -200,6 +200,52 @@ describe("searchApprovedJobs — mock fallback", () => {
 });
 
 describe("searchApprovedJobs — Supabase configured", () => {
+  it("keeps configured search and detail on the same canonical job id", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", REAL_URL);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", REAL_KEY);
+    const id = "bbbbbbbb-0000-0000-0000-000000000001";
+    const row = dbJobRow({ id, title: "Configured public job" });
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      return new Response(
+        JSON.stringify(url.includes("search_public_jobs") ? [row] : row),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(
+      createClient(REAL_URL, REAL_KEY, { global: { fetch: fetchMock } }),
+    );
+
+    const search = await searchApprovedJobs({});
+    expect(search.jobs.map((job) => job.id)).toEqual([id]);
+    await expect(getApprovedJobById(id)).resolves.toMatchObject({
+      id,
+      title: "Configured public job",
+    });
+  });
+
+  it("returns undefined when a configured detail row is missing", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", REAL_URL);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", REAL_KEY);
+    const query = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      maybeSingle: vi.fn(),
+      then: (resolve: (value: unknown) => unknown) =>
+        resolve({ data: null, error: null }),
+    };
+    query.select.mockReturnValue(query);
+    query.eq.mockReturnValue(query);
+    query.maybeSingle.mockReturnValue(query);
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      from: () => query,
+    } as never);
+
+    await expect(
+      getApprovedJobById("bbbbbbbb-0000-0000-0000-000000000099"),
+    ).resolves.toBeUndefined();
+  });
+
   it("passes literal keywords to the search RPC without PostgREST filter grammar", async () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", REAL_URL);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", REAL_KEY);
@@ -323,23 +369,63 @@ describe("public jobs — production fallback safety", () => {
     );
   });
 
-  it("rethrows configured production DB failures instead of showing mocks", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", REAL_URL);
-    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", REAL_KEY);
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("NEXT_PHASE", "phase-production-server");
-    const failure = new Error("database unavailable");
-    vi.mocked(createSupabaseServerClient).mockRejectedValue(failure);
-    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  it.each(["development", "production"])(
+    "rethrows configured %s client failures instead of showing mocks",
+    async (nodeEnv) => {
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", REAL_URL);
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", REAL_KEY);
+      vi.stubEnv("NODE_ENV", nodeEnv);
+      vi.stubEnv("NEXT_PHASE", "phase-production-server");
+      const failure = new Error("database unavailable");
+      vi.mocked(createSupabaseServerClient).mockRejectedValue(failure);
+      const errorLog = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
 
-    await expect(getApprovedJobs()).rejects.toBe(failure);
-    await expect(
-      getApprovedJobById("11111111-1111-4111-8111-111111111111"),
-    ).rejects.toBe(failure);
-    await expect(searchApprovedJobs({})).rejects.toBe(failure);
-    expect(errorLog).toHaveBeenCalledTimes(3);
-    errorLog.mockRestore();
-  });
+      await expect(getApprovedJobs()).rejects.toBe(failure);
+      await expect(
+        getApprovedJobById("bbbbbbbb-0000-0000-0000-000000000001"),
+      ).rejects.toBe(failure);
+      await expect(searchApprovedJobs({})).rejects.toBe(failure);
+      await expect(getPublicJobCities()).rejects.toBe(failure);
+      expect(errorLog).toHaveBeenCalledTimes(4);
+      errorLog.mockRestore();
+    },
+  );
+
+  it.each(["development", "production"])(
+    "rethrows configured %s query-result failures instead of showing mocks",
+    async (nodeEnv) => {
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", REAL_URL);
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", REAL_KEY);
+      vi.stubEnv("NODE_ENV", nodeEnv);
+      const failure = new Error("query failed");
+      const query = {
+        select: vi.fn(),
+        eq: vi.fn(),
+        order: vi.fn(),
+        maybeSingle: vi.fn(),
+        then: (resolve: (value: unknown) => unknown) =>
+          resolve({ data: null, error: failure }),
+      };
+      query.select.mockReturnValue(query);
+      query.eq.mockReturnValue(query);
+      query.order.mockReturnValue(query);
+      query.maybeSingle.mockReturnValue(query);
+      vi.mocked(createSupabaseServerClient).mockResolvedValue({
+        from: () => query,
+        rpc: () => query,
+      } as never);
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+      await expect(getApprovedJobs()).rejects.toBe(failure);
+      await expect(searchApprovedJobs({})).rejects.toBe(failure);
+      await expect(getPublicJobCities()).rejects.toBe(failure);
+      await expect(
+        getApprovedJobById("bbbbbbbb-0000-0000-0000-000000000001"),
+      ).rejects.toBe(failure);
+    },
+  );
 
   it("does not send malformed ids to Supabase", async () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", REAL_URL);
