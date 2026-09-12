@@ -172,3 +172,11 @@ describe("verifyPhoneOtpCore", () => {
     expect(result.status).toBe("error");
   });
 });
+
+it("rejects non-string action arguments without reaching a limiter or Auth", async () => {
+  const { deps, enforce, getAuthClient } = makeDeps();
+  await expect(requestPhoneOtpCore(deps, null as unknown as string)).resolves.toMatchObject({ status: "error" });
+  await expect(verifyPhoneOtpCore(deps, RAW_PHONE, 123456 as unknown as string)).resolves.toMatchObject({ status: "error" });
+  expect(enforce).not.toHaveBeenCalled();
+  expect(getAuthClient).not.toHaveBeenCalled();
+});

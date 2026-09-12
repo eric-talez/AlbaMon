@@ -19,17 +19,24 @@ function looksLikePlaceholder(value: string): boolean {
 }
 
 /**
- * True only when both the Supabase URL and anon key are present and not the
- * shipped placeholders. Used to decide between real Supabase auth and dev mode.
+ * Returns the public Supabase settings only when both are present and are not
+ * shipped placeholders. Used by auth and cookie-free public database checks.
  *
- * Reads `process.env` dynamically (not the module-level consts) so this single
- * predicate stays correct under tests that stub the environment.
+ * Reads `process.env` dynamically (not the module-level consts) so this stays
+ * correct under tests that stub the environment.
  */
+export function getSupabasePublicConfig():
+  | { url: string; anonKey: string }
+  | undefined {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+  return looksLikePlaceholder(url) || looksLikePlaceholder(anonKey)
+    ? undefined
+    : { url, anonKey };
+}
+
 export function isSupabaseConfigured(): boolean {
-  return (
-    !looksLikePlaceholder(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "") &&
-    !looksLikePlaceholder(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "")
-  );
+  return getSupabasePublicConfig() !== undefined;
 }
 
 /** True when running a production build/runtime. */

@@ -7,6 +7,7 @@ vi.mock("@/lib/supabase/server", () => ({
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   createApplication,
+  withdrawApplication,
   getEmployerApplications,
   getSeekerApplications,
 } from "@/lib/db/applications";
@@ -97,7 +98,7 @@ describe("createApplication", () => {
 
 describe("application listing RPCs", () => {
   it("maps the caller-bound seeker listing without passing an identity", async () => {
-    rpc.mockResolvedValue({
+    rpc.mockReturnValue({ range: vi.fn().mockResolvedValue({
       data: [
         {
           application_id: "application-1",
@@ -109,14 +110,15 @@ describe("application listing RPCs", () => {
           application_status: "submitted",
           cover_note: "안녕하세요",
           submitted_at: "2026-06-21T12:00:00.000Z",
+          application_updated_at: "2026-09-09T01:02:03.123456Z",
           job_is_public: true,
         },
       ],
       error: null,
-    });
+    }) });
 
     await expect(getSeekerApplications()).resolves.toEqual({
-      status: "ok",
+      status: "ok", hasNext: false,
       applications: [
         {
           id: "application-1",
@@ -128,6 +130,7 @@ describe("application listing RPCs", () => {
           status: "submitted",
           coverNote: "안녕하세요",
           submittedAt: "2026-06-21T12:00:00.000Z",
+          applicationUpdatedAt: "2026-09-09T01:02:03.123456Z",
           jobIsPublic: true,
         },
       ],
@@ -136,7 +139,7 @@ describe("application listing RPCs", () => {
   });
 
   it("maps only the limited employer applicant identity fields", async () => {
-    rpc.mockResolvedValue({
+    rpc.mockReturnValue({ range: vi.fn().mockResolvedValue({
       data: [
         {
           application_id: "application-2",
@@ -148,15 +151,16 @@ describe("application listing RPCs", () => {
           application_status: "submitted",
           cover_note: null,
           submitted_at: "2026-06-21T11:00:00.000Z",
+          application_updated_at: "2026-09-09T01:02:03.123456Z",
           job_is_public: false,
         },
       ],
       error: null,
-    });
+    }) });
 
     const result = await getEmployerApplications();
     expect(result).toEqual({
-      status: "ok",
+      status: "ok", hasNext: false,
       applications: [
         {
           id: "application-2",
@@ -168,6 +172,7 @@ describe("application listing RPCs", () => {
           status: "submitted",
           coverNote: null,
           submittedAt: "2026-06-21T11:00:00.000Z",
+          applicationUpdatedAt: "2026-09-09T01:02:03.123456Z",
           jobIsPublic: false,
         },
       ],
@@ -178,7 +183,7 @@ describe("application listing RPCs", () => {
 
   it("returns explicit errors instead of empty application lists", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    rpc.mockResolvedValue({ data: null, error: { code: "42501" } });
+    rpc.mockReturnValue({ range: vi.fn().mockResolvedValue({ data: null, error: { code: "42501" } }) });
 
     await expect(getSeekerApplications()).resolves.toEqual({ status: "error" });
     await expect(getEmployerApplications()).resolves.toEqual({ status: "error" });
@@ -193,4 +198,32 @@ describe("application listing RPCs", () => {
     expect(mockClient).not.toHaveBeenCalled();
     expect(rpc).not.toHaveBeenCalled();
   });
+});
+
+it("returns 20 applications per page while keeping raw microseconds", async () => {
+  const rows=Array.from({length:21},(_,i)=>({application_id:`a-${i}`,application_updated_at:"2026-09-09T01:02:03.123456+00:00"}));
+  const range=vi.fn(async(from:number,to:number)=>({data:rows.slice(from,to+1),error:null}));
+  rpc.mockReturnValue({range});
+  for(const read of [getSeekerApplications,getEmployerApplications]) {
+    const first=await read();
+    if(first.status!=="ok") throw new Error("missing list");
+    expect(first.applications).toHaveLength(20);
+    expect(first.hasNext).toBe(true);
+    expect(first.applications[0].applicationUpdatedAt).toBe("2026-09-09T01:02:03.123456+00:00");
+    const second=await read(2);
+    if(second.status!=="ok") throw new Error("missing list");
+    expect(second.applications.map(a=>a.id)).toEqual(["a-20"]);
+    expect(second.hasNext).toBe(false);
+  }
+  expect(range.mock.calls).toEqual([[0,20],[20,40],[0,20],[20,40]]);
+});
+
+it("withdrawal RPC forwards the raw timestamp and maps only known responses",async()=>{
+  for(const status of ["withdrawn","already_withdrawn","conflict","not_allowed"]) {
+    rpc.mockResolvedValueOnce({data:[{status}],error:null});
+    expect(await withdrawApplication("a","2026-09-09T01:02:03.123456Z")).toEqual({status});
+  }
+  expect(rpc).toHaveBeenCalledWith("withdraw_application",{target_application_id:"a",expected_updated_at:"2026-09-09T01:02:03.123456Z"});
+  rpc.mockResolvedValueOnce({data:[{status:"unexpected"}],error:null});
+  expect(await withdrawApplication("a","2026-09-09T01:02:03.123456Z")).toEqual({status:"error"});
 });

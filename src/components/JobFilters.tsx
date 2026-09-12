@@ -6,9 +6,10 @@ import {
   JOB_TYPE_LABELS,
   LANGUAGE_REQUIREMENTS,
   LANGUAGE_REQUIREMENT_LABELS,
+  PAY_UNITS,
+  PAY_UNIT_LABELS,
 } from "@/lib/types";
 import type { JobSearchParams } from "@/lib/db/jobs";
-import { LAUNCH_CITIES } from "@/lib/site";
 
 function Field({
   id,
@@ -36,7 +37,13 @@ const controlClass =
  * read by `/jobs` — it works without JavaScript and keeps the filter state in
  * the URL. `values` are the currently-applied filters (echoed back as defaults).
  */
-export function JobFilters({ values = {} }: { values?: JobSearchParams }) {
+export function JobFilters({
+  cities = [],
+  values = {},
+}: {
+  cities?: string[];
+  values?: JobSearchParams;
+}) {
   return (
     <form
       method="get"
@@ -50,6 +57,7 @@ export function JobFilters({ values = {} }: { values?: JobSearchParams }) {
           type="text"
           name="q"
           defaultValue={values.q ?? ""}
+          maxLength={200}
           placeholder="직무, 회사, 내용"
           className={controlClass}
         />
@@ -62,8 +70,8 @@ export function JobFilters({ values = {} }: { values?: JobSearchParams }) {
           className={controlClass}
           defaultValue={values.city ?? ""}
         >
-          <option value="">전체 지역</option>
-          {LAUNCH_CITIES.map((c) => (
+          <option value="">CA 전체</option>
+          {cities.map((c) => (
             <option key={c} value={c}>
               {c}
             </option>
@@ -125,12 +133,28 @@ export function JobFilters({ values = {} }: { values?: JobSearchParams }) {
           type="number"
           name="payMin"
           min={0}
-          step={1}
-          inputMode="numeric"
+          step="any"
+          inputMode="decimal"
           defaultValue={values.payMin ?? ""}
           placeholder="예: 20"
           className={controlClass}
         />
+      </Field>
+
+      <Field id="filter-payUnit" label="급여 단위 (Pay unit)">
+        <select
+          id="filter-payUnit"
+          name="payUnit"
+          className={controlClass}
+          defaultValue={values.payUnit ?? ""}
+        >
+          <option value="">전체 급여 단위</option>
+          {PAY_UNITS.map((unit) => (
+            <option key={unit} value={unit}>
+              {PAY_UNIT_LABELS[unit]}
+            </option>
+          ))}
+        </select>
       </Field>
 
       <Field id="filter-sort" label="정렬 (Sort)">

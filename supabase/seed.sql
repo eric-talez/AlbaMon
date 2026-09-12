@@ -1,5 +1,5 @@
 -- ============================================================================
--- K-Work US — seed data (LA / Orange County)
+-- K-Work US — seed data (California)
 -- ============================================================================
 -- Reproducible, idempotent-ish seed for local dev and demos. Mirrors the public
 -- mock jobs in src/lib/mock/jobs.ts. All company names are clearly fictional —
@@ -8,8 +8,8 @@
 -- Compliance: language requirements are framed as job-related only. No
 -- Korean-only / nationality / visa-status / under-the-table-cash phrasing.
 --
--- Apply AFTER the migration. On Supabase:  supabase db reset  (runs migration +
--- this seed automatically), or paste this file into the SQL editor.
+-- Apply after migrations ONLY on an explicitly disposable local test database.
+-- Never run this fixture seed in a hosted SQL editor or against retained user data.
 --
 -- Owner identities use fixed UUIDs so the seed is deterministic. Inserting into
 -- auth.users fires on_auth_user_created, which auto-creates a profiles row; we
@@ -59,7 +59,7 @@ values
    '11111111-1111-1111-1111-111111111111',
    'Koreatown Kitchen Collective',
    '코리아타운 한식당 및 카페 그룹 (가상 시드 데이터).',
-   'Los Angeles (Koreatown)', 'CA', 'Koreatown, Los Angeles, CA', true),
+   'Los Angeles', 'CA', 'Koreatown, Los Angeles, CA', true),
   ('aaaaaaaa-0000-0000-0000-000000000002',
    '22222222-2222-2222-2222-222222222222',
    'OC Wellness & Beauty Group',
@@ -73,7 +73,7 @@ values
 on conflict (id) do nothing;
 
 -- --- Jobs -------------------------------------------------------------------
--- 8 approved + 1 pending + 1 draft. moderation_status drives public visibility.
+-- 11 approved + 1 pending + 1 draft. moderation_status drives public visibility.
 insert into public.jobs (
   id, company_id, title, category, job_type, city, state, address_display,
   address_display_mode, pay_min, pay_max, pay_unit, tips_available,
@@ -84,7 +84,7 @@ values
   -- 1. Restaurant server (approved, featured)
   ('bbbbbbbb-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001',
    '한식당 홀서버 (파트타임)', 'restaurant_cafe', 'part_time',
-   'Los Angeles (Koreatown)', 'CA', 'Koreatown, Los Angeles, CA', 'city_only',
+   'Los Angeles', 'CA', 'Koreatown, Los Angeles, CA', 'city_only',
    18, 22, 'hour', true, '주 4–5일 (주말 포함)', '11:00 AM – 4:00 PM',
    'korean_required',
    '코리아타운 인기 한식당에서 홀서버를 모집합니다. 친절하고 성실하신 분을 찾습니다. 팁 별도.',
@@ -177,6 +177,34 @@ values
    '{"주말 휴무","장기 근무 우대"}',
    'approved', null, '2026-06-12'),
 
+  -- 11. Bay Area hourly range (approved)
+  ('bbbbbbbb-0000-0000-0000-000000000011', 'aaaaaaaa-0000-0000-0000-000000000003',
+   '급여 의미 테스트 literal * comma, open( close)', 'office_admin', 'full_time',
+   'San Jose', 'CA', 'San Jose, CA', 'city_only',
+   18, 25, 'hour', false, '월–금', '9:00 AM – 5:00 PM',
+   'bilingual_preferred',
+   '지역 커뮤니티 콘텐츠와 일정을 관리합니다. Literal percent % and underscore _ markers.',
+   '{"콘텐츠 관리"}', '{"업무 관련 한/영 소통"}', '{}',
+   'approved', null, '2026-06-20 08:00:00+00'),
+
+  -- 12. Sacramento exact minimum (approved)
+  ('bbbbbbbb-0000-0000-0000-000000000012', 'aaaaaaaa-0000-0000-0000-000000000003',
+   '급여 의미 테스트 리테일 매장 운영 직원', 'retail', 'full_time',
+   'Sacramento', 'CA', 'Sacramento, CA', 'city_only',
+   22, 25, 'hour', false, '주 5일', '9:00 AM – 6:00 PM',
+   'korean_helpful', '매장 운영과 고객 안내를 담당합니다.',
+   '{"매장 운영"}', '{"고객 응대 가능"}', '{}',
+   'approved', null, '2026-06-20 09:00:00+00'),
+
+  -- 13. San Diego annual salary (approved)
+  ('bbbbbbbb-0000-0000-0000-000000000013', 'aaaaaaaa-0000-0000-0000-000000000003',
+   '급여 의미 테스트 회계 사무 담당', 'office_admin', 'full_time',
+   'San Diego', 'CA', 'San Diego, CA', 'city_only',
+   60000, 60000, 'year', false, '월–금', '9:00 AM – 5:00 PM',
+   'english_required', '회계 자료와 사무 업무를 관리합니다.',
+   '{"회계 자료 관리"}', '{"관련 업무 경험"}', '{}',
+   'approved', null, '2026-06-20 10:00:00+00'),
+
   -- 9. Bakery sales (PENDING — must not appear publicly)
   ('bbbbbbbb-0000-0000-0000-000000000101', 'aaaaaaaa-0000-0000-0000-000000000003',
    '베이커리 판매 직원 (검수 대기)', 'retail', 'part_time',
@@ -197,3 +225,7 @@ values
    '{"데이터 입력","서류 정리"}', '{"엑셀 기본"}', '{"주말 휴무"}',
    'draft', null, '2026-06-20')
 on conflict (id) do nothing;
+
+-- Disposable local fixtures only. Hosted legacy publication requires operator review.
+update public.jobs set expires_at = now() + interval '30 days'
+where moderation_status = 'approved';

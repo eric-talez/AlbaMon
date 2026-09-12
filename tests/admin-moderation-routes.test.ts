@@ -1,9 +1,10 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 
-vi.mock("@/lib/auth/guards", () => ({ requireRole: vi.fn() }));
+vi.mock("@/lib/auth/guards", async (original) => ({ ...await original<object>(), requireRole: vi.fn() }));
 vi.mock("@/lib/db/admin-moderation", () => ({
   getAdminQueueCounts: vi.fn(),
   getAdminJobs: vi.fn(),
@@ -14,7 +15,7 @@ vi.mock("@/lib/db/admin-moderation", () => ({
 vi.mock("@/lib/db/reports", () => ({
   getAdminReports: vi.fn(),
 }));
-vi.mock("@/lib/db/admin-analytics", () => ({
+vi.mock("@/lib/db/admin-analytics", () => ({ getSuspendedAccountCount: vi.fn(async () => ({ status: "ok", count: 0 })),
   getAdminAnalytics: vi.fn(),
 }));
 
@@ -45,6 +46,7 @@ beforeEach(() => {
     email: "admin@example.com",
     role: "admin",
     isDev: false,
+    aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
   });
   mockCounts.mockResolvedValue({
     pendingJobs: { status: "ok", count: 2 },
@@ -72,7 +74,7 @@ describe("admin moderation routes", () => {
     expect(home).toContain(">1<");
     expect(home).toContain(">3<");
 
-    await AdminJobsPage();
+    await AdminJobsPage({});
     expect(mockRequireRole).toHaveBeenCalledWith("admin", "/admin/jobs");
     await AdminCompaniesPage();
     expect(mockRequireRole).toHaveBeenCalledWith("admin", "/admin/companies");
@@ -80,6 +82,19 @@ describe("admin moderation routes", () => {
     expect(mockRequireRole).toHaveBeenCalledWith("admin", "/admin/reports");
     await AdminAnalyticsPage();
     expect(mockRequireRole).toHaveBeenCalledWith("admin", "/admin/analytics");
+  });
+
+  it("distinguishes empty samples from zero and displays numerator/denominator with the exact CA window", async () => {
+    const empty = renderToStaticMarkup(await AdminAnalyticsPage());
+    expect(empty).toContain("관찰 가능한 공고 없음");
+    expect(empty).toContain("No answered samples");
+    mockAnalytics.mockResolvedValue({status:"ok",analytics:{...analyticsFixture(),cohortCount:4,appliedWithin7Days:2,medianFirstEmployerReplyHours:4,unansweredApplicationCount:1}});
+    const populated=renderToStaticMarkup(await AdminAnalyticsPage());
+    expect(populated).toContain("50.0%");
+    expect(populated).toContain("2 / 4개 공고");
+    expect(populated).toContain("4.0시간 / hours");
+    expect(populated).toContain("28일 전부터 7일 전까지");
+    expect(populated).toContain("채용 완료를 뜻하지 않습니다");
   });
 
   it("blocks non-admin callers before loading analytics", async () => {
@@ -90,7 +105,7 @@ describe("admin moderation routes", () => {
     expect(mockAnalytics).not.toHaveBeenCalled();
   });
 
-  it("shows full job content and moderation controls only for pending jobs", async () => {
+  it("shows full job content and approval controls for pending and pause controls for approved jobs", async () => {
     mockJobs.mockResolvedValue({
       status: "ok",
       jobs: [
@@ -98,12 +113,13 @@ describe("admin moderation routes", () => {
         adminJob("22222222-2222-4222-8222-222222222222", "approved", "Approved job"),
       ],
     });
-    const html = renderToStaticMarkup(await AdminJobsPage());
+    const html = renderToStaticMarkup(await AdminJobsPage({}));
     expect(html).toContain("Pending job");
     expect(html).toContain("Approved job");
     expect(html).toContain("Full description");
     expect(html).toContain("Prepare orders");
-    expect(html.match(/name="decision"/g)).toHaveLength(2);
+    expect(html.match(/name="decision"/g)).toHaveLength(3);
+    expect(html).toContain('value="pause"');
   });
 
   it("shows compliance review flags for pending job moderation", async () => {
@@ -118,7 +134,7 @@ describe("admin moderation routes", () => {
         }],
       }],
     });
-    const html = renderToStaticMarkup(await AdminJobsPage());
+    const html = renderToStaticMarkup(await AdminJobsPage({}));
     expect(html).toContain("Compliance review flag");
     expect(html).toContain("cash only");
     expect(html).toContain("not a legal determination");
@@ -160,7 +176,7 @@ describe("admin moderation routes", () => {
         jobId: "job-1",
         jobTitle: "Server",
         companyName: "K-Work Cafe",
-        jobModerationStatus: "approved",
+        jobModerationStatus: "approved", jobUpdatedAt: "2026-09-09T00:00:00Z", companyIsVerified: false,
         reporterDisplayName: "Reporter",
         reporterEmail: "reporter@example.com",
         submittedAt: "2026-06-21T00:00:00Z",
@@ -185,7 +201,7 @@ describe("admin moderation routes", () => {
   });
 
   it("distinguishes empty, unavailable, and database-error states", async () => {
-    const emptyJobs = renderToStaticMarkup(await AdminJobsPage());
+    const emptyJobs = renderToStaticMarkup(await AdminJobsPage({}));
     expect(emptyJobs).toContain("등록된 공고가 없습니다.");
 
     mockCompanies.mockResolvedValue({ status: "unavailable" });
@@ -219,9 +235,8 @@ describe("admin moderation static security boundaries", () => {
     expect(dbSource).toContain('.select("id, display_name, email")');
     expect(dbSource).not.toMatch(/\.select\("id, display_name, email, phone/i);
     expect(dbSource).not.toMatch(/service.?role/i);
-    // Writes go through the transactional admin-only SQL functions (Slice 27),
-    // never direct table updates from the app.
-    expect(dbSource).toContain('.rpc("moderate_pending_job"');
+    expect(dbSource).toContain('.rpc("transition_job",');
+    expect(dbSource).toContain('.eq("moderation_status", "pending")');
     expect(dbSource).toContain('.rpc("set_company_verification"');
     expect(dbSource).not.toMatch(/from\("jobs"\)\s*\.update/);
     expect(dbSource).not.toMatch(/from\("companies"\)\s*\.update/);
@@ -274,11 +289,13 @@ function adminJob(id: string, status: "pending" | "approved", title: string) {
     moderationStatus: status,
     complianceFlags: [],
     createdAt: "2026-06-21T00:00:00Z",
+    updatedAt: "2026-06-21T00:00:00.000001Z",
   };
 }
 
 function analyticsFixture() {
   return {
+    cohortCount: 0, appliedWithin7Days: 0, medianFirstEmployerReplyHours: null, unansweredApplicationCount: 0, referenceDate: "2026-09-10T00:00:00Z",
     jobs: {
       total: 10,
       byStatus: {

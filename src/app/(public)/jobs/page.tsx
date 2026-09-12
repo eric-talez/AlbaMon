@@ -3,6 +3,7 @@ import Link from "next/link";
 import { JobCard } from "@/components/JobCard";
 import { JobFilters } from "@/components/JobFilters";
 import {
+  getPublicJobCities,
   parseJobSearchParams,
   searchApprovedJobs,
 } from "@/lib/db/jobs";
@@ -15,6 +16,17 @@ export const metadata: Metadata = {
   alternates: { canonical: "/jobs" },
 };
 
+function pageHref(params: ReturnType<typeof parseJobSearchParams>, page: number): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries({ ...params, page })) {
+    if (value !== undefined && !(key === "page" && value === 1)) {
+      query.set(key, String(value));
+    }
+  }
+  const search = query.toString();
+  return search ? `/jobs?${search}` : "/jobs";
+}
+
 export default async function JobsPage({
   searchParams,
 }: {
@@ -22,9 +34,14 @@ export default async function JobsPage({
 }) {
   const params = parseJobSearchParams(await searchParams);
   const hasFilters = Object.entries(params).some(
-    ([key, value]) => key !== "sort" || value !== "newest",
+    ([key, value]) =>
+      key !== "page" && (key !== "sort" || value !== "newest") && value !== undefined,
   );
-  const jobs = await searchApprovedJobs(params);
+  const [result, cities] = await Promise.all([
+    searchApprovedJobs(params),
+    getPublicJobCities(),
+  ]);
+  const { jobs, page, hasNext } = result;
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-6">
@@ -36,7 +53,7 @@ export default async function JobsPage({
         </p>
       </header>
 
-      <JobFilters values={params} />
+      <JobFilters cities={cities} values={params} />
 
       <section className="mt-5">
         {jobs.length === 0 ? (
@@ -61,6 +78,22 @@ export default async function JobsPage({
           </ul>
         )}
       </section>
+
+      {(page > 1 || hasNext) && (
+        <nav className="mt-6 flex items-center justify-center gap-4" aria-label="검색 결과 페이지">
+          {page > 1 && (
+            <Link href={pageHref(params, page - 1)} className="text-sm font-medium text-brand hover:underline">
+              ← 이전 페이지
+            </Link>
+          )}
+          <span className="text-sm text-muted">{page} 페이지</span>
+          {hasNext && (
+            <Link href={pageHref(params, page + 1)} className="text-sm font-medium text-brand hover:underline">
+              다음 페이지 →
+            </Link>
+          )}
+        </nav>
+      )}
     </main>
   );
 }

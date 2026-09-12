@@ -4,20 +4,16 @@ import {
   appendFileSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   writeFileSync,
   rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-/**
- * Exercises scripts/verify-beta-readiness.mjs: green on this repo and on a
- * minimal fixture, red when a Slice 28 invariant regresses — a missing
- * `RATE_LIMIT_HMAC_SECRET` in the env reference, an undocumented migration, a
- * resurrected "service-role client has no consumer" claim, a stale *current*
- * migration count, or a dropped runbook section. A Slice/PR-labeled *historical*
- * count stays green. The gate is offline by contract, so these tests need no
- * Docker, Supabase CLI, network, or env values.
+/** Offline launch documentation gate: complete fixtures pass; missing settings,
+ * migration drift, obsolete privilege claims and secret-shaped values fail.
+ * Historical counts remain valid evidence of the source they actually tested.
  */
 
 const SCRIPT = join(process.cwd(), "scripts/verify-beta-readiness.mjs");
@@ -29,27 +25,12 @@ function runScript(root: string) {
   return { status: result.status, output: result.stdout + result.stderr };
 }
 
-const DISCLAIMERS =
-  "This runbook is not a substitute for attorney review, and is not legal, " +
-  "tax, immigration, or employment advice.";
-
 const fixtureRoots: string[] = [];
 afterAll(() => {
   for (const root of fixtureRoots) {
     rmSync(root, { recursive: true, force: true });
   }
 });
-
-/** Build a `docs/BETA_READINESS.md` body with sections `## 1.`..`## count.`. */
-function runbook(count: number): string {
-  const sections = Array.from(
-    { length: count },
-    (_, i) => `## ${i + 1}. Section ${i + 1}`,
-  ).join("\n\n");
-  return ["# Beta readiness (fixture)", "", sections, "", DISCLAIMERS, ""].join(
-    "\n",
-  );
-}
 
 /** Minimal `docs/LAUNCH_CHECKLIST.md` covering every required topic, claiming
  * `count` migrations. */
@@ -83,15 +64,16 @@ function writeFixture(): string {
   const root = mkdtempSync(join(tmpdir(), "kwork-beta-"));
   fixtureRoots.push(root);
   mkdirSync(join(root, "supabase", "migrations"), { recursive: true });
-  mkdirSync(join(root, "docs"), { recursive: true });
+  mkdirSync(join(root, "docs", "launch-evidence"), { recursive: true });
+  mkdirSync(join(root, "docs", "legal"), { recursive: true });
   mkdirSync(join(root, ".github", "workflows"), { recursive: true });
 
   writeFileSync(
-    join(root, "supabase", "migrations", "0001_init.sql"),
+    join(root, "supabase", "migrations", "20260621000000_init.sql"),
     "select 1;\n",
   );
   writeFileSync(
-    join(root, "supabase", "migrations", "0002_rate_limiting.sql"),
+    join(root, "supabase", "migrations", "20260714010000_rate_limiting.sql"),
     "select 1;\n",
   );
 
@@ -106,16 +88,19 @@ function writeFixture(): string {
       "",
       "| # | File |",
       "|---|---|",
-      "| 1 | `0001_init.sql` |",
-      "| 2 | `0002_rate_limiting.sql` |",
+      "| 1 | `20260621000000_init.sql` |",
+      "| 2 | `20260714010000_rate_limiting.sql` |",
       "",
-      "The service-role key's only consumer is the rate limiter (`consume_rate_limit`).",
+      "The service-role key supports trusted notification_outbox workers and optional local OTP consume_rate_limit calls.",
       "",
     ].join("\n"),
   );
 
   writeFileSync(join(root, "docs", "LAUNCH_CHECKLIST.md"), launchChecklist(2));
-  writeFileSync(join(root, "docs", "BETA_READINESS.md"), runbook(17));
+  writeFileSync(join(root, "docs", "BETA_READINESS.md"), "Historical guide: use DEPLOYMENT.md and LAUNCH_CHECKLIST.md.\n");
+  writeFileSync(join(root, "docs", "launch-evidence", "environments.md"), "Actual hosted evidence remains unverified.\n");
+  writeFileSync(join(root, "docs", "legal", "launch-policy-review.md"), "Reviewed operator facts are required for release.\n");
+  writeFileSync(join(root, "vercel.json"), JSON.stringify({ buildCommand: "npm run build:release" }));
 
   writeFileSync(
     join(root, "docs", "PRODUCTION_ENV_VARS.md"),
@@ -127,8 +112,8 @@ function writeFixture(): string {
       "- `NEXT_PUBLIC_SITE_URL`",
       "- `NEXT_PUBLIC_SUPABASE_URL`",
       "- `NEXT_PUBLIC_SUPABASE_ANON_KEY`",
-      "- `SUPABASE_SERVICE_ROLE_KEY` (**server-only**) — only consumer is the rate limiter (`consume_rate_limit`)",
-      "- `RATE_LIMIT_HMAC_SECRET` (**server-only**)",
+      "- `SUPABASE_SERVICE_ROLE_KEY` (**server-only**) — trusted notification_outbox workers and optional local OTP consume_rate_limit",
+      "- `RATE_LIMIT_HMAC_SECRET` (**server-only**, optional while phone auth is disabled)",
       "",
     ].join("\n"),
   );
@@ -200,12 +185,12 @@ describe("verify-beta-readiness script", () => {
   it("fails when a migration is not documented in DEPLOYMENT.md", () => {
     const root = writeFixture();
     writeFileSync(
-      join(root, "supabase", "migrations", "0003_extra.sql"),
+      join(root, "supabase", "migrations", "20260911000000_extra.sql"),
       "select 1;\n",
     );
     const { status, output } = runScript(root);
     expect(status).toBe(1);
-    expect(output).toContain("0003_extra.sql");
+    expect(output).toContain("20260911000000_extra.sql");
   });
 
   it("fails when a doc claims no app code path uses the service-role client", () => {
@@ -228,12 +213,49 @@ describe("verify-beta-readiness script", () => {
     expect(output).toContain("migrations does not match");
   });
 
-  it("fails when the runbook is missing section 17", () => {
+  it("fails when the launch checklist loses its rollback procedure", () => {
     const root = writeFixture();
-    writeFileSync(join(root, "docs", "BETA_READINESS.md"), runbook(16));
+    writeFileSync(join(root, "docs", "LAUNCH_CHECKLIST.md"), launchChecklist(2).replace(/## 6\. Rollback[\s\S]*/, ""));
     const { status, output } = runScript(root);
     expect(status).toBe(1);
-    expect(output).toContain("## 17.");
+    expect(output).toContain("launch checklist no longer covers: rollback");
+  });
+
+  it("fails when the native production build no longer uses the release gate", () => {
+    const root = writeFixture();
+    writeFileSync(join(root, "vercel.json"), JSON.stringify({ buildCommand: "npm run build" }));
+    const { status, output } = runScript(root);
+    expect(status).toBe(1);
+    expect(output).toContain("Vercel native release build command missing");
+  });
+
+  it("fails when migration history contains a duplicate version", () => {
+    const root = writeFixture();
+    writeFileSync(join(root, "supabase", "migrations", "20260621000000_duplicate.sql"), "select 1;\n");
+    const { status, output } = runScript(root);
+    expect(status).toBe(1);
+    expect(output).toContain("duplicate migration history version");
+  });
+
+  it("fails when a scanned document contains a secret-shaped token without printing it", () => {
+    const root = writeFixture();
+    const token = ["eyJ" + "a".repeat(20), "b".repeat(20), "c".repeat(12)].join(".");
+    appendFileSync(join(root, "docs", "PRODUCTION_ENV_VARS.md"), `\n${token}\n`);
+    const { status, output } = runScript(root);
+    expect(status).toBe(1);
+    expect(output).toContain("jwt-shaped token");
+    expect(output).not.toContain(token);
+  });
+
+  it("fails when the active notification service-role consumer is undocumented", () => {
+    const root = writeFixture();
+    for (const file of ["DEPLOYMENT.md", "PRODUCTION_ENV_VARS.md"]) {
+      const path = join(root, "docs", file);
+      writeFileSync(path, readFileSync(path, "utf8").replaceAll("notification_outbox", "background tasks"));
+    }
+    const { status, output } = runScript(root);
+    expect(status).toBe(1);
+    expect(output).toContain("notification_outbox");
   });
 
   it("preserves a clearly historical, Slice-labeled migration count", () => {

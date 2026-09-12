@@ -1,3 +1,5 @@
+import { normalizePage as adminPage, ADMIN_PAGE_SIZE } from "@/lib/pagination";
+import { writeFailure } from "@/lib/db/write-errors";
 import "server-only";
 
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -43,7 +45,7 @@ export interface AdminEmployerAccessRequest {
 
 export type CreateEmployerAccessRequestResult =
   | { status: "ok"; requestId: string }
-  | { status: "duplicate_pending" | "not_allowed" | "unavailable" | "error" };
+  | { status: "duplicate_pending" | "not_allowed" | "rate_limited" | "suspended" | "unavailable" | "error" };
 
 export type LatestEmployerAccessRequestResult =
   | { status: "ok"; request: EmployerAccessRequestSummary | null }
@@ -100,6 +102,8 @@ export async function createEmployerAccessRequest(
 
     if (!error) return { status: "ok", requestId: data.id as string };
     if (error.code === "23505") return { status: "duplicate_pending" };
+    const failure = writeFailure(error);
+    if (failure) return { status: failure };
     if (NOT_ALLOWED_CODES.has(error.code)) return { status: "not_allowed" };
     throw error;
   } catch (error) {
@@ -145,16 +149,16 @@ export async function getLatestEmployerAccessRequest(
   }
 }
 
-/** Full admin queue, pending requests first, newest first within each group. */
-export async function getAdminEmployerAccessRequests(): Promise<AdminEmployerAccessRequestsResult> {
+/** Bounded admin queue; oldest pending requests are the default. */
+export async function getAdminEmployerAccessRequests(page = 1, status: EmployerAccessRequestStatus | "all" = "pending"): Promise<AdminEmployerAccessRequestsResult> {
   if (!isSupabaseConfigured()) return { status: "unavailable" };
 
   try {
     const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("employer_access_requests")
-      .select(REQUEST_SELECT)
-      .order("created_at", { ascending: false });
+    let query = supabase.from("employer_access_requests").select(REQUEST_SELECT);
+    if (status !== "all") query = query.eq("status", status);
+    const start = (adminPage(page) - 1) * ADMIN_PAGE_SIZE;
+    const { data, error } = await query.order("created_at", { ascending: true }).order("id", { ascending: true }).range(start, start + ADMIN_PAGE_SIZE - 1);
     if (error) throw error;
 
     const rows = (data ?? []) as unknown as EmployerAccessRequestRow[];
@@ -189,11 +193,6 @@ export async function getAdminEmployerAccessRequests(): Promise<AdminEmployerAcc
           createdAt: row.created_at,
           reviewedAt: row.reviewed_at,
         };
-      })
-      .sort((a, b) => {
-        const pendingDifference =
-          Number(b.status === "pending") - Number(a.status === "pending");
-        return pendingDifference || b.createdAt.localeCompare(a.createdAt);
       });
     return { status: "ok", requests };
   } catch (error) {

@@ -1,307 +1,65 @@
-# Launch Checklist — K-Work US private beta
+# California public launch checklist
 
-Working go/no-go checklist for the first small private beta (LA/OC). Step-by-step
-setup instructions live in [`DEPLOYMENT.md`](DEPLOYMENT.md); this file is the
-list of things that must be **true** before inviting users. No real secrets
-belong in this file — every value is a placeholder.
+Use the [approved design](superpowers/specs/2026-09-09-california-launch-design.md),
+[deployment runbook](DEPLOYMENT.md), [local Supabase guide](LOCAL_SUPABASE.md) and
+[environment evidence](launch-evidence/environments.md). Historical private-beta
+exceptions do not authorize public launch. Every checked gate needs UTC, exact
+commit, actual target/ref/origins, action/result and non-secret evidence reference.
 
-Companion docs: [`BETA_READINESS.md`](BETA_READINESS.md) is the step-by-step
-runbook for verifying each gate below,
-[`PRODUCTION_ENV_VARS.md`](PRODUCTION_ENV_VARS.md) is the per-variable
-environment reference, and [`OPERATIONAL_HEALTH.md`](OPERATIONAL_HEALTH.md) is
-the post-deploy health-check and incident runbook. `npm run verify:beta`
-checks this documentation set automatically.
+Current result: **public NO-GO**. The [Korean owner handover and production record](launch-evidence/production-release.md)
+separate completed local software evidence from these unexecuted real release gates.
+Use [first 30 days](operations/first-30-days.md) only after an actual public T0.
 
-Legend: `[ ]` open · `[x]` done · items marked **(placeholder)** are known-open
-work that beta launch explicitly accepts or defers.
+## 1. Environment variables and ownership
 
-## 1. Environment variables
+- [ ] Actual operator/support/domain, Vercel and two Supabase projects selected; existing resources inspected before creating/billing anything.
+- [ ] `NEXT_PUBLIC_SUPABASE_URL`/keys correctly scoped; staging and production refs/origins differ; `verify:deploy-target` passes for the actual target.
+- [ ] Native `npm run build:release` effective in Vercel; Preview staging indexing=false, Production indexing=true; `EMAIL_ENVIRONMENT` matches target.
+- [ ] Preview protection denies anonymous access, approved smoke access succeeds without disabling protection; staging HTML noindex and robots disallow `/` verified.
+- [ ] Google OAuth origin/Supabase callback/app `/auth/callback` independently verified in each environment; other flags false until verified.
 
-All values set in Vercel (Production scope), none committed to the repo. The
-placeholder-detection in the app treats `.env.example` values as *unconfigured*,
-and production **fails closed** if Supabase credentials are missing.
-Per-variable reference (exposure, validation, placeholders):
-[`PRODUCTION_ENV_VARS.md`](PRODUCTION_ENV_VARS.md).
+## 2. Migrations and existing data
 
-- [ ] `NEXT_PUBLIC_SITE_URL` = `https://<your-domain>` (canonical/OG/sitemap base)
-- [ ] `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` set (real project, not placeholders)
-- [ ] `SUPABASE_SERVICE_ROLE_KEY` set as **server-only** (never `NEXT_PUBLIC_*`)
-- [ ] `RATE_LIMIT_HMAC_SECRET` set as **server-only** on **Production + Preview**
-      (64 hex chars via `openssl rand -hex 32`); missing/invalid ⇒ rate-limited
-      actions (phone OTP, high-risk writes) fail closed
-- [ ] `EMAIL_PROVIDER=dev` confirmed (real email delivery is out of beta scope)
-- [ ] PostHog vars left empty (analytics provider not initialized in this build)
-- [ ] `NEXT_PUBLIC_AUTH_*` flags decided per provider — keep the default
-      `false` for any method whose Supabase dashboard setup is not verified
-      (see [`AUTH_PROVIDERS.md`](AUTH_PROVIDERS.md) and §12)
-- [ ] `npm test` passes — includes `tests/security.test.ts`, which scans tracked
-      files for secret-shaped strings and forbidden brand names
+- [ ] Actual remote history compared with **all current** `supabase/migrations/*.sql`; expected `supabase db push --dry-run` reviewed before plain `supabase db push`.
+- [ ] No hosted reset, seed, production-to-staging copy, forced history repair or destructive migration.
+- [ ] CA/pay/city and missing-expiry/ambiguous-publication inventories reviewed with real owner/source evidence; no invented publication dates.
 
-## 2. Supabase setup & migrations
+## 3. Seed/demo-data verification
 
-- [ ] Local Supabase rehearsal completed ([`LOCAL_SUPABASE.md`](LOCAL_SUPABASE.md)):
-      migrations + seed + auth mode + admin promotion verified against a
-      disposable local stack **before** touching the hosted project
-- [ ] Hosted project created; region appropriate for LA/OC
-- [ ] All 14 migrations applied **in filename order** via `supabase db push`
-      (order table in [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project)),
-      after `supabase login` + `supabase link --project-ref <project-ref>`
-- [ ] **Never `supabase db reset` against the hosted project** — it wipes the
-      database; `db push` is the only hosted schema command (`reset` is for
-      the disposable local stack). And never apply `supabase/seed.sql` to
-      production (§3)
-- [ ] Post-migration smoke completed per
-      [`DEPLOYMENT.md §2`](DEPLOYMENT.md#2-supabase-hosted-project): `/api/health`
-      shows Supabase `configured` → first sign-up gets `profiles.role =
-      'seeker'` → founding admin promoted via SQL (§4) → `/admin` shows live
-      queue counts → auth flags flipped only after per-provider smoke (§12)
-- [ ] Auth URL configuration: Site URL + `/auth/callback` redirect
-- [ ] Email confirmations setting reviewed (Supabase Auth → Providers → Email)
-- [ ] Database backups enabled (daily is fine for beta); note the restore path
-
-## 3. Seed / demo data
-
-`supabase/seed.sql` is **demo data only**: fictional employers with a shared
-password and fixed UUIDs. It must never be applied to production.
-
-- [ ] Verify production contains no seed rows (all three counts must be 0):
-
-  ```sql
-  select count(*) from auth.users        where email like 'employer%@example.com';
-  select count(*) from public.companies  where id::text like 'aaaaaaaa-%';
-  select count(*) from public.jobs       where id::text like 'bbbbbbbb-%';
-  ```
-
-- [ ] If seed data was applied by mistake **before real users exist**, reset the
-      database and re-run migrations. After real data exists, delete narrowly in
-      dependency order (jobs → companies → the three `employer%@example.com`
-      auth users) and re-run the counts above.
+- [ ] No mock IDs, known seeded UUIDs/companies or `employer%@example.com` fixtures are public; actual controlled fixture cleanup checked.
+- [ ] Production unconfigured build/runtime never publishes mock jobs. Safe read-only smoke and production artifact checks pass.
 
 ## 4. Admin setup
 
-There is intentionally no self-serve admin path (role self-update is blocked by
-a DB trigger + RLS).
+- [ ] Real seeker login creates a profile; representative confirms exact UUID; trusted SQL `role = 'admin'` promotion recorded.
+- [ ] TOTP enrollment/recovery procedure, AAL1 denial, active+AAL2 review success and current-policy acknowledgements verified.
 
-- [ ] Founding admin signed up through the normal flow
-- [ ] Promoted via SQL editor: `update public.profiles set role = 'admin' where id = '<auth-user-uuid>';`
-- [ ] Verified: that account can open `/admin`, and a fresh non-admin account
-      gets `/forbidden`
-- [ ] Verified: `/admin` shows live queue counts (jobs, companies, employer
-      access requests, reports). Live counts need real Supabase — a dev-auth
-      admin previews the UI only and sees the "Admin setup required" panel
-- [ ] Documented who holds admin (beta: keep it to 1–2 people)
+## 5. RLS and full journeys
 
-**Employer access (Slice 21):** employers need no SQL. New users start as
-`seeker` and request employer access at `/employer/request-access`; the admin
-approves or rejects at `/admin/employer-requests`. Approval switches the
-profile role to `employer` (company creation still happens afterwards through
-the employer flow); rejection changes nothing; self-promotion stays blocked.
-Approval is an operational gate only — it is not business, legal, or
-work-authorization verification.
+- [ ] Final candidate unit/type/lint/offline, live RLS/RPC/CAS matrix and both production/DB and separate hermetic development browser suites pass with exact counts and retained evidence.
+- [ ] Actual production CSP/HSTS/browser hardening headers and Preview noindex coexist; hydration and redirects are verified.
+- [ ] Database write quotas remain enforced for authenticated callers; disabled production phone sign-in does not require the optional local OTP HMAC secret.
+- [ ] 390px/1440px and required physical devices, keyboard/assistive interaction, session/callback/expiry, owner/job/app/message/report/suspension journeys and real performance measured.
+- [ ] Cookie-free sitemap public predicate, real publication/expiry/location, request-origin versus canonical-origin and no production noindex verified.
+- [ ] Expired and null-expiry jobs are absent from public reads/detail and reject new applications; owner/admin history is retained without an automatic moderation-status change.
 
-- [ ] Verified: a seeker's request appears in `/admin/employer-requests`, and
-      approving it opens `/employer` for that account
+## 6. Policy publication and operations
 
-## 5. Payments (de-scoped in Slice 23)
+- [ ] Real facts/prose reviewed, effective/change-notice process approved, support tested, exact bundle digest and immutable policy archive retained.
+- [ ] Service-controlled current policy pointer activated with captured expected identity; anonymous bounded read matches the release artifact; prior acceptance/audit/history preserved.
+- [ ] Stale account/job identities require explicit reacknowledgement; no bulk acceptance or historical seed rewrite.
+- [ ] Hosted privacy workflow and retention/deletion/backup holds reviewed and rehearsed; no local fixture results counted as legal review.
 
-Payments and paid boosts were de-scoped from the MVP in Slice 23; the
-`jobs.boost` column, enum, and write-protection triggers remain in the schema,
-intentionally unused. Revisit post-beta. No Stripe account, keys, webhook, or
-test transaction is required to launch — this section is intentionally empty.
+## 7. Notifications and readiness
 
-## 6. Legal & compliance copy **(placeholder — attorney review pending)**
+- [ ] `/api/health` coarse configuration and `/api/ready` actual public DB read are healthy; readiness outage behavior verified.
+- [ ] Resend sender/DNS, authorized controlled inbox/spam, signed suppression webhook, retry/idempotency/lease recovery and queue/log privacy verified.
+- [ ] **Valid-auth GET worker and signed webhook tests explicitly authorized as mutating.** Read-only smoke invokes neither.
+- [ ] Actual Production Vercel cron/plan/frequency verified; Preview has no platform cron merely because a schedule exists.
 
-The in-app copy (work-authorization disclaimer, posting policy, terms, privacy)
-is **informational only and has not been reviewed by an attorney**. Policy pages
-currently render "Coming soon" placeholders stating that final text follows
-legal review.
+## 8. Rollback, restore and public promotion
 
-- [ ] Attorney review of Terms of Service **(placeholder — not done)**
-- [ ] Attorney review of Privacy Policy **(placeholder — not done)**
-- [ ] Attorney review of posting policy & compliance disclaimers **(placeholder — not done)**
-- [ ] Until then: beta invite communication states the service is a beta and
-      policies are being finalized
-- [ ] Verified the app itself makes no legal determinations or guarantees
-      (disclaimers on job detail, apply, posting, verification surfaces;
-      covered by `tests/jobs.test.ts` and `tests/smoke-public-pages.test.ts`)
-
-## 7. RLS / security review
-
-RLS is the authorization gate; the anon key is safe to expose **only** because
-of it. Since `20260707000000_explicit_table_grants.sql`, table-level privileges
-for the API roles are **explicit** (current Supabase applies no implicit
-grants); RLS remains the row gate on top
-([`DATABASE.md`](DATABASE.md#table-grants-supabase-api-roles)). Static tests
-assert the policy files; live-DB verification needs the Supabase CLI + Docker
-(see `supabase/README.md`).
-
-| Area | Migration | Static test |
-|---|---|---|
-| Base schema, RLS enabled on all tables | `20260621…_init_schema.sql` | `tests/db-schema.test.ts` |
-| Approved-only public view, role revocation | `20260622…_audit_hardening.sql` | `tests/db-schema.test.ts`, `tests/auth-role-source.test.ts` |
-| Seeker-only application inserts | `20260623…_application_submission.sql` | `tests/application-flow.test.ts`, `tests/db-applications.test.ts` |
-| Caller-bound dashboard RPCs | `20260624…_application_listing_functions.sql` | `tests/db-applications.test.ts` |
-| Verification/boost write guards (boost column retained but unused since Slice 23) | `20260625…_employer_write_hardening.sql` | `tests/db-companies.test.ts`, `tests/db-employer-jobs.test.ts` |
-| Participant-bound messages | `20260626…_application_messages.sql` | `tests/messaging-routes-security.test.ts`, `tests/db-messages.test.ts` |
-| Status workflow constraints | `20260627…_application_status_workflow.sql` | `tests/application-status-migration.test.ts` |
-| Report queue constraints | `20260628…_report_queue_hardening.sql` | `tests/report-workflow-migration.test.ts`, `tests/db-reports.test.ts` |
-| Seeker→employer request queue + review RPC | `20260706…_employer_access_requests.sql` | `tests/db-employer-access-requests.test.ts`, `tests/employer-access-migration.test.ts` |
-| Explicit API-role table grants (fail-closed sign-in fix) | `20260707…_explicit_table_grants.sql` | `tests/db-schema.test.ts` |
-| Public companies read dropped, anon SELECT revoked (view-only identity) | `20260713…_restrict_company_public_reads.sql` | `tests/db-schema.test.ts` |
-| Transactional admin audit logs + append-only guard | `20260714…_transactional_admin_audit_logs.sql` | `tests/admin-audit-migration.test.ts` |
-| Private rate-limit counter + `consume_rate_limit` RPC (service_role-only) | `20260714010000_server_rate_limiting.sql` | `tests/db-rate-limit.test.ts` |
-| Expired jobs hidden from public view/search/detail + application cutoff (approved AND unexpired) | `20260715000000_expired_job_visibility.sql` | `tests/db-schema.test.ts`, `tests/smoke-public-pages.test.ts` |
-
-- [ ] Role guards remain server-side (`src/lib/auth/guards.ts`; every
-      `/admin`, `/employer`, `/dashboard` page calls them — no client-only gating)
-- [ ] Service-role client used only by the Slice 28 rate limiter
-      (`src/lib/supabase/service.ts` → private `consume_rate_limit` RPC; never OTP
-      send/verify or business writes; the health check reports the key's presence)
-- [ ] Public job surfaces read approved, **unexpired** listings only
-      (`public_job_listings` view; `tests/smoke-public-pages.test.ts` asserts
-      non-approved **and expired** ids 404)
-- [ ] Sitemap/robots expose no private routes and no per-job URLs
-      (`tests/seo.test.ts`)
-- [ ] Spot-check in prod: signed-out user cannot fetch `/admin`, `/employer`,
-      `/dashboard` (redirects), and a pending or expired job's URL 404s
-- [ ] Production security headers present on every response (Slice 26):
-      `Content-Security-Policy`, `Strict-Transport-Security`,
-      `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
-      `Referrer-Policy`, `Permissions-Policy`
-      (`src/lib/security/headers.ts`, wired in `next.config.ts`; unit-tested by
-      `tests/security-headers.test.ts`). **Code-level only** — after deploy,
-      verify on the live domain with `curl -I https://<your-domain>/` (and
-      `/api/health`) that all six are set and the CSP `connect-src` lists your
-      Supabase origin. A strict nonce-based CSP (dropping `script-src
-      'unsafe-inline'`) remains future hardening.
-
-## 8. Monitoring & operations
-
-Current state: **no error-tracking or analytics provider is wired** (PostHog env
-vars exist but are not initialized). Beta operates on platform logs plus the
-public `GET /api/health` endpoint. Operating procedures (health-check
-reference, log triage, incident response) live in
-[`OPERATIONAL_HEALTH.md`](OPERATIONAL_HEALTH.md).
-
-- [ ] `GET /api/health` on production returns 200; required checks
-      `configured`, deferred ones `deferred` — no `missing`/`partial`
-      ([`OPERATIONAL_HEALTH.md §1`](OPERATIONAL_HEALTH.md#1-quick-health-check))
-- [ ] External uptime monitor pointed at `/api/health` (alert on non-200;
-      [`OPERATIONAL_HEALTH.md §3`](OPERATIONAL_HEALTH.md#3-uptime-monitoring))
-- [ ] Vercel function logs reviewed after first deploy (no recurring errors;
-      log-prefix guide in
-      [`OPERATIONAL_HEALTH.md §5`](OPERATIONAL_HEALTH.md#5-log-triage--where-to-look-when-a-flow-fails))
-- [ ] Supabase logs/dashboard reviewed (auth + Postgres errors)
-- [ ] `/admin` operational-health card shows the same checks and links
-      `/api/health` — treat `/api/health` as the first setup check whenever
-      admin queues look wrong
-- [ ] Decide post-beta: error tracking (e.g. Sentry) and product analytics —
-      **deferred, out of beta scope**
-      ([`OPERATIONAL_HEALTH.md §7`](OPERATIONAL_HEALTH.md#7-deferred-observability-post-beta))
-- [ ] On-call answer for the beta: who checks logs, and how users report
-      problems (email/Kakao channel), documented for the team
-
-## 9. Rollback notes
-
-- **App**: Vercel → Deployments → promote the previous production deployment
-  (instant, stateless app — safe at any time).
-- **Database**: migrations are forward-only; there are no down-migrations.
-  Take a backup/PITR snapshot **before** applying new migrations to prod.
-  Restoring a backup rolls back *data* too — prefer fixing forward for
-  code-level issues.
-
-## 10. QA & verification
-
-Automated (all must pass on the release commit):
-
-- [ ] `git diff --check` (no whitespace/conflict markers)
-- [ ] `npm run typecheck`
-- [ ] `npm run lint`
-- [ ] `npm test` (unit + server-render smoke tests; Playwright specs excluded)
-- [ ] `npm run build`
-- [ ] `npm run verify:beta` (readiness docs gate: required docs + CI workflow
-      present, checklist topics intact, placeholder-only secret hygiene)
-- [ ] `npm run test:e2e` (Chromium browser E2E — public shell, filters,
-      dev-auth guards, responsive nav, `/api/health`; hermetic, no credentials)
-
-> **Browser E2E covers the credential-free Chromium/dev-auth surface** (Slice 30:
-> `npm run test:e2e` — public shell + hydration, filters, dev-auth role guards,
-> responsive nav, `/api/health`, against mock data with placeholder Supabase).
-> It does **not** touch real Supabase, OAuth/SMS providers, or Safari. The manual
-> script below covers those real-service and cross-browser flows.
-
-Manual smoke script — run at **390px (mobile)** and **1440px (desktop)**, in
-Chrome + Safari, on the production URL:
-
-- [ ] `/` renders; disclaimer visible; keyboard Tab shows focus rings
-- [ ] `/jobs` browse + filter (keyword, city, pay); reset works without JS errors
-- [ ] Job detail: pay range, schedule, disclaimers, apply/report buttons
-- [ ] Apply signed-out → redirected to `/login?next=…`; after sign-in returns to apply
-- [ ] Seeker: submit application; duplicate re-submit shows the duplicate state
-- [ ] Employer: create company → post job (compliance acknowledgement required;
-      risky phrasing blocked) → job **not** publicly visible while pending
-- [ ] Admin: approve the job → appears on `/jobs`; reject path shows correctly
-- [ ] Report a job → visible in admin report queue → review/dismiss
-- [ ] Messaging: seeker ↔ employer thread on an application; status updates
-      (reviewing/interview/offered) reflect on the seeker dashboard
-- [ ] `/robots.txt` and `/sitemap.xml` respond; sitemap lists only public pages
-- [ ] Forms usable with keyboard only; labels announce correctly (VoiceOver spot-check)
-
-## 11. Go / no-go
-
-| Gate | Status |
-|---|---|
-| All §10 automated checks green on the release commit | ☐ |
-| Manual smoke script passed at 390px & 1440px | ☐ |
-| No seed/demo data in production (§3 counts are 0) | ☐ |
-| Founding admin verified (§4) | ☐ |
-| RLS spot-checks passed (§7) | ☐ |
-| Team accepts open placeholders: attorney review pending, no error tracking, dev-stub email, browser E2E limited to the Chromium/dev-auth surface (real-Supabase, provider, and Safari flows manual) | ☐ |
-| Social/phone auth providers verified per §12 — or their flags stay `false` | ☐ |
-
-**Go** = every row checked. Any unchecked row = **no-go**; fix or explicitly
-accept (with a name and date) before inviting users.
-
-## 12. Social & phone auth providers
-
-Config-time checklist for enabling real sign-in methods; not a beta blocker —
-every method ships behind a default-`false` flag and renders as
-"setup required" until this section is done for it. Full setup steps:
-[`AUTH_PROVIDERS.md`](AUTH_PROVIDERS.md).
-
-- [ ] Supabase Auth → URL Configuration: Site URL set, and the redirect
-      allowlist includes the **wildcard** `https://<your-domain>/auth/callback*`
-      (the OAuth `redirectTo` can carry `?next=…`)
-- [ ] Kakao: Kakao Developers app configured with the Supabase callback URL;
-      provider enabled in Supabase; live sign-in smoke-tested → then
-      `NEXT_PUBLIC_AUTH_KAKAO_ENABLED=true`
-- [ ] Google: GCP OAuth client configured; provider enabled in Supabase; live
-      sign-in smoke-tested → then `NEXT_PUBLIC_AUTH_GOOGLE_ENABLED=true`
-- [ ] Naver (go/no-go): Supabase **custom OIDC provider** registered and
-      verified end-to-end in staging — if Naver's OIDC support cannot satisfy
-      it, keep the flag `false` (button stays setup-required) → otherwise set
-      `NEXT_PUBLIC_AUTH_NAVER_PROVIDER_ID=<slug>` and
-      `NEXT_PUBLIC_AUTH_NAVER_ENABLED=true`
-- [ ] Phone OTP: Supabase Phone provider + SMS vendor connected **in the
-      Supabase dashboard only** (no SMS credentials in Vercel/repo/CI); send +
-      verify tested with a real number; rate limits reviewed → then
-      `NEXT_PUBLIC_AUTH_PHONE_ENABLED=true`
-- [ ] First social/phone sign-up spot-checked: `profiles` row auto-created
-      with role `seeker`; flags flipped only after the matching dashboard
-      setup was verified
-
-## Deferred (accepted for beta, revisit after)
-
-- Payments and paid boosts were de-scoped from the MVP in Slice 23; the
-  `jobs.boost` column, enum, and write-protection triggers remain in the
-  schema, intentionally unused. Revisit post-beta.
-- Attorney-reviewed legal copy (placeholder pages ship with review notice)
-- Real email/SMS delivery (dev stub only)
-- Error tracking & product analytics providers
-- Cross-browser (Safari) and real-Supabase/provider browser E2E — the Chromium
-  dev-auth surface is automated in Slice 30; these broader flows stay manual
-- Per-job URLs in the sitemap (build-time sitemap would go stale; jobs are
-  crawlable via `/jobs`)
-- Open Graph/social preview image (text metadata only)
-- `lang="en"` spans on inline English copy and a skip-to-content link
-  (accessibility polish beyond the beta bar)
+- [ ] D2 fault/restore drill records actual backup coverage, recoverable point, RPO ≤24h and measured RTO ≤4h; Auth/settings/RLS and audit dependencies preserved. Local 114.070s restore and 1,003ms artifact switch do not prove hosted objectives.
+- [ ] Compatible immutable code rollback uses same current reviewed policy identity; no silent older-policy activation or assumption that Instant Rollback changes active cron.
+- [ ] Staged Production URL smoke expects the future Production canonical; domain promotion only after all actual external gates pass.
+- [ ] Any missing fact, access, review or execution remains **UNVERIFIED / NO-GO**. Synthetic configuration PASS and local production-shaped builds are software evidence only.

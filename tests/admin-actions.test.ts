@@ -1,3 +1,4 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -29,6 +30,7 @@ beforeEach(() => {
     email: "admin@example.com",
     role: "admin",
     isDev: false,
+    aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
   });
   mockModerateJob.mockResolvedValue({ status: "updated" });
   mockVerification.mockResolvedValue({ status: "updated" });
@@ -36,10 +38,12 @@ beforeEach(() => {
 
 afterEach(() => vi.clearAllMocks());
 
-function jobForm(decision: "approve" | "reject", jobId = validJobId) {
+function jobForm(decision: "approve" | "reject" | "pause", jobId = validJobId) {
   const form = new FormData();
   form.set("jobId", jobId);
   form.set("decision", decision);
+  form.set("expectedUpdatedAt", "2026-09-09T00:00:00.123456Z");
+  if (decision !== "approve") form.set("reason", "Policy review");
   form.set("boost", "featured");
   form.set("company_id", "forged-company");
   return form;
@@ -57,17 +61,22 @@ describe("admin job moderation action", () => {
   it("reauthenticates exact admin and revalidates public routes on approval", async () => {
     const result = await moderateJob(idle, jobForm("approve"));
     expect(mockRequireRole).toHaveBeenCalledWith("admin", "/admin/jobs");
-    expect(mockModerateJob).toHaveBeenCalledWith(validJobId, "approve");
+    expect(mockModerateJob).toHaveBeenCalledWith(
+      validJobId,
+      "approve",
+      "2026-09-09T00:00:00.123456Z",
+      null,
+    );
     expect(result.status).toBe("success");
     for (const path of ["/admin", "/admin/jobs", "/jobs", `/jobs/${validJobId}`]) {
       expect(revalidatePath).toHaveBeenCalledWith(path);
     }
   });
 
-  it("does not revalidate public routes for rejection", async () => {
+  it("revalidates public routes for rejection", async () => {
     await moderateJob(idle, jobForm("reject"));
     expect(revalidatePath).toHaveBeenCalledWith("/admin/jobs");
-    expect(revalidatePath).not.toHaveBeenCalledWith("/jobs");
+    expect(revalidatePath).toHaveBeenCalledWith("/jobs");
   });
 
   it("treats stale decisions as conflicts and refreshes the queue", async () => {

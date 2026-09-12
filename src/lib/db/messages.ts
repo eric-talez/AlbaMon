@@ -1,5 +1,7 @@
+import { writeFailure } from "@/lib/db/write-errors";
 import "server-only";
 
+import { normalizePage } from "@/lib/pagination";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
@@ -21,6 +23,8 @@ export interface ApplicationThread {
   jobTitle: string;
   companyName: string;
   applicationStatus: string;
+  participantSide: "applicant" | "employer" | "admin";
+  hasOlder: boolean;
   messages: ApplicationMessage[];
 }
 
@@ -29,8 +33,8 @@ export type ApplicationThreadResult =
   | { status: "not_allowed" | "unavailable" | "error" };
 
 export type SendMessageResult =
-  | { status: "sent"; messageId: string }
-  | { status: "not_allowed" | "unavailable" | "error" };
+  | { status: "sent"; messageId: string; recipientId: string; recipientSide: "applicant" | "employer" }
+  | { status: "not_allowed" | "rate_limited" | "suspended" | "unavailable" | "error" };
 
 const MESSAGE_SELECT = "id, application_id, sender_id, body, created_at";
 const NOT_ALLOWED_CODES = new Set(["23503", "23514", "42501"]);
@@ -38,6 +42,7 @@ const NOT_ALLOWED_CODES = new Set(["23503", "23514", "42501"]);
 export async function getApplicationThread(
   applicationId: string,
   currentUserId: string,
+  page = 1,
 ): Promise<ApplicationThreadResult> {
   if (!isSupabaseConfigured()) return { status: "unavailable" };
   try {
@@ -56,8 +61,9 @@ export async function getApplicationThread(
       .from("messages")
       .select(MESSAGE_SELECT)
       .eq("application_id", applicationId)
-      .order("created_at", { ascending: true })
-      .order("id", { ascending: true });
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range((normalizePage(page) - 1) * 50, (normalizePage(page) - 1) * 50 + 50);
     if (error) throw error;
 
     return {
@@ -68,7 +74,9 @@ export async function getApplicationThread(
         jobTitle: context.job_title,
         companyName: context.company_name,
         applicationStatus: context.application_status,
-        messages: ((data ?? []) as unknown as MessageRow[]).map((message) => ({
+        participantSide: context.participant_side,
+        hasOlder: (data ?? []).length > 50,
+        messages: ((data ?? []) as unknown as MessageRow[]).slice(0, 50).reverse().map((message) => ({
           id: message.id,
           senderId: message.sender_id,
           body: message.body,
@@ -91,6 +99,10 @@ export async function sendApplicationMessage(
   if (!isSupabaseConfigured()) return { status: "unavailable" };
   try {
     const supabase = await createSupabaseServerClient();
+    const { data: contexts, error: contextError } = await supabase.rpc("get_application_thread_context", { target_application_id: applicationId });
+    if (contextError) throw contextError;
+    const context = contexts?.[0] as ApplicationThreadContextRow | undefined;
+    if (!context || !context.recipient_id || !["applicant", "employer"].includes(context.participant_side)) return { status: "not_allowed" };
     const { data, error } = await supabase
       .from("messages")
       .insert({
@@ -100,7 +112,11 @@ export async function sendApplicationMessage(
       })
       .select("id")
       .single();
-    if (!error) return { status: "sent", messageId: data.id as string };
+    if (!error) return { status: "sent", messageId: data.id as string,
+      recipientId: context.recipient_id,
+      recipientSide: context.participant_side === "applicant" ? "employer" : "applicant" };
+    const failure = writeFailure(error);
+    if (failure) return { status: failure };
     if (NOT_ALLOWED_CODES.has(error.code)) return { status: "not_allowed" };
     throw error;
   } catch {

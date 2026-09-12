@@ -1,17 +1,16 @@
+import { WRITE_RETRY_MESSAGE, SUSPENDED_WRITE_MESSAGE } from "@/lib/db/write-errors";
+
 import "server-only";
 
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth/guards";
+import { activeWriterError, requireUser } from "@/lib/auth/guards";
 import { createEmployerAccessRequest } from "@/lib/db/employer-access-requests";
 import { parseEmployerAccessRequestForm } from "@/lib/employer-access/validation";
-import { enforceUserPolicy } from "@/lib/rate-limit/service";
-import { RATE_LIMIT_POLICIES } from "@/lib/rate-limit/policies";
-import { rateLimitedResult } from "@/lib/rate-limit/types";
-import type { RateLimitedResult } from "@/lib/rate-limit/types";
 
-export type EmployerAccessRequestFormState =
-  | { status: "idle" | "success" | "duplicate_pending" | "error"; message: string }
-  | RateLimitedResult;
+export interface EmployerAccessRequestFormState {
+  status: "idle" | "success" | "duplicate_pending" | "error";
+  message: string;
+}
 
 /**
  * Submit an employer access request for the signed-in user. Only seekers may
@@ -22,6 +21,8 @@ export async function submitEmployerAccessRequestForUser(
   formData: FormData,
 ): Promise<EmployerAccessRequestFormState> {
   const user = await requireUser("/employer/request-access");
+  const writerError = activeWriterError(user);
+  if (writerError) return writerError;
   if (user.role !== "seeker") {
     return {
       status: "error",
@@ -32,14 +33,10 @@ export async function submitEmployerAccessRequestForUser(
   const parsed = parseEmployerAccessRequestForm(formData);
   if (!parsed.ok) return { status: "error", message: parsed.message };
 
-  const limit = await enforceUserPolicy(
-    RATE_LIMIT_POLICIES.employerAccessRequest,
-    user.id,
-  );
-  if (!limit.allowed) return rateLimitedResult(limit.retryAfterSeconds);
-
   const result = await createEmployerAccessRequest(user.id, parsed.value);
 
+  if (result.status === "rate_limited") return { status: "error", message: WRITE_RETRY_MESSAGE };
+  if (result.status === "suspended") return { status: "error", message: SUSPENDED_WRITE_MESSAGE };
   if (result.status === "ok") {
     revalidatePath("/admin");
     revalidatePath("/admin/employer-requests");

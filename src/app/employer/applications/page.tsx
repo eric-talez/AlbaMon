@@ -1,3 +1,4 @@
+import { normalizePage } from "@/lib/pagination";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/guards";
@@ -11,7 +12,7 @@ export const metadata: Metadata = { title: "지원자 목록" };
 function formatSubmittedAt(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "날짜 정보 없음";
-  return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium" }).format(date);
+  return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeZone: "America/Los_Angeles" }).format(date) + " PT";
 }
 
 function statusLabel(status: string): string {
@@ -21,9 +22,10 @@ function statusLabel(status: string): string {
   );
 }
 
-export default async function EmployerApplicationsPage() {
+export default async function EmployerApplicationsPage({ searchParams }: { searchParams?: Promise<{ page?: string | string[] }> } = {}) {
+  const page = normalizePage((await searchParams)?.page);
   await requireRole("employer", "/employer/applications");
-  const result = await getEmployerApplications();
+  const result = await getEmployerApplications(page);
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
@@ -94,6 +96,7 @@ export default async function EmployerApplicationsPage() {
               <ApplicationStatusControl
                 applicationId={application.id}
                 currentStatus={application.status}
+                expectedUpdatedAt={application.applicationUpdatedAt}
                 updateAction={updateEmployerApplicationStatus}
               />
 
@@ -119,6 +122,10 @@ export default async function EmployerApplicationsPage() {
           ))}
         </ul>
       )}
+      <nav className="mt-6 flex gap-4 text-sm text-brand" aria-label="지원 목록 페이지 / Application pages">
+        {page > 1 ? <Link href={`?page=${page - 1}`}>이전 / Previous</Link> : null}
+        {result.status === "ok" && result.hasNext ? <Link href={`?page=${page + 1}`}>다음 / Next</Link> : null}
+      </nav>
     </main>
   );
 }

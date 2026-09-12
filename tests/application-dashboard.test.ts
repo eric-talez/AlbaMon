@@ -1,17 +1,18 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 vi.mock("@/lib/auth/guards", () => ({
-  requireRole: vi.fn(),
+  requireRole: vi.fn(), requireUser: vi.fn(),
 }));
 vi.mock("@/lib/db/applications", () => ({
   getSeekerApplications: vi.fn(),
   getEmployerApplications: vi.fn(),
 }));
 
-import { requireRole } from "@/lib/auth/guards";
+import { requireRole, requireUser } from "@/lib/auth/guards";
 import {
   getEmployerApplications,
   getSeekerApplications,
@@ -24,22 +25,24 @@ const mockSeekerApplications = vi.mocked(getSeekerApplications);
 const mockEmployerApplications = vi.mocked(getEmployerApplications);
 
 beforeEach(() => {
+  vi.mocked(requireUser).mockResolvedValue({id:"user-1",role:"employer",email:"user@example.com",isDev:false,aal:"aal1",...acknowledgedPolicies, accountStatus:"active",displayName:null});
   mockRequireRole.mockResolvedValue({
     id: "user-1",
     email: "user@example.com",
     role: "seeker",
     isDev: false,
+    aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
   });
-  mockSeekerApplications.mockResolvedValue({ status: "ok", applications: [] });
-  mockEmployerApplications.mockResolvedValue({ status: "ok", applications: [] });
+  mockSeekerApplications.mockResolvedValue({ status: "ok", hasNext: false, applications: [] });
+  mockEmployerApplications.mockResolvedValue({ status: "ok", hasNext: false, applications: [] });
 });
 
 afterEach(() => vi.clearAllMocks());
 
 describe("application dashboard access and states", () => {
-  it("uses exact runtime-role guards for both routes", async () => {
+  it("allows promoted applicants history but keeps employer list role-bound", async () => {
     await SeekerApplicationsPage();
-    expect(mockRequireRole).toHaveBeenCalledWith("seeker", "/dashboard/applications");
+    expect(requireUser).toHaveBeenCalledWith("/dashboard/applications");
 
     await EmployerApplicationsPage();
     expect(mockRequireRole).toHaveBeenCalledWith("employer", "/employer/applications");
@@ -56,7 +59,7 @@ describe("application dashboard access and states", () => {
 
   it("renders seeker data, cover note, and only public job links", async () => {
     mockSeekerApplications.mockResolvedValue({
-      status: "ok",
+      status: "ok", hasNext: false,
       applications: [
         {
           id: "a-1",
@@ -68,6 +71,7 @@ describe("application dashboard access and states", () => {
           status: "submitted",
           coverNote: "반갑습니다",
           submittedAt: "2026-06-21T12:00:00.000Z",
+          applicationUpdatedAt: "2026-09-09T01:02:03.123456Z",
           jobIsPublic: true,
         },
         {
@@ -80,6 +84,7 @@ describe("application dashboard access and states", () => {
           status: "submitted",
           coverNote: null,
           submittedAt: "2026-06-20T12:00:00.000Z",
+          applicationUpdatedAt: "2026-09-09T01:02:03.123456Z",
           jobIsPublic: false,
         },
       ],
@@ -94,7 +99,7 @@ describe("application dashboard access and states", () => {
 
   it("renders only the limited employer identity with safe null fallbacks", async () => {
     mockEmployerApplications.mockResolvedValue({
-      status: "ok",
+      status: "ok", hasNext: false,
       applications: [
         {
           id: "a-3",
@@ -106,6 +111,7 @@ describe("application dashboard access and states", () => {
           status: "submitted",
           coverNote: null,
           submittedAt: "2026-06-21T12:00:00.000Z",
+          applicationUpdatedAt: "2026-09-09T01:02:03.123456Z",
           jobIsPublic: true,
         },
       ],
@@ -128,7 +134,7 @@ describe("application dashboard access and states", () => {
 
   it("gives the employer a status control with every supported status option", async () => {
     mockEmployerApplications.mockResolvedValue({
-      status: "ok",
+      status: "ok", hasNext: false,
       applications: [
         {
           id: "a-4",
@@ -140,6 +146,7 @@ describe("application dashboard access and states", () => {
           status: "submitted",
           coverNote: null,
           submittedAt: "2026-06-21T12:00:00.000Z",
+          applicationUpdatedAt: "2026-09-09T01:02:03.123456Z",
           jobIsPublic: true,
         },
       ],
@@ -148,13 +155,14 @@ describe("application dashboard access and states", () => {
     const html = renderToStaticMarkup(await EmployerApplicationsPage());
     expect(html).toContain("지원 상태 변경");
     expect(html).toContain('name="status"');
+    expect(html).not.toContain('value="withdrawn"');
+    expect(html).toContain('name="expectedUpdatedAt"');
     for (const value of [
       "submitted",
       "reviewing",
       "interview",
       "offered",
       "rejected",
-      "withdrawn",
     ]) {
       expect(html).toContain(`value="${value}"`);
     }
@@ -162,7 +170,7 @@ describe("application dashboard access and states", () => {
 
   it("shows the seeker a friendly label for an employer-updated status", async () => {
     mockSeekerApplications.mockResolvedValue({
-      status: "ok",
+      status: "ok", hasNext: false,
       applications: [
         {
           id: "a-5",
@@ -174,6 +182,7 @@ describe("application dashboard access and states", () => {
           status: "interview",
           coverNote: null,
           submittedAt: "2026-06-21T12:00:00.000Z",
+          applicationUpdatedAt: "2026-09-09T01:02:03.123456Z",
           jobIsPublic: true,
         },
       ],
@@ -181,6 +190,8 @@ describe("application dashboard access and states", () => {
 
     const html = renderToStaticMarkup(await SeekerApplicationsPage());
     expect(html).toContain("면접");
+    expect(html).toContain("지원 철회 / Withdraw");
+    expect(html).toContain("2026-09-09T01:02:03.123456Z");
   });
 
   it("links both dashboard entry points to their application routes", () => {
@@ -195,5 +206,17 @@ describe("application dashboard access and states", () => {
     expect(seekerDashboard).toContain('href="/dashboard/applications"');
     expect(employerDashboard).toContain('href: "/employer/applications"');
     expect(employerDashboard).toContain('user.role === "employer"');
+  });
+
+  it("uses California-wide job discovery copy in seeker dashboards", async () => {
+    const seekerDashboard = readFileSync(
+      join(process.cwd(), "src", "app", "dashboard", "page.tsx"),
+      "utf8",
+    );
+    const applicationsHtml = renderToStaticMarkup(await SeekerApplicationsPage());
+
+    expect(seekerDashboard).toContain("캘리포니아 지역의 승인된 공고");
+    expect(applicationsHtml).toContain("캘리포니아 채용 공고");
+    expect(`${seekerDashboard}\n${applicationsHtml}`).not.toMatch(/LA\s*\/\s*OC/i);
   });
 });

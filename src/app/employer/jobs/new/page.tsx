@@ -1,3 +1,4 @@
+import { policyAcceptanceIdentity } from "@/lib/policy-publication.mjs";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/guards";
@@ -32,7 +33,7 @@ export default async function NewJobPage() {
           <Link href="/employer/company" className="mt-4 inline-block text-sm font-medium text-brand hover:underline">회사 정보 등록</Link>
         </section>
       ) : (
-        <JobForm companies={result.companies} />
+        <JobForm policyIdentity={policyAcceptanceIdentity()} companies={result.companies} />
       )}
     </main>
   );

@@ -1,7 +1,3 @@
-# CI gate: every pull request and every push to main must pass all steps
-# below before merging/releasing. No secrets are required — typecheck, lint,
-# tests, and `next build` all run in the same "Supabase unconfigured"
-# mode as a fresh local checkout (mock/dev fallbacks, no live services).
 name: CI
 
 on:
@@ -16,9 +12,9 @@ concurrency:
 
 jobs:
   ci:
-    name: Whitespace, typecheck, lint, test, build
+    name: Unit, live RLS, production browser checks
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
@@ -28,7 +24,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
@@ -51,7 +47,7 @@ jobs:
         run: git diff --check "$(git hash-object -t tree /dev/null)" HEAD
 
       - name: Typecheck
-        run: npm run typecheck
+        run: npx next typegen && npm run typecheck
 
       - name: Lint
         run: npm run lint
@@ -59,13 +55,62 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Build
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.109.1
+
+      - name: Start isolated disposable Supabase
+        # Start/status can print local credentials. Keep output out of job logs.
+        run: supabase start > /dev/null
+
+      - name: Reset isolated local database
+        run: supabase db reset --local
+
+      - name: Align fresh local database with the current policy bundle
+        run: npm run setup:local-policy
+
+      - name: Offline launch documentation checks
+        run: |
+          npm run verify:beta
+          npm run verify:local-supabase
+
+      - name: Live database authorization matrix
+        run: npm run test:db
+
+      - name: Local transactional email provider double and signed webhook
+        run: npm run test:notifications:local
+
+      - name: Set local public test environment
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { appendFileSync } from 'node:fs';
+          const status = JSON.parse(execFileSync('supabase', ['status', '-o', 'json'], { encoding: 'utf8' }));
+          if (status.API_URL !== 'http://127.0.0.1:55321' || !status.ANON_KEY) {
+            throw new Error('Expected isolated disposable Supabase');
+          }
+          appendFileSync(process.env.GITHUB_ENV,
+            `NEXT_PUBLIC_SUPABASE_URL=${status.API_URL}\nNEXT_PUBLIC_SUPABASE_ANON_KEY=${status.ANON_KEY}\n`);
+          NODE
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build against local database
         run: npm run build
 
+      - name: Production browser and anonymous REST checks
+        # Playwright owns Next start and shuts it down after the tests.
+        run: npm run test:e2e
+
+      - name: Stop isolated disposable Supabase
+        if: always()
+        run: supabase stop --no-backup
   # Separate browser-E2E gate (Slice 30). Runs only after the unit/build job
   # succeeds, and — like it — needs no secrets: the Playwright webServer runs
   # `next dev` in dev-auth mode with placeholder Supabase env (mock jobs, no
-  # database, no network services). See playwright.config.ts.
+  # database, no network services). See playwright.dev.config.ts.
   e2e:
     name: Browser E2E (Playwright, Chromium)
     needs: ci
@@ -92,9 +137,9 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run browser E2E
-        run: npm run test:e2e
+        run: npm run test:e2e:dev
 
-      # Report + traces are retained on failure only (see playwright.config.ts).
+      # Report + traces are retained on failure only (see playwright.dev.config.ts).
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4

@@ -92,6 +92,7 @@ describe("admin analytics reads", () => {
     await expect(getAdminAnalytics(now)).resolves.toMatchObject({
       status: "ok",
       analytics: {
+        cohortCount: 4, appliedWithin7Days: 2, medianFirstEmployerReplyHours: 4, unansweredApplicationCount: 1,
         jobs: {
           total: 12,
           byStatus: {
@@ -175,7 +176,7 @@ describe("admin analytics static security boundaries", () => {
 function makeCountClient(
   counts: Record<string, number>,
   errorKey?: string,
-): { client: { from: ReturnType<typeof vi.fn> }; calls: CountCall[] } {
+): { client: { from: ReturnType<typeof vi.fn>; rpc: ReturnType<typeof vi.fn> }; calls: CountCall[] } {
   const calls: CountCall[] = [];
   const from = vi.fn((table: string) => ({
     select(selected: string, options: { count: string; head: boolean }) {
@@ -205,7 +206,7 @@ function makeCountClient(
     },
   }));
 
-  return { client: { from }, calls };
+  return { client: { from, rpc: vi.fn(async () => ({data:[{cohort_count:4,applied_within_7_days:2,median_first_employer_reply_hours:4,unanswered_application_count:1}],error:null})) }, calls };
 }
 
 function eq(column: string, value: string | boolean): FilterCall {

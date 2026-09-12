@@ -1,3 +1,4 @@
+import type { AuthUser } from "@/lib/auth/types";
 import Link from "next/link";
 
 const ITEMS = [
@@ -9,17 +10,14 @@ const ITEMS = [
 ];
 
 /** Compact bottom navigation for mobile (hidden on desktop). */
-export function MobileBottomNav() {
+export function MobileBottomNav({ user }: { user: AuthUser | null }) {
   return (
-    <nav
-      data-testid="mobile-bottom-nav"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 backdrop-blur sm:hidden"
-    >
+    <nav data-testid="mobile-bottom-nav" aria-label="모바일 메뉴" className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden">
       <ul className="mx-auto flex max-w-5xl items-stretch justify-around">
         {ITEMS.map((item) => (
           <li key={item.href} className="flex-1">
             <Link
-              href={item.href}
+              href={item.href === "/login" && user ? "/dashboard/profile" : item.href}
               className="flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium text-muted transition-colors hover:text-brand"
             >
               <span className="text-lg leading-none" aria-hidden>

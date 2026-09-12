@@ -31,9 +31,9 @@ describe("isJobPubliclyActive — expiry boundary (injected clock)", () => {
   const NOW = Date.parse("2026-07-15T00:00:00.000Z");
   const approved = { moderationStatus: "approved" } as const;
 
-  it("is public when expiry is absent (null or undefined)", () => {
-    expect(isJobPubliclyActive({ ...approved, expiresAt: null }, NOW)).toBe(true);
-    expect(isJobPubliclyActive({ ...approved }, NOW)).toBe(true);
+  it("fails closed when expiry is absent (null or undefined)", () => {
+    expect(isJobPubliclyActive({ ...approved, expiresAt: null }, NOW)).toBe(false);
+    expect(isJobPubliclyActive({ ...approved }, NOW)).toBe(false);
   });
 
   it("is public strictly when expiresAt > now", () => {
@@ -112,22 +112,22 @@ describe("getMockJobs", () => {
     const approvedButHidden = MOCK_JOBS.filter(
       (j) => j.moderationStatus === "approved" && !isJobPubliclyActive(j),
     );
-    expect(approvedButHidden.map((j) => j.id).sort()).toEqual(["kw-011", "kw-012"]);
+    expect(approvedButHidden.map((j) => j.id).sort()).toEqual(["kw-103", "kw-104"]);
 
     const publicIds = new Set(getMockJobs().map((j) => j.id));
-    expect(publicIds.has("kw-011")).toBe(false); // fixed past expiry
-    expect(publicIds.has("kw-012")).toBe(false); // malformed expiry (fail closed)
+    expect(publicIds.has("kw-103")).toBe(false); // fixed past expiry
+    expect(publicIds.has("kw-104")).toBe(false); // malformed expiry (fail closed)
   });
 
-  it("keeps approved jobs with null or future expiry public", () => {
+  it("keeps approved jobs with future expiry public", () => {
     const publicIds = new Set(getMockJobs().map((j) => j.id));
-    expect(publicIds.has("kw-001")).toBe(true); // no expiresAt (null)
+    expect(publicIds.has("kw-001")).toBe(true); // required future expiry
     expect(publicIds.has("kw-010")).toBe(true); // far-future expiresAt
   });
 
   it("getMockJobById returns undefined for expired / malformed-expiry jobs", () => {
-    expect(getMockJobById("kw-011")).toBeUndefined(); // expired
-    expect(getMockJobById("kw-012")).toBeUndefined(); // malformed expiry
+    expect(getMockJobById("kw-103")).toBeUndefined(); // expired
+    expect(getMockJobById("kw-104")).toBeUndefined(); // malformed expiry
     expect(getMockJobById("kw-010")?.id).toBe("kw-010"); // future expiry still resolves
   });
 });

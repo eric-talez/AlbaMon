@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import {
   submitApplication,
@@ -21,7 +22,7 @@ export function ApplicationForm({ jobId }: { jobId: string }) {
       >
         <p className="font-semibold">{state.message}</p>
         <p className="mt-2 text-xs">
-          지원 내역 관리는 다음 지원자 대시보드 슬라이스에서 제공됩니다.
+          <Link href="/dashboard/applications" className="inline-flex min-h-11 items-center font-medium underline">내 지원 현황</Link>에서 대화와 철회를 진행할 수 있습니다.
         </p>
       </div>
     );

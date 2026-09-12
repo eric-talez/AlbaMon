@@ -26,18 +26,5 @@ export function getSiteUrl(): string {
   }
 }
 
-/** Initial launch market. */
-export const LAUNCH_MARKET = "LA / Orange County";
-
-/** Cities we seed/launch with first (LA Koreatown + OC Korean hubs). */
-export const LAUNCH_CITIES = [
-  "Los Angeles (Koreatown)",
-  "Buena Park",
-  "Fullerton",
-  "Irvine",
-  "Garden Grove",
-  "Torrance",
-  "Gardena",
-  "West Covina",
-  "Rowland Heights",
-] as const;
+/** Initial public launch market. */
+export const LAUNCH_MARKET = "California";

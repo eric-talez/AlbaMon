@@ -1,11 +1,10 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth/guards";
-import { updateApplicationStatus } from "@/lib/db/applications";
+import { activeWriterError, requireRole, requireUser } from "@/lib/auth/guards";
+import { updateApplicationStatus, withdrawApplication } from "@/lib/db/applications";
 import { notifyApplicationStatusChanged } from "@/lib/notifications/dev";
 import {
-  APPLICATION_STATUSES,
   APPLICATION_STATUS_LABELS,
   type ApplicationStatus,
 } from "@/lib/types";
@@ -15,13 +14,16 @@ export interface ApplicationStatusFormState {
   message: string;
 }
 
+export { EMPLOYER_APPLICATION_STATUSES, canEmployerChangeStatus } from "./status";
+import { EMPLOYER_APPLICATION_STATUSES } from "./status";
+
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function isApplicationStatus(value: unknown): value is ApplicationStatus {
   return (
     typeof value === "string" &&
-    (APPLICATION_STATUSES as readonly string[]).includes(value)
+    (EMPLOYER_APPLICATION_STATUSES as readonly string[]).includes(value)
   );
 }
 
@@ -37,10 +39,13 @@ function isApplicationStatus(value: unknown): value is ApplicationStatus {
 export async function updateApplicationStatusForEmployer(
   formData: FormData,
 ): Promise<ApplicationStatusFormState> {
-  await requireRole("employer", "/employer/applications");
+  const user = await requireRole("employer", "/employer/applications");
+  const writerError = activeWriterError(user);
+  if (writerError) return writerError;
 
   const applicationId = formData.get("applicationId");
   const nextStatus = formData.get("status");
+  const expectedUpdatedAt = formData.get("expectedUpdatedAt");
 
   if (typeof applicationId !== "string" || !UUID_PATTERN.test(applicationId)) {
     return { status: "error", message: "올바른 상태 변경 요청이 아닙니다." };
@@ -49,7 +54,10 @@ export async function updateApplicationStatusForEmployer(
     return { status: "error", message: "지원하지 않는 상태입니다." };
   }
 
-  const result = await updateApplicationStatus(applicationId, nextStatus);
+  if (typeof expectedUpdatedAt !== "string" || !Number.isFinite(Date.parse(expectedUpdatedAt))) {
+    return { status: "error", message: "새로고침 후 다시 시도해 주세요. / Refresh and try again." };
+  }
+  const result = await updateApplicationStatus(applicationId, nextStatus, expectedUpdatedAt);
 
   if (result.status === "updated") {
     // Best-effort dev notification: a notify failure must never turn a
@@ -71,6 +79,9 @@ export async function updateApplicationStatusForEmployer(
     };
   }
 
+  if (result.status === "conflict") {
+    return { status: "error", message: "지원 상태가 변경되었습니다. 새로고침 후 다시 시도해 주세요. / Application changed; refresh and retry." };
+  }
   if (result.status === "unavailable") {
     return {
       status: "error",
@@ -87,4 +98,28 @@ export async function updateApplicationStatusForEmployer(
     status: "error",
     message: "상태를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   };
+}
+
+export async function withdrawApplicationForApplicant(formData: FormData): Promise<ApplicationStatusFormState> {
+  const user = await requireUser("/dashboard/applications");
+  const writerError = activeWriterError(user);
+  if (writerError) return writerError;
+  const applicationId = formData.get("applicationId");
+  const expectedUpdatedAt = formData.get("expectedUpdatedAt");
+  if (typeof applicationId !== "string" || !UUID_PATTERN.test(applicationId) ||
+      typeof expectedUpdatedAt !== "string" || !Number.isFinite(Date.parse(expectedUpdatedAt))) {
+    return { status: "error", message: "새로고침 후 다시 시도해 주세요. / Refresh and try again." };
+  }
+  const result = await withdrawApplication(applicationId, expectedUpdatedAt);
+  if (result.status === "withdrawn" || result.status === "already_withdrawn") {
+    revalidatePath("/dashboard/applications");
+    revalidatePath("/employer/applications");
+    revalidatePath(`/dashboard/applications/${applicationId}/messages`);
+    revalidatePath(`/employer/applications/${applicationId}/messages`);
+    return { status: "success", message: result.status === "withdrawn"
+      ? "지원을 철회했습니다. / Application withdrawn."
+      : "이미 철회된 지원서입니다. / Already withdrawn." };
+  }
+  if (result.status === "conflict") return { status: "error", message: "지원 상태가 변경되었습니다. 새로고침 후 다시 시도해 주세요. / Application changed; refresh and retry." };
+  return { status: "error", message: "지원을 철회할 수 없습니다. / Unable to withdraw this application." };
 }

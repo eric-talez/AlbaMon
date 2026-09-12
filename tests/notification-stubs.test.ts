@@ -16,8 +16,8 @@ describe("development notification stubs", () => {
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     expect(notifyApplicationSubmitted("application-1")).toBe("logged");
     expect(notifyApplicationStatusChanged("application-1", "submitted", "reviewing")).toBe("logged");
-    expect(notifyNewMessage("application-1", "message-1", "seeker")).toBe("logged");
-    expect(notifyNewMessage("application-1", "message-2", "employer")).toBe("logged");
+    expect(notifyNewMessage("application-1", "message-1", "owner-1", "employer")).toBe("logged");
+    expect(notifyNewMessage("application-1", "message-2", "applicant-1", "applicant")).toBe("logged");
     const output = info.mock.calls.map((call) => call.join(" ")).join("\n");
     expect(output).toContain("application_submitted");
     expect(output).toContain("application_status_changed");

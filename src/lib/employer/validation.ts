@@ -1,3 +1,5 @@
+import { policyAcceptanceIdentity } from "@/lib/policy-publication.mjs";
+import { POSTING_POLICY_VERSION } from "@/lib/policies";
 import {
   JOB_CATEGORIES,
   JOB_TYPES,
@@ -368,7 +370,7 @@ export function parseEmployerCompanyForm(formData: FormData): ValidationResult<E
 }
 
 export function parseEmployerJobForm(formData: FormData): ValidationResult<EmployerJobInput> {
-  if (formData.get("complianceAcknowledgement") !== "on") {
+  if (formData.get("complianceAcknowledgement") !== "on" || formData.get("postingPolicyVersion") !== POSTING_POLICY_VERSION || formData.get("postingPolicyIdentity") !== policyAcceptanceIdentity()) {
     return {
       ok: false,
       message:
@@ -386,6 +388,9 @@ export function parseEmployerJobForm(formData: FormData): ValidationResult<Emplo
   if (!city.ok) return city;
   const state = stateValue(formData);
   if (!state.ok) return state;
+  if (state.value !== "CA") {
+    return { ok: false, message: "현재는 캘리포니아 근무지 공고만 등록할 수 있습니다." };
+  }
   const addressDisplayMode = enumValue(
     formData,
     "addressDisplayMode",
@@ -400,6 +405,9 @@ export function parseEmployerJobForm(formData: FormData): ValidationResult<Emplo
   }
   const payMin = parseMoney(formData, "payMin", "최소 급여");
   if (!payMin.ok) return payMin;
+  if (payMin.value <= 0) {
+    return { ok: false, message: "0보다 큰 기본 급여를 입력해 주세요. 팁은 별도입니다." };
+  }
   const payMax = parseMoney(formData, "payMax", "최대 급여");
   if (!payMax.ok) return payMax;
   if (payMax.value < payMin.value) {
@@ -443,17 +451,22 @@ export function parseEmployerJobForm(formData: FormData): ValidationResult<Emplo
     };
   }
 
+  const normalizedCity = city.value.replace(/\s+/g, " ");
+  const isKoreatownAlias =
+    normalizedCity.toLowerCase() === "los angeles (koreatown)";
+  const canonicalCity = isKoreatownAlias ? "Los Angeles" : normalizedCity;
+
   return {
     ok: true,
     value: {
       title: title.value,
       category: category.value,
       jobType: jobType.value,
-      city: city.value,
+      city: canonicalCity,
       state: state.value,
       addressDisplay:
         addressDisplayMode.value === "city_only"
-          ? `${city.value}, ${state.value}`
+          ? `${isKoreatownAlias ? "Koreatown, " : ""}${canonicalCity}, ${state.value}`
           : (rawAddress.value as string),
       addressDisplayMode: addressDisplayMode.value,
       payMin: payMin.value,

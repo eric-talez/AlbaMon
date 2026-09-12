@@ -5,35 +5,48 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:release": "node scripts/check-release-env.mjs && next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
     "verify:beta": "node scripts/verify-beta-readiness.mjs",
     "verify:local-supabase": "node scripts/verify-local-supabase-readiness.mjs",
-    "verify:rate-limit": "node scripts/verify-rate-limit-concurrency.mjs"
+    "test:db": "node scripts/test-database.mjs",
+    "test:e2e": "playwright test",
+    "test:notifications:local": "RUN_NOTIFICATION_LOCAL=true vitest run tests/notification-local.test.ts",
+    "verify:deploy-target": "node scripts/check-deploy-target.mjs",
+    "smoke:deployment": "node scripts/smoke-deployment.mjs",
+    "setup:local-policy": "node scripts/activate-local-policy.mjs",
+    "check:production-artifact": "node scripts/check-production-artifact.mjs",
+    "verify:rate-limit": "node scripts/verify-rate-limit-concurrency.mjs",
+    "test:e2e:dev": "playwright test --config=playwright.dev.config.ts"
   },
   "dependencies": {
+    "@next/env": "16.3.4",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
-    "next": "16.2.9",
+    "next": "16.3.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "resend": "6.26.0",
     "server-only": "^0.0.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1",
+    "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.2",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9",
+    "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.9"
+  },
+  "engines": {
+    "node": "22.x"
   }
 }

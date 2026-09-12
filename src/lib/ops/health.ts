@@ -1,7 +1,13 @@
 import "server-only";
 
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { emailDeliveryConfigured } from "@/lib/notifications/email";
+import { createClient } from "@supabase/supabase-js";
+import {
+  getSupabasePublicConfig,
+  isSupabaseConfigured,
+} from "@/lib/supabase/config";
 import { isSupabaseServiceRoleConfigured } from "@/lib/supabase/service";
+import { isPhoneAuthEnabled } from "@/lib/auth/providers";
 import { hmacConfigured } from "@/lib/rate-limit/keys";
 
 /**
@@ -26,7 +32,7 @@ export type HealthCheckStatus =
   | "partial"
   /** None of the values this check covers are present. */
   | "missing"
-  /** Deliberately not wired for the beta (email provider, analytics). */
+  /** Disabled/unselected integrations (email dev mode, analytics). */
   | "deferred";
 
 export interface HealthChecks {
@@ -64,10 +70,8 @@ function checkSiteUrl(): HealthCheckStatus {
   }
 }
 
-/** Anon (auth) credentials plus the server-only service-role key — the latter
- * is used by the Slice 28 durable rate limiter to reach its private
- * `consume_rate_limit` counter (never for OTP or business writes). Placeholder
- * values from `.env.example` count as missing. */
+/** Auth credentials plus the service-role key reserved for notification workers,
+ * verified webhooks, and controlled operations in the public launch. */
 function checkSupabase(): HealthCheckStatus {
   const present = [isSupabaseConfigured(), isSupabaseServiceRoleConfigured()];
   if (present.every(Boolean)) return "configured";
@@ -75,26 +79,19 @@ function checkSupabase(): HealthCheckStatus {
   return "missing";
 }
 
-/** The durable rate limiter's HMAC secret (`RATE_LIMIT_HMAC_SECRET`). Reports
- * only whether the secret passes the limiter's own 64-hex validation via the
- * shared `hmacConfigured()` predicate — kept separate from Supabase because a
- * missing/placeholder secret makes protected actions fail closed in
- * production/preview even when Supabase is fully configured. */
+/** The private counter is optional while OTP is development-only. Authenticated
+ * launch writes use the database's actor quotas, without this HMAC secret. */
 function checkRateLimit(): HealthCheckStatus {
+  if (!isPhoneAuthEnabled()) return "deferred";
   return hmacConfigured() ? "configured" : "missing";
 }
 
-/** `EMAIL_PROVIDER=dev` (or unset) is the accepted beta state → "deferred".
- * A real provider without its API key is a misconfiguration → "partial". */
+/** A key alone is partial. Configured means the delivery path is enabled with
+ * worker/webhook settings; it does not claim DNS or inbox delivery was verified. */
 function checkEmail(): HealthCheckStatus {
   const provider = process.env.EMAIL_PROVIDER?.trim().toLowerCase();
-  if (provider === "resend") {
-    return hasValue(process.env.RESEND_API_KEY) ? "configured" : "partial";
-  }
-  if (provider === "sendgrid") {
-    return hasValue(process.env.SENDGRID_API_KEY) ? "configured" : "partial";
-  }
-  return "deferred";
+  if (!provider || provider === "dev") return "deferred";
+  return emailDeliveryConfigured() && isSupabaseServiceRoleConfigured() ? "configured" : "partial";
 }
 
 /** Analytics is not initialized in this build; a present key still reports
@@ -118,4 +115,31 @@ export function buildHealthReport(now: Date = new Date()): HealthReport {
       analytics: checkAnalytics(),
     },
   };
+}
+
+/** Cookie-free public DB read used by the readiness endpoint. */
+export async function checkReadiness(
+  fetchImplementation: typeof fetch = fetch,
+): Promise<boolean> {
+  const config = getSupabasePublicConfig();
+  if (!config) return false;
+
+  try {
+    const supabase = createClient(config.url, config.anonKey, {
+      auth: {
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        persistSession: false,
+      },
+      global: { fetch: fetchImplementation },
+    });
+    const result = await supabase
+      .from("public_job_listings")
+      .select("id")
+      .limit(1)
+      .abortSignal(AbortSignal.timeout(2_000));
+    return !result.error;
+  } catch {
+    return false;
+  }
 }

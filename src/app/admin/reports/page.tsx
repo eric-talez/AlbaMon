@@ -1,3 +1,5 @@
+import { normalizePage as adminPage } from "@/lib/pagination";
+import { AdminPagination } from "../AdminPagination";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/guards";
@@ -25,6 +27,8 @@ function ReportCard({ report }: { report: AdminReport }) {
         <div>
           <p className="text-sm text-muted">{report.companyName}</p>
           <h2 className="mt-1 text-lg font-semibold">{report.jobTitle}</h2>
+          {report.jobId && <div className="flex gap-3 text-sm text-brand"><Link href={`/jobs/${report.jobId}`}>공개 공고 보기 / Public job</Link><Link href={`/admin/jobs?status=all&job=${report.jobId}`}>관련 공고 검토 / Review job</Link></div>}
+          <p className="text-sm">회사 확인: {report.companyIsVerified ? "확인됨" : "미확인"} · 공고 위험 검토와 별개</p>
           <p className="mt-2 text-xs text-muted">신고일 {formatDate(report.submittedAt)}</p>
         </div>
         <span className="inline-flex self-start rounded-full bg-brand-soft px-3 py-1 text-xs font-semibold text-brand">
@@ -66,14 +70,18 @@ function ReportCard({ report }: { report: AdminReport }) {
         </section>
       ) : null}
 
-      <ReportReviewForm reportId={report.id} disabled={report.status !== "open"} />
+      <ReportReviewForm reportId={report.id} disabled={report.status !== "open"} jobUpdatedAt={report.jobUpdatedAt} canPause={report.jobModerationStatus === "approved"} />
     </li>
   );
 }
 
-export default async function AdminReportsPage() {
+export default async function AdminReportsPage({ searchParams }: { searchParams?: Promise<{ status?: string; page?: string }> } = {}) {
   await requireRole("admin", "/admin/reports");
-  const result = await getAdminReports();
+  const params = await searchParams;
+  const page = adminPage(params?.page);
+  const options = ["all", "open", "reviewed", "dismissed"] as const;
+  const status = options.find(value => value === params?.status) ?? "open";
+  const result = await getAdminReports(page, status);
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
@@ -85,6 +93,7 @@ export default async function AdminReportsPage() {
         사용자가 신고한 공고를 검토하고 처리 상태를 표시합니다.
       </p>
 
+      <nav aria-label="상태 필터" className="mt-4 flex gap-4">{options.map(value => <Link key={value} href={`/admin/reports?status=${value}`}>{value === "all" ? "전체 / All" : REPORT_STATUS_LABELS[value]}</Link>)}</nav>
       {result.status !== "ok" ? (
         <section className="mt-6 rounded-xl border border-border bg-surface p-5" role="alert">
           <h2 className="font-semibold">신고 큐를 사용할 수 없습니다.</h2>
@@ -98,7 +107,7 @@ export default async function AdminReportsPage() {
         <section className="mt-6 rounded-xl border border-dashed border-border p-6 text-center">
           <h2 className="font-semibold">접수된 신고가 없습니다.</h2>
           <p className="mt-2 text-sm text-muted">
-            새 신고가 접수되면 이곳에 최신순으로 표시됩니다.
+            새 신고가 접수되면 이곳에 오래된 접수순으로 표시됩니다.
           </p>
         </section>
       ) : (
@@ -108,6 +117,7 @@ export default async function AdminReportsPage() {
           ))}
         </ul>
       )}
+      {result.status === "ok" && <AdminPagination page={page} count={result.reports.length} href={`/admin/reports?status=${status}`} />}
     </main>
   );
 }

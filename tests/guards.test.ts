@@ -1,3 +1,4 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -14,7 +15,7 @@ vi.mock("next/navigation", () => ({
   redirect: mocks.redirect,
 }));
 
-import { requireEmployerAreaAccess, requireRole } from "@/lib/auth/guards";
+import { requireArea, requireEmployerAreaAccess, requireRole } from "@/lib/auth/guards";
 
 afterEach(() => vi.clearAllMocks());
 
@@ -32,6 +33,7 @@ describe("requireRole", () => {
       email: "admin@example.com",
       role: "admin",
       isDev: false,
+      aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
     });
     await expect(requireRole("employer")).rejects.toThrow("REDIRECT:/forbidden");
   });
@@ -42,6 +44,7 @@ describe("requireRole", () => {
       email: "employer@example.com",
       role: "employer" as const,
       isDev: false,
+      aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
     };
     mocks.getCurrentUser.mockResolvedValue(user);
     await expect(requireRole("employer")).resolves.toEqual(user);
@@ -63,6 +66,7 @@ describe("requireEmployerAreaAccess", () => {
       email: "seeker@example.com",
       role: "seeker",
       isDev: false,
+      aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
     });
     await expect(requireEmployerAreaAccess("/employer")).rejects.toThrow(
       "REDIRECT:/employer/request-access",
@@ -76,10 +80,25 @@ describe("requireEmployerAreaAccess", () => {
         email: `${role}@example.com`,
         role,
         isDev: false,
+        aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
       };
       mocks.getCurrentUser.mockResolvedValue(user);
       await expect(requireEmployerAreaAccess("/employer")).resolves.toEqual(user);
     }
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
+});
+
+ it("routes admin aal1 to security and denies suspended admin aal2", async () => {
+   mocks.getCurrentUser.mockResolvedValue({ role: "admin", aal: "aal1", ...acknowledgedPolicies, accountStatus: "active" });
+   await expect(requireRole("admin")).rejects.toThrow("REDIRECT:/account/security");
+   mocks.getCurrentUser.mockResolvedValue({ role: "admin", aal: "aal2", ...acknowledgedPolicies, accountStatus: "suspended" });
+   await expect(requireRole("admin")).rejects.toThrow("REDIRECT:/forbidden");
+   mocks.getCurrentUser.mockResolvedValue({ role: "admin", aal: "aal2", ...acknowledgedPolicies, accountStatus: "active" });
+   await expect(requireRole("admin")).resolves.toMatchObject({ aal: "aal2" });
+ });
+
+it("the generic admin area guard also requires session MFA", async () => {
+  mocks.getCurrentUser.mockResolvedValue({ role: "admin", aal: "aal1", ...acknowledgedPolicies, accountStatus: "active" });
+  await expect(requireArea("admin")).rejects.toThrow("REDIRECT:/account/security");
 });

@@ -15,7 +15,7 @@ const SEED_PATH = join(process.cwd(), "supabase", "seed.sql");
 
 function migrationFiles(): string[] {
   if (!existsSync(MIGRATIONS_DIR)) return [];
-  return readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql"));
+  return readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql")).sort();
 }
 
 /** Concatenated text of all migration files (there is one in Slice 3). */
@@ -226,12 +226,9 @@ describe("no unsafe RLS patterns", () => {
     expect(policy).toBeTruthy();
     expect(policy).toMatch(/seeker_id\s*=\s*auth\.uid\(\)/i);
     expect(policy).toMatch(/current_profile_role\(\)\s*=\s*'seeker'/i);
-    expect(policy).toMatch(/moderation_status\s*=\s*'approved'/i);
+    expect(policy).toMatch(/public\.is_job_open\(job_id\)/i);
     expect(policy).toMatch(/status\s*=\s*'submitted'/i);
-    // Slice 31: an expired job cannot receive a new application via RLS insert.
-    expect(policy).toMatch(
-      /expires_at\s+is\s+null\s+or\s+j\.expires_at\s*>\s*now\(\)/i,
-    );
+    // The shared predicate also enforces current launch geography/owner state.
   });
 
   it("bounds cover notes and preserves one application per seeker/job", () => {
@@ -274,22 +271,17 @@ describe("no unsafe RLS patterns", () => {
   });
 
   it("exposes only approved AND unexpired jobs through the net read-only view", () => {
-    // Inspect the LATEST view definition (Slice 31's create-or-replace), not the
-    // historical Slice 4 create-view still present earlier in the stream.
+    // September supersedes July expiry behavior with the shared launch predicate.
     const view = latestView(sql, "public_job_listings");
     expect(view).toBeTruthy();
-    // Public-visibility invariant: approved AND (expires_at null or future).
-    expect(view).toMatch(/moderation_status\s*=\s*'approved'/i);
-    expect(view).toMatch(
-      /expires_at\s+is\s+null\s+or\s+j\.expires_at\s*>\s*now\(\)/i,
-    );
+    expect(view).toMatch(/where\s+public\.is_job_open\(j\.id\)/i);
     // security_barrier, safe company identity, and no private company columns.
     expect(view).toMatch(/security_barrier\s*=\s*true/i);
     expect(view).toMatch(/c\.name\s+as\s+company_name/i);
     expect(view).toMatch(/c\.is_verified\s+as\s+company_is_verified/i);
     expect(view).not.toMatch(/c\.(?:phone|website|address_display)/i);
-    // expires_at stays a filter predicate only — never an exposed column.
-    expect(view).not.toMatch(/j\.expires_at\s+as\b/i);
+    // Launch clients display publication expiry and carry the revision token.
+    expect(view).toMatch(/j\.expires_at,\s*j\.updated_at/i);
     // anon/authenticated SELECT grant is present and unchanged (not broadened).
     expect(sql).toMatch(
       /grant\s+select\s+on\s+public\.public_job_listings\s+to\s+anon,\s*authenticated/i,
@@ -299,8 +291,19 @@ describe("no unsafe RLS patterns", () => {
   it("gates the net public jobs read policy on approved AND unexpired", () => {
     const policy = latestPolicy(sql, "jobs_select_public_approved");
     expect(policy).toBeTruthy();
-    expect(policy).toMatch(/moderation_status\s*=\s*'approved'/i);
-    expect(policy).toMatch(/expires_at\s+is\s+null\s+or\s+expires_at\s*>\s*now\(\)/i);
+    expect(policy).toMatch(/public\.is_job_open\(id\)/i);
+  });
+
+  it("uses strict future expiry, California and active owner in the shared predicate", () => {
+    const predicate = [...sql.matchAll(
+      /create or replace function public\.is_job_open\([\s\S]*?\$\$;/gi,
+    )].at(-1)?.[0];
+    expect(predicate).toBeTruthy();
+    expect(predicate).toMatch(/j\.moderation_status\s*=\s*'approved'/i);
+    expect(predicate).toMatch(/j\.expires_at\s*>\s*now\(\)/i);
+    expect(predicate).not.toMatch(/expires_at\s+is\s+null/i);
+    expect(predicate).toMatch(/j\.state\s*=\s*'CA'/i);
+    expect(predicate).toMatch(/p\.account_status\s*=\s*'active'/i);
   });
 
   it("keeps owner/admin job reads unaffected by expiry (history stays visible)", () => {

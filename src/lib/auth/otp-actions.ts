@@ -1,8 +1,9 @@
 "use server";
 
 /**
- * Server-boundary phone OTP actions (Slice 28).
+ * Development-only server-boundary phone OTP actions (Slice 28).
  *
+ * The shared provider gate rejects production/preview even if its flag is true.
  * The browser no longer calls Supabase `signInWithOtp`/`verifyOtp` directly.
  * These cookie-aware Server Actions run durable rate limiting first (per IP and
  * per phone), then call the ordinary anon Supabase Auth client — NEVER the

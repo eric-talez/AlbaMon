@@ -23,7 +23,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  */
 
 const PROFILE_SELECT =
-  "id, role, email, display_name, phone, city, state, created_at, updated_at";
+  "id, terms_version, terms_accepted_at, privacy_notice_version, policy_identity, privacy_notice_acknowledged_at, role, account_status, email_notifications_enabled, suppressed_email, email, display_name, phone, city, state, created_at, updated_at";
 
 function coerceRole(value: unknown): Role | null {
   return (ROLES as readonly string[]).includes(value as string)
@@ -53,17 +53,30 @@ export async function getProfileByUserId(
   }
 }
 
-/**
- * The caller's role from `profiles`, or null when there is no usable role.
- *
- * Returns null when Supabase is unconfigured, the profile row is missing, the
- * query fails, or the stored role is not a recognized value. Callers treat null
- * as "no trusted role" and fail closed — never as a silent `seeker`.
- */
-export async function getProfileRoleForUser(
-  userId: string,
-): Promise<Role | null> {
-  const profile = await getProfileByUserId(userId);
-  if (!profile) return null;
-  return coerceRole(profile.role);
+/** One narrow profile read supplies the trusted session fields. */
+export async function getAuthProfileForUser(userId: string): Promise<{
+  role: Role;
+  accountStatus: "active" | "suspended";
+  displayName: string | null;
+  policyIdentity: string | null;
+  termsVersion: string | null;
+  termsAcceptedAt: string | null;
+  privacyNoticeVersion: string | null;
+  privacyNoticeAcknowledgedAt: string | null;
+} | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.from("profiles")
+      .select("role, account_status, display_name, terms_version, terms_accepted_at, privacy_notice_version, policy_identity, privacy_notice_acknowledged_at").eq("id", userId).maybeSingle();
+    if (error || !data) return null;
+    const role = coerceRole(data.role);
+    if (!role || !["active", "suspended"].includes(data.account_status)) return null;
+    return { role, accountStatus: data.account_status,
+      policyIdentity: data.policy_identity ?? null, termsVersion: data.terms_version ?? null, termsAcceptedAt: data.terms_accepted_at ?? null,
+      privacyNoticeVersion: data.privacy_notice_version ?? null, privacyNoticeAcknowledgedAt: data.privacy_notice_acknowledged_at ?? null,
+      displayName: typeof data.display_name === "string" ? data.display_name : null };
+  } catch {
+    return null;
+  }
 }

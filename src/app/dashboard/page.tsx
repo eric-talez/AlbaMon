@@ -19,15 +19,31 @@ export default async function DashboardPage() {
       </p>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <Link href="/dashboard/profile" className="rounded-xl border border-border p-5 hover:bg-surface">
+          <h2 className="font-semibold">프로필 / Profile</h2>
+        </Link>
+        <Link href="/account/security" className="rounded-xl border border-border p-5 hover:bg-surface">
+          <h2 className="font-semibold">계정 보안 / Account security</h2>
+        </Link>
         <Link
           href="/jobs"
           className="rounded-xl border border-border p-5 transition-colors hover:bg-surface"
         >
           <h2 className="font-semibold">공고 둘러보기</h2>
           <p className="mt-1 text-sm text-muted">
-            LA/OC 지역의 승인된 공고를 검색합니다.
+            캘리포니아 지역의 승인된 공고를 검색합니다.
           </p>
         </Link>
+
+            <Link
+              href="/dashboard/applications"
+              className="rounded-xl border border-border p-5 transition-colors hover:bg-surface"
+            >
+              <h2 className="font-semibold">내 지원 현황</h2>
+              <p className="mt-1 text-sm text-muted">
+                제출한 지원서와 현재 상태를 확인합니다.
+              </p>
+            </Link>
 
         {user.role !== "seeker" ? (
           <Link
@@ -43,15 +59,6 @@ export default async function DashboardPage() {
           </Link>
         ) : (
           <>
-            <Link
-              href="/dashboard/applications"
-              className="rounded-xl border border-border p-5 transition-colors hover:bg-surface"
-            >
-              <h2 className="font-semibold">내 지원 현황</h2>
-              <p className="mt-1 text-sm text-muted">
-                제출한 지원서와 현재 상태를 확인합니다.
-              </p>
-            </Link>
             <Link
               href="/employer/request-access"
               className="rounded-xl border border-border p-5 transition-colors hover:bg-surface"

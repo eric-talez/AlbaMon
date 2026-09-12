@@ -1,24 +1,26 @@
 "use server";
 
+import { WRITE_RETRY_MESSAGE, SUSPENDED_WRITE_MESSAGE } from "@/lib/db/write-errors";
+
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth/guards";
+import { activeWriterError, requireRole } from "@/lib/auth/guards";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createEmployerJob } from "@/lib/db/employer-jobs";
 import { parseEmployerJobForm } from "@/lib/employer/validation";
-import { enforceUserPolicy } from "@/lib/rate-limit/service";
-import { RATE_LIMIT_POLICIES } from "@/lib/rate-limit/policies";
-import { rateLimitedResult } from "@/lib/rate-limit/types";
-import type { RateLimitedResult } from "@/lib/rate-limit/types";
 
-export type JobFormState =
-  | { status: "idle" | "success" | "error"; message: string; jobId?: string }
-  | RateLimitedResult;
+export interface JobFormState {
+  status: "idle" | "success" | "error";
+  message: string;
+  jobId?: string;
+}
 
 export async function submitEmployerJob(
   _previousState: JobFormState,
   formData: FormData,
 ): Promise<JobFormState> {
   const user = await requireRole("employer", "/employer/jobs/new");
+  const writerError = activeWriterError(user);
+  if (writerError) return writerError;
   if (!isSupabaseConfigured()) {
     return { status: "error", message: "공고 등록은 Supabase가 연결된 환경에서 사용할 수 있습니다." };
   }
@@ -30,10 +32,9 @@ export async function submitEmployerJob(
   const parsed = parseEmployerJobForm(formData);
   if (!parsed.ok) return { status: "error", message: parsed.message };
 
-  const limit = await enforceUserPolicy(RATE_LIMIT_POLICIES.createJob, user.id);
-  if (!limit.allowed) return rateLimitedResult(limit.retryAfterSeconds);
-
   const result = await createEmployerJob(user.id, rawCompanyId.trim(), parsed.value);
+  if (result.status === "rate_limited") return { status: "error", message: WRITE_RETRY_MESSAGE };
+  if (result.status === "suspended") return { status: "error", message: SUSPENDED_WRITE_MESSAGE };
   if (result.status === "created") {
     revalidatePath("/employer");
     revalidatePath("/employer/jobs");

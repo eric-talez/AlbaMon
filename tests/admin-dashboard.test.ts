@@ -1,9 +1,10 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 
-vi.mock("@/lib/auth/guards", () => ({ requireRole: vi.fn() }));
+vi.mock("@/lib/auth/guards", async (original) => ({ ...await original<object>(), requireRole: vi.fn() }));
 vi.mock("@/lib/db/admin-moderation", () => ({
   getAdminQueueCounts: vi.fn(),
 }));
@@ -13,10 +14,13 @@ vi.mock("@/lib/db/employer-access-requests", () => ({
 vi.mock("@/lib/db/audit-logs", () => ({
   getRecentAdminAuditLogs: vi.fn(),
 }));
+vi.mock("@/lib/db/admin-analytics", () => ({ getSuspendedAccountCount: vi.fn(async () => ({ status: "ok", count: 0 })) }));
+vi.mock("@/lib/db/notifications", () => ({ getNotificationQueueHealth: vi.fn(async () => null) }));
 vi.mock("@/lib/ops/health", () => ({
   buildHealthReport: vi.fn(),
 }));
 
+import { getNotificationQueueHealth } from "@/lib/db/notifications";
 import { requireRole } from "@/lib/auth/guards";
 import {
   getAdminQueueCounts,
@@ -87,6 +91,7 @@ beforeEach(() => {
     email: "admin@example.com",
     role: "admin",
     isDev: false,
+    aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
   });
   mockCounts.mockResolvedValue(queueCounts());
   mockPendingCount.mockResolvedValue({ status: "ok", count: 4 });
@@ -254,3 +259,12 @@ describe("admin dashboard static security boundaries", () => {
 function read(path: string): string {
   return readFileSync(join(process.cwd(), ...path.split("/")), "utf8");
 }
+
+it("shows aggregate email backlog, failures and the ten-minute warning", async () => {
+  vi.mocked(getNotificationQueueHealth).mockResolvedValueOnce({ pending: 7, failed: 5, oldest_available_at: "2026-09-09T01:00:00Z", overdue: true });
+  const html = renderToStaticMarkup(await AdminHomePage());
+  expect(html).toContain("Pending: 7");
+  expect(html).toContain("Failed: 5");
+  expect(html).toContain("2026-09-09T01:00:00Z");
+  expect(html).toContain("Email queue delayed over 10 minutes");
+});

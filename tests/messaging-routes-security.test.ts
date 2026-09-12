@@ -1,30 +1,27 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 
-vi.mock("@/lib/auth/guards", () => ({ requireRole: vi.fn() }));
+vi.mock("next/navigation", () => ({useRouter: () => ({refresh: vi.fn()}), notFound: () => {throw new Error("NOT_FOUND");}}));
+vi.mock("@/lib/auth/guards", () => ({ requireUser: vi.fn() }));
 vi.mock("@/lib/db/messages", () => ({
   getApplicationThread: vi.fn(),
   sendApplicationMessage: vi.fn(),
 }));
 
-import { requireRole } from "@/lib/auth/guards";
+import { requireUser } from "@/lib/auth/guards";
 import { getApplicationThread } from "@/lib/db/messages";
 import SeekerApplicationMessagesPage from "@/app/dashboard/applications/[applicationId]/messages/page";
 import EmployerApplicationMessagesPage from "@/app/employer/applications/[applicationId]/messages/page";
 
-const mockRequireRole = vi.mocked(requireRole);
+const mockRequireUser = vi.mocked(requireUser);
 const mockThread = vi.mocked(getApplicationThread);
 const applicationId = "11111111-1111-4111-8111-111111111111";
 
 beforeEach(() => {
-  mockRequireRole.mockImplementation(async (role) => ({
-    id: `${role}-1`,
-    email: `${role}@example.com`,
-    role,
-    isDev: false,
-  }));
+  mockRequireUser.mockResolvedValue({id:"promoted-1",email:"user@example.com",role:"employer",isDev:false,aal:"aal1",...acknowledgedPolicies, accountStatus:"active",displayName:null});
   mockThread.mockResolvedValue({
     status: "ok",
     thread: {
@@ -33,6 +30,7 @@ beforeEach(() => {
       jobTitle: "Server",
       companyName: "K-Work Cafe",
       applicationStatus: "submitted",
+      participantSide: "applicant", hasOlder: false,
       messages: [
         { id: "message-1", senderId: "seeker-1", body: "Interview question", createdAt: "2026-06-21T10:00:00Z", isOwn: true },
         { id: "message-2", senderId: "employer-1", body: "Thanks for asking", createdAt: "2026-06-21T11:00:00Z", isOwn: false },
@@ -44,24 +42,25 @@ beforeEach(() => {
 afterEach(() => vi.clearAllMocks());
 
 describe("application message routes", () => {
-  it("uses exact seeker and employer guards and maps ownership locally", async () => {
+  it("uses authenticated sessions and DB participant context", async () => {
     const seekerHtml = renderToStaticMarkup(await SeekerApplicationMessagesPage({
       params: Promise.resolve({ applicationId }),
     }));
-    expect(mockRequireRole).toHaveBeenCalledWith(
-      "seeker",
+    expect(mockRequireUser).toHaveBeenCalledWith(
       `/dashboard/applications/${applicationId}/messages`,
     );
-    expect(mockThread).toHaveBeenCalledWith(applicationId, "seeker-1");
+    expect(mockThread).toHaveBeenCalledWith(applicationId, "promoted-1", 1);
     expect(seekerHtml).toContain("Interview question");
     expect(seekerHtml).toContain("Thanks for asking");
+    expect(seekerHtml).toContain("PT");
+    expect(seekerHtml).toContain("새로고침 / Refresh");
 
+    mockThread.mockResolvedValueOnce({status:"ok",thread:{applicationId,jobId:"job-1",jobTitle:"Server",companyName:"Cafe",applicationStatus:"submitted",participantSide:"employer",hasOlder:false,messages:[]}});
     await EmployerApplicationMessagesPage({ params: Promise.resolve({ applicationId }) });
-    expect(mockRequireRole).toHaveBeenCalledWith(
-      "employer",
+    expect(mockRequireUser).toHaveBeenCalledWith(
       `/employer/applications/${applicationId}/messages`,
     );
-    expect(mockThread).toHaveBeenCalledWith(applicationId, "employer-1");
+    expect(mockThread).toHaveBeenCalledWith(applicationId, "promoted-1", 1);
   });
 
   it("renders empty and unavailable states without mock messages", async () => {
@@ -73,6 +72,7 @@ describe("application message routes", () => {
         jobTitle: "Server",
         companyName: "K-Work Cafe",
         applicationStatus: "submitted",
+      participantSide: "applicant", hasOlder: false,
         messages: [],
       },
     });
@@ -110,7 +110,7 @@ describe("message migration security", () => {
   });
 
   it("limits thread access to applicant, owning employer, or admin", () => {
-    const access = sql.match(
+    const access = read("supabase/migrations/20260909000100_profile_and_admin_security.sql").match(
       /function\s+public\.can_access_application_thread[\s\S]*?\$\$;/i,
     )?.[0];
     expect(access).toBeTruthy();
@@ -118,7 +118,8 @@ describe("message migration security", () => {
     expect(access).toMatch(/set\s+search_path\s*=\s*''/i);
     expect(access).toMatch(/a\.seeker_id\s*=\s*auth\.uid\(\)/i);
     expect(access).toMatch(/c\.owner_id\s*=\s*auth\.uid\(\)/i);
-    expect(access).toMatch(/current_profile_role\(\)\s*=\s*'admin'/i);
+    expect(access).toMatch(/public\.is_admin\(\)/i);
+    expect(access).not.toMatch(/current_profile_role\(\)\s*=\s*'admin'/i);
   });
 
   it("allows only seeker/employer participants to send as themselves", () => {
@@ -142,3 +143,13 @@ describe("message migration security", () => {
 function read(path: string): string {
   return readFileSync(join(process.cwd(), ...path.split("/")), "utf8");
 }
+
+it("hides sending for admin-only reads and preserves page navigation",async()=>{
+  mockThread.mockResolvedValueOnce({status:"ok",thread:{applicationId,jobId:"job-1",jobTitle:"Server",companyName:"Cafe",applicationStatus:"withdrawn",participantSide:"admin",hasOlder:true,messages:[]}});
+  const html=renderToStaticMarkup(await SeekerApplicationMessagesPage({params:Promise.resolve({applicationId}),searchParams:Promise.resolve({page:"2"})}));
+  expect(html).not.toContain('name="body"');
+  expect(html).toContain("Admin read only");
+  expect(html).toContain('href="?page=3"');
+  expect(html).toContain('href="?page=1"');
+  expect(mockThread).toHaveBeenCalledWith(applicationId,"promoted-1",2);
+});

@@ -148,13 +148,17 @@ function AnalyticsDashboard({ analytics }: { analytics: AdminAnalytics }) {
         <BreakdownTable title="Messages" items={messageItems} />
       </div>
 
-      <section className="mt-6 rounded-xl border border-dashed border-border p-5">
-        <h2 className="text-sm font-semibold">Deferred metrics / 보류된 지표</h2>
-        <p className="mt-2 text-sm text-muted">
-          External analytics providers, CSV export, and cohort retention are not
-          included in this slice. Payments and paid boosts were de-scoped from
-          the MVP in Slice 23.
-        </p>
+      <section className="mt-6 rounded-xl border border-border p-5" aria-label="CA 게시 성과">
+        <h2 className="text-lg font-semibold">CA 게시 후 7일 내 지원 / Seven-day application reach</h2>
+        <p className="mt-3 text-2xl font-bold">{analytics.cohortCount === 0 ? "관찰 가능한 공고 없음" : `${(100 * analytics.appliedWithin7Days / analytics.cohortCount).toFixed(1)}%`}</p>
+        <p>{analytics.appliedWithin7Days} / {analytics.cohortCount}개 공고에 유효 지원이 1개 이상 있습니다.</p>
+        <dl className="mt-4 space-y-3">
+          <div><dt>첫 고용주 답장 중앙값 / Median first employer reply</dt><dd className="font-semibold">{analytics.medianFirstEmployerReplyHours === null ? "답장 표본 없음 / No answered samples" : `${analytics.medianFirstEmployerReplyHours.toFixed(1)}시간 / hours`}</dd></div>
+          <div><dt>답장 없는 지원 / Unanswered applications</dt><dd className="font-semibold">{analytics.unansweredApplicationCount}</dd></div>
+        </dl>
+        <p className="mt-4 text-sm text-muted">기준 시각: <time dateTime={analytics.referenceDate}>{analytics.referenceDate}</time>. 분모는 최신 게시일이 기준 시각 28일 전부터 7일 전까지(양 끝 포함)인 CA 공고입니다. 마감·만료·중지된 공고도 포함하며, 게시일을 모르는 과거 공고는 제외합니다. 같은 공고의 재게시에는 최신 게시일을 사용합니다.</p>
+        <p className="mt-2 text-sm text-muted">각 공고의 최신 게시일부터 7일 후까지(양 끝 포함) 접수된 지원 중 현재 철회 상태이거나 정지된 구직자의 지원은 제외합니다. 같은 모집단의 지원별 실제 회사 소유자 답장만 지원 접수 시각부터 기준 시각까지 계산합니다. 중앙값은 답장이 있는 지원만, 무응답 수는 나머지 지원입니다. 회사 소유권 변경 기능이 생기면 과거 답장 귀속을 재검토해야 합니다.</p>
+        <p className="mt-2 text-sm text-muted">CA publications in the last 28–7 days; eligible applications in each publication’s first seven days. Reply times use the first actual owner reply through the reference time. Offered는 오퍼 상태이며 채용 완료를 뜻하지 않습니다. 방문 수를 수집하지 않아 방문 대비 지원 전환율은 계산하지 않습니다.</p>
       </section>
     </>
   );

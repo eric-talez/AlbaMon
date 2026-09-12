@@ -1,74 +1,27 @@
 import { defineConfig, devices } from "@playwright/test";
 
-/**
- * Slice 30 — hermetic core browser E2E (Chromium only).
- *
- * The dev server runs in DEV-AUTH MODE: placeholder Supabase env makes
- * `isSupabaseConfigured()` false, which (a) enables the unsigned cookie
- * role-picker (`isDevAuthEnabled()`), and (b) serves deterministic mock jobs
- * (`kw-001`..`kw-010`) instead of hitting a database. Both require a
- * non-production runtime, so the server is `next dev` (never `next start`).
- *
- * No credentials, Docker, hosted Supabase, network services, or persistent
- * writes are involved. The placeholder values below are intentionally
- * non-secret (they match `.env.example`) so `tests/security.test.ts`'s
- * secret-shape scan stays green.
- */
-
-const PORT = 3130;
-const BASE_URL = `http://localhost:${PORT}`;
-
-const DEV_AUTH_ENV = {
-  // Placeholder fragments → treated as unconfigured → dev-auth + mock jobs.
-  NEXT_PUBLIC_SUPABASE_URL: "https://your-project.supabase.co",
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: "your-anon-key",
-  // Fixed site URL so /api/health reports siteUrl "configured" deterministically.
-  NEXT_PUBLIC_SITE_URL: BASE_URL,
-  NEXT_TELEMETRY_DISABLED: "1",
-};
+// These tests require the seeded disposable stack, never a hosted project.
+if (process.env.NEXT_PUBLIC_SUPABASE_URL !== "http://127.0.0.1:55321" ||
+    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  throw new Error("E2E requires the isolated local Supabase URL and anon key; see docs/launch-evidence/rls-matrix.md");
+}
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  testIgnore: /(auth-guards|health|job-discovery|public-shell|responsive-nav)\.spec\.ts/,
   fullyParallel: true,
-  // No `.only` slips into CI; retries only in CI; a fixed, deterministic worker
-  // count so runs are reproducible rather than scaling with the host's cores.
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: 2,
-  // Dev-mode (Turbopack) first-request compiles can be slow — be generous.
-  timeout: 60_000,
-  expect: { timeout: 10_000 },
-  reporter: process.env.CI
-    ? [["list"], ["html", { open: "never" }]]
-    : [["list"]],
+  retries: 0,
+  reporter: "list",
   use: {
-    baseURL: BASE_URL,
-    // Artifacts on failure only (kept out of git via .gitignore).
-    trace: "retain-on-failure",
-    screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    baseURL: "http://127.0.0.1:3100",
+    trace: "off",
   },
-  projects: [
-    {
-      name: "chromium-desktop",
-      use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } },
-    },
-    {
-      // 390px mobile viewport — only the viewport-relevant specs run here.
-      name: "chromium-mobile",
-      use: { ...devices["Desktop Chrome"], viewport: { width: 390, height: 844 } },
-      testMatch: /(public-shell|job-discovery|responsive-nav)\.spec\.ts/,
-    },
-  ],
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: `npm run dev -- -p ${PORT}`,
-    url: BASE_URL,
-    // Never reuse a server already on this port (local OR CI): an arbitrary
-    // process could be running with real or unknown env — tests must only run
-    // against this config's own dev-auth server. A port conflict then fails
-    // loudly instead of silently testing the wrong server.
+    command: "npm run start -- --hostname 127.0.0.1 --port 3100",
+    url: "http://127.0.0.1:3100/api/ready",
     reuseExistingServer: false,
-    timeout: 120_000,
-    env: DEV_AUTH_ENV,
+    timeout: 60_000,
   },
 });

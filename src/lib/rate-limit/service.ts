@@ -142,9 +142,9 @@ export async function enforcePolicies(
 }
 
 /**
- * Convenience for the authenticated write actions: consume a single per-user
- * bucket. The `user.id` is HMAC-hashed with the `user` domain before it reaches
- * the DB.
+ * Single-subject operational counter helper. Public-launch authenticated writes
+ * use DB actor quotas instead, without invoking this service-role counter.
+ * The subject is HMAC-hashed with the `user` domain before it reaches the DB.
  */
 export async function enforceUserPolicy(
   policy: RateLimitPolicy,

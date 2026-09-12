@@ -1,28 +1,26 @@
+import { WRITE_RETRY_MESSAGE, SUSPENDED_WRITE_MESSAGE } from "@/lib/db/write-errors";
+
 import "server-only";
 
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth/guards";
+import { activeWriterError, requireUser } from "@/lib/auth/guards";
 import { createJobReport } from "@/lib/db/reports";
 import { parseReportForm } from "@/lib/reports/validation";
-import { enforceUserPolicy } from "@/lib/rate-limit/service";
-import { RATE_LIMIT_POLICIES } from "@/lib/rate-limit/policies";
-import { rateLimitedResult } from "@/lib/rate-limit/types";
-import type { RateLimitedResult } from "@/lib/rate-limit/types";
 
-export type ReportJobFormState =
-  | { status: "idle" | "success" | "duplicate" | "error"; message: string }
-  | RateLimitedResult;
+export interface ReportJobFormState {
+  status: "idle" | "success" | "duplicate" | "error";
+  message: string;
+}
 
 export async function submitJobReportForUser(
   jobId: string,
   formData: FormData,
 ): Promise<ReportJobFormState> {
   const user = await requireUser(`/jobs/${encodeURIComponent(jobId)}/report`);
+  const writerError = activeWriterError(user);
+  if (writerError) return writerError;
   const parsed = parseReportForm(formData);
   if (!parsed.ok) return { status: "error", message: parsed.message };
-
-  const limit = await enforceUserPolicy(RATE_LIMIT_POLICIES.createReport, user.id);
-  if (!limit.allowed) return rateLimitedResult(limit.retryAfterSeconds);
 
   const result = await createJobReport(
     jobId,
@@ -31,6 +29,8 @@ export async function submitJobReportForUser(
     parsed.value.details,
   );
 
+  if (result.status === "rate_limited") return { status: "error", message: WRITE_RETRY_MESSAGE };
+  if (result.status === "suspended") return { status: "error", message: SUSPENDED_WRITE_MESSAGE };
   if (result.status === "submitted") {
     revalidatePath("/admin");
     revalidatePath("/admin/reports");

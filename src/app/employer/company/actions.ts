@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth/guards";
+import { activeWriterError, requireRole } from "@/lib/auth/guards";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   createEmployerCompany,
@@ -9,20 +9,20 @@ import {
   updateEmployerCompany,
 } from "@/lib/db/companies";
 import { parseEmployerCompanyForm } from "@/lib/employer/validation";
-import { enforceUserPolicy } from "@/lib/rate-limit/service";
-import { RATE_LIMIT_POLICIES } from "@/lib/rate-limit/policies";
-import { rateLimitedResult } from "@/lib/rate-limit/types";
-import type { RateLimitedResult } from "@/lib/rate-limit/types";
 
-export type CompanyFormState =
-  | { status: "idle" | "success" | "error"; message: string; companyId?: string }
-  | RateLimitedResult;
+export interface CompanyFormState {
+  status: "idle" | "success" | "error";
+  message: string;
+  companyId?: string;
+}
 
 export async function saveEmployerCompany(
   _previousState: CompanyFormState,
   formData: FormData,
 ): Promise<CompanyFormState> {
   const user = await requireRole("employer", "/employer/company");
+  const writerError = activeWriterError(user);
+  if (writerError) return writerError;
   if (!isSupabaseConfigured()) {
     return { status: "error", message: "회사 관리는 Supabase가 연결된 환경에서 사용할 수 있습니다." };
   }
@@ -40,14 +40,6 @@ export async function saveEmployerCompany(
     if (!owned) {
       return { status: "error", message: "수정할 수 있는 회사 정보를 찾지 못했습니다." };
     }
-  } else {
-    // Rate-limit company CREATION only. Ordinary profile edits (companyId set)
-    // are intentionally left unlimited.
-    const limit = await enforceUserPolicy(
-      RATE_LIMIT_POLICIES.createCompany,
-      user.id,
-    );
-    if (!limit.allowed) return rateLimitedResult(limit.retryAfterSeconds);
   }
 
   const result = companyId

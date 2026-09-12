@@ -17,9 +17,10 @@
 -- Self-verifying: each check RAISEs on failure (psql exits non-zero) and emits
 -- `PASS <case>` on success. Role is simulated via SET LOCAL ROLE + the
 -- request.jwt.claims GUC that Supabase's auth.uid() reads; every check runs in
--- its own transaction and is rolled back, so this script mutates nothing except
--- the two throwaway test principals it provisions up front.
+-- its own savepoint. The enclosing transaction rolls back all setup principals.
 -- Depends on supabase/seed.sql (employer 1111.. owns company aaaa..0001).
+
+begin;
 
 -- --- Provision throwaway seeker + admin principals ---------------------------
 insert into auth.users (
@@ -46,7 +47,7 @@ update public.profiles set role = 'admin'
   where id = '55555555-5555-5555-5555-555555555555';
 
 -- --- A. anon: base-table SELECT denied ---------------------------------------
-begin;
+savepoint slice_case;
 set local role anon;
 do $$
 begin
@@ -57,10 +58,10 @@ begin
     raise notice 'PASS A: anon denied on public.companies (%)', sqlerrm;
   end;
 end $$;
-rollback;
+rollback to savepoint slice_case; release savepoint slice_case;
 
 -- --- B. anon: approved jobs still readable via the view ----------------------
-begin;
+savepoint slice_case;
 set local role anon;
 do $$
 declare n int;
@@ -71,10 +72,10 @@ begin
   end if;
   raise notice 'PASS B: anon reads public_job_listings (% approved rows)', n;
 end $$;
-rollback;
+rollback to savepoint slice_case; release savepoint slice_case;
 
 -- --- C. authenticated seeker: zero company rows ------------------------------
-begin;
+savepoint slice_case;
 select set_config(
   'request.jwt.claims',
   '{"sub":"44444444-4444-4444-4444-444444444444","role":"authenticated"}',
@@ -89,10 +90,10 @@ begin
   end if;
   raise notice 'PASS C: seeker reads 0 company rows';
 end $$;
-rollback;
+rollback to savepoint slice_case; release savepoint slice_case;
 
 -- --- D. employer: only their own company -------------------------------------
-begin;
+savepoint slice_case;
 select set_config(
   'request.jwt.claims',
   '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}',
@@ -109,13 +110,13 @@ begin
   end if;
   raise notice 'PASS D: employer reads only their own company (%)', n;
 end $$;
-rollback;
+rollback to savepoint slice_case; release savepoint slice_case;
 
 -- --- E. admin: all companies -------------------------------------------------
-begin;
+savepoint slice_case;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"55555555-5555-5555-5555-555555555555","role":"authenticated"}',
+  '{"sub":"55555555-5555-5555-5555-555555555555","role":"authenticated","aal":"aal2"}',
   true);
 set local role authenticated;
 do $$
@@ -127,6 +128,7 @@ begin
   end if;
   raise notice 'PASS E: admin reads all companies (%)', n;
 end $$;
-rollback;
+rollback to savepoint slice_case; release savepoint slice_case;
 
-\echo 'Slice 25 live verification: all cases passed.'
+rollback;
+\echo 'Slice 25 live verification: all cases passed (all fixtures rolled back).'

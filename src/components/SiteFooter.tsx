@@ -1,3 +1,4 @@
+import { validatePolicyPublication } from "@/lib/policy-publication.mjs";
 import Link from "next/link";
 import { SITE_NAME, LAUNCH_MARKET } from "@/lib/site";
 
@@ -16,6 +17,7 @@ export function SiteFooter() {
         <p className="mt-1">
           {LAUNCH_MARKET} · Korean-English bilingual local jobs
         </p>
+        {validatePolicyPublication().length > 0 && <p className="mt-3">정책 검토 초안 / Policies are drafts for review</p>}
         <nav className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
           {FOOTER_LINKS.map((link) => (
             <Link key={link.href} href={link.href} className="hover:text-brand">

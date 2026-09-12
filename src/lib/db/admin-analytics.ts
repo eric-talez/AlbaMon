@@ -26,6 +26,11 @@ interface CountBuilder extends PromiseLike<CountResponse> {
 type CountFilter = (query: CountBuilder) => CountBuilder;
 
 export interface AdminAnalytics {
+  cohortCount: number;
+  appliedWithin7Days: number;
+  medianFirstEmployerReplyHours: number | null;
+  unansweredApplicationCount: number;
+  referenceDate: string;
   jobs: {
     total: number;
     byStatus: Record<ModerationStatus, number>;
@@ -86,6 +91,9 @@ export async function getAdminAnalytics(
 
   try {
     const supabase = await createSupabaseServerClient();
+    const { data: signals, error: signalsError } = await supabase.rpc("admin_marketplace_signals", { reference_date: referenceDate.toISOString() });
+    if (signalsError || !signals?.[0]) throw new Error("Signals unavailable");
+    const signal = signals[0];
     const [
       jobStatusCounts,
       jobTotal,
@@ -143,6 +151,11 @@ export async function getAdminAnalytics(
     return {
       status: "ok",
       analytics: {
+        cohortCount: Number(signal.cohort_count),
+        appliedWithin7Days: Number(signal.applied_within_7_days),
+        medianFirstEmployerReplyHours: signal.median_first_employer_reply_hours === null ? null : Number(signal.median_first_employer_reply_hours),
+        unansweredApplicationCount: Number(signal.unanswered_application_count),
+        referenceDate: referenceDate.toISOString(),
         jobs: {
           total: jobTotal,
           byStatus: jobStatusCounts,
@@ -227,4 +240,14 @@ async function countByValues<T extends string>(
 
 function daysAgoIso(referenceDate: Date, days: number): string {
   return new Date(referenceDate.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+/** Operational account count, without profile or audit metadata. */
+export async function getSuspendedAccountCount(): Promise<{ status: "ok"; count: number } | { status: "error" | "unavailable" }> {
+  if (!isSupabaseConfigured()) return { status: "unavailable" };
+  try {
+    const client = await createSupabaseServerClient();
+    const { count, error } = await client.from("profiles").select("id", { count: "exact", head: true }).eq("account_status", "suspended");
+    return error ? { status: "error" } : { status: "ok", count: count ?? 0 };
+  } catch { return { status: "error" }; }
 }

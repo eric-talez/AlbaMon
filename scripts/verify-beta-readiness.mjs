@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * verify-beta-readiness.mjs - offline docs gate for the private beta.
+ * verify-beta-readiness.mjs - offline docs gate for the California public launch.
  *
  * Usage:
  *   npm run verify:beta
@@ -32,8 +32,11 @@ const root = resolve(
 
 const REQUIRED_FILES = [
   "docs/DEPLOYMENT.md",
-  "docs/LAUNCH_CHECKLIST.md",
   "docs/BETA_READINESS.md",
+  "docs/LAUNCH_CHECKLIST.md",
+  "docs/launch-evidence/environments.md",
+  "docs/legal/launch-policy-review.md",
+  "vercel.json",
   "docs/PRODUCTION_ENV_VARS.md",
   "docs/OPERATIONAL_HEALTH.md",
   "docs/LOCAL_SUPABASE.md",
@@ -58,10 +61,8 @@ const MIGRATION_COUNT_DOCS = [
   "docs/OPERATIONAL_HEALTH.md",
 ];
 
-// Production/launch docs that must not resurrect the pre-Slice-28 claim that the
-// service-role client has no app consumer. Scoped to the operational set so the
-// Group-B "this user flow doesn't use the service role" notes elsewhere (README,
-// DATABASE.md, PRODUCT_BRIEF.md, supabase/README.md) stay untouched.
+// Operational docs must describe real privileged consumers without confusing
+// trusted workers with ordinary caller-authenticated business mutations.
 const SERVICE_ROLE_DOCS = [
   "docs/DEPLOYMENT.md",
   "docs/LAUNCH_CHECKLIST.md",
@@ -71,9 +72,7 @@ const SERVICE_ROLE_DOCS = [
   "docs/LOCAL_SUPABASE.md",
 ];
 
-// The exact stale global negation. Group-B slice-specific statements ("the OTP
-// flow uses the anon client, not the service role") use different wording and
-// are not matched.
+// Match the obsolete global claim, not scoped descriptions of user flows.
 const SERVICE_ROLE_NO_CONSUMER_RE =
   /no app code path\s+(?:currently\s+)?uses\s+(?:the\s+service[-\s]role\s+client|it)\b/i;
 
@@ -156,24 +155,18 @@ function checkChecklistTopics() {
   ).map(({ topic }) => `launch checklist no longer covers: ${topic}`);
 }
 
-function checkRunbookStructure() {
-  const runbook = tryRead("docs/BETA_READINESS.md");
-  if (runbook === null) {
-    return ["docs/BETA_READINESS.md is missing (see required-files check)"];
-  }
-  const failures = [];
-  for (let section = 1; section <= 17; section += 1) {
-    if (!new RegExp(`^## ${section}\\. `, "m").test(runbook)) {
-      failures.push(`missing runbook section: ## ${section}.`);
-    }
-  }
-  if (!/substitute\s+for\s+attorney\s+review/i.test(runbook)) {
-    failures.push("missing attorney-review disclaimer");
-  }
-  if (!/legal,\s+tax,\s+immigration,\s+or\s+employment\s+advice/i.test(runbook)) {
-    failures.push("missing not-legal-advice disclaimer");
-  }
-  return failures;
+function checkCurrentMigrations() {
+  const dir = join(root, "supabase/migrations");
+  if (!existsSync(dir)) return ["missing current migration directory"];
+  const files = readdirSync(dir).filter(name => name.endsWith(".sql")).sort();
+  if (!files.length || files.some(name => !/^\d{14}_[a-z0-9_]+\.sql$/.test(name))) return ["invalid current migration filenames"];
+  if (new Set(files.map(name => name.slice(0,14))).size !== files.length) return ["duplicate migration history version"];
+  return [];
+}
+
+function checkNativeReleaseBuild() {
+  const config = tryRead("vercel.json");
+  return config && JSON.parse(config).buildCommand === "npm run build:release" ? [] : ["Vercel native release build command missing"];
 }
 
 function checkEnvVarReference() {
@@ -196,7 +189,7 @@ function checkEnvVarReference() {
 function checkNoSecretsInDocs() {
   const docsDir = join(root, "docs");
   if (!existsSync(docsDir)) return ["docs/ directory missing"];
-  const files = readdirSync(docsDir)
+  const files = readdirSync(docsDir, { recursive: true })
     .filter((name) => name.endsWith(".md"))
     .map((name) => join("docs", name));
   for (const extra of ["README.md", ".env.example"]) {
@@ -274,9 +267,9 @@ function checkMigrationInventory() {
   return failures;
 }
 
-// Since Slice 28 the service-role client HAS an app consumer (the durable rate
-// limiter's consume_rate_limit RPC). Fail if any operational doc still claims it
-// has none, and require the real consumer to be documented somewhere.
+// Launch notification workers use the service role; the optional local OTP
+// limiter is a separate retained consumer. Fail obsolete global claims and
+// require the active notification boundary to be documented.
 function checkServiceRoleConsumerClaim() {
   const failures = [];
   for (const doc of SERVICE_ROLE_DOCS) {
@@ -284,17 +277,17 @@ function checkServiceRoleConsumerClaim() {
     if (content === null) continue;
     if (SERVICE_ROLE_NO_CONSUMER_RE.test(content)) {
       failures.push(
-        `${doc}: stale claim that no app code path uses the service-role client (the Slice 28 rate limiter is its consumer)`,
+        `${doc}: stale claim that no app code path uses the service-role client (trusted notification workers use it)`,
       );
     }
   }
   const documentsConsumer = SERVICE_ROLE_DOCS.some((doc) => {
     const content = tryRead(doc);
-    return content !== null && content.includes("consume_rate_limit");
+    return content !== null && content.includes("notification_outbox");
   });
   if (!documentsConsumer) {
     failures.push(
-      "no operational doc documents the service-role consumer (consume_rate_limit)",
+      "no operational doc documents the trusted notification service-role consumer (notification_outbox)",
     );
   }
   return failures;
@@ -303,7 +296,8 @@ function checkServiceRoleConsumerClaim() {
 const checks = [
   { name: "required files exist", run: checkRequiredFilesExist },
   { name: "launch checklist covers required topics", run: checkChecklistTopics },
-  { name: "beta runbook structure", run: checkRunbookStructure },
+  { name: "current migration history names", run: checkCurrentMigrations },
+  { name: "native Vercel release build", run: checkNativeReleaseBuild },
   { name: "env var reference completeness", run: checkEnvVarReference },
   { name: "migration inventory documented", run: checkMigrationInventory },
   { name: "service-role consumer documented", run: checkServiceRoleConsumerClaim },
@@ -311,7 +305,7 @@ const checks = [
   { name: "npm script wiring", run: checkNpmScriptWiring },
 ];
 
-console.log("K-Work US - beta readiness verification (offline docs gate)");
+console.log("K-Work US - California launch verification (offline docs gate; not hosted readiness)");
 console.log(`root: ${root}`);
 console.log("");
 

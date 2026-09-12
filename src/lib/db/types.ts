@@ -36,7 +36,15 @@ export type {
 export type AddressDisplayMode = "full" | "city_only";
 
 export interface ProfileRow {
+  policy_identity: string | null;
+  terms_version: string | null;
+  terms_accepted_at: string | null;
+  privacy_notice_version: string | null;
+  privacy_notice_acknowledged_at: string | null;
   id: string;
+  account_status: "active" | "suspended";
+  email_notifications_enabled: boolean;
+  suppressed_email: boolean;
   role: Role;
   email: string | null;
   display_name: string | null;
@@ -63,6 +71,9 @@ export interface CompanyRow {
 }
 
 export interface JobRow {
+  posting_policy_identity: string | null;
+  posting_policy_version: string | null;
+  posting_policy_acknowledged_at: string | null;
   id: string;
   company_id: string;
   title: string;
@@ -117,6 +128,12 @@ export interface PublicJobListingRow {
   posted_at: string | null;
   company_name: string;
   company_is_verified: boolean;
+  expires_at: string;
+  updated_at: string;
+}
+
+export interface PublicJobCityRow {
+  city: string;
 }
 
 export interface ApplicationRow {
@@ -138,6 +155,8 @@ export interface MessageRow {
 }
 
 export interface ApplicationThreadContextRow {
+  participant_side: "applicant" | "employer" | "admin";
+  recipient_id: string | null;
   application_id: string;
   job_id: string;
   job_title: string;
@@ -157,6 +176,7 @@ export interface SeekerApplicationListingRow {
   cover_note: string | null;
   submitted_at: string;
   job_is_public: boolean;
+  application_updated_at: string;
 }
 
 /** Row returned by the employer-owned application listing RPC. */
@@ -171,6 +191,7 @@ export interface EmployerApplicationListingRow {
   cover_note: string | null;
   submitted_at: string;
   job_is_public: boolean;
+  application_updated_at: string;
 }
 
 export interface ReportRow {

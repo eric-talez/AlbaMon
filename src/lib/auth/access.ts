@@ -51,3 +51,8 @@ export const ROLE_HOME: Record<Role, string> = {
 export function roleHome(role: Role): string {
   return ROLE_HOME[role];
 }
+
+/** Privileged operations require MFA in the current session. */
+export function canUseAdmin(user: { role: Role; aal: "aal1" | "aal2" }): boolean {
+  return user.role === "admin" && user.aal === "aal2";
+}

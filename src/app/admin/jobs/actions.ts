@@ -15,9 +15,10 @@ const UUID_PATTERN =
 function refreshAdminJobPaths(jobId?: string, includePublic = false): void {
   revalidatePath("/admin");
   revalidatePath("/admin/jobs");
+  for (const path of ["/", "/employer", "/employer/jobs", "/employer/applications", "/dashboard", "/dashboard/applications"]) revalidatePath(path);
   if (includePublic) {
     revalidatePath("/jobs");
-    if (jobId) revalidatePath(`/jobs/${jobId}`);
+    if (jobId) { revalidatePath(`/jobs/${jobId}`); revalidatePath(`/jobs/${jobId}/apply`); revalidatePath(`/employer/jobs/${jobId}/edit`); }
   }
 }
 
@@ -28,22 +29,31 @@ export async function moderateJob(
   await requireRole("admin", "/admin/jobs");
   const jobId = formData.get("jobId");
   const decision = formData.get("decision");
+  const revision = formData.get("expectedUpdatedAt");
+  const reason = String(formData.get("reason") ?? "").trim();
   if (
     typeof jobId !== "string" ||
     !UUID_PATTERN.test(jobId) ||
-    (decision !== "approve" && decision !== "reject")
+    (decision !== "approve" && decision !== "reject" && decision !== "pause") ||
+    typeof revision !== "string" || !Number.isFinite(Date.parse(revision)) ||
+    (decision !== "approve" && (reason.length < 1 || reason.length > 500))
   ) {
     return { status: "error", message: "올바른 검토 요청이 아닙니다." };
   }
 
-  const result = await moderatePendingJob(jobId, decision);
+  const result = await moderatePendingJob(
+    jobId,
+    decision,
+    revision,
+    decision === "approve" ? null : reason,
+  );
   if (result.status === "updated") {
-    refreshAdminJobPaths(jobId, decision === "approve");
+    refreshAdminJobPaths(jobId, true);
     return {
       status: "success",
       message: decision === "approve"
         ? "공고를 승인했습니다."
-        : "공고를 반려했습니다.",
+        : decision === "pause" ? "공고 게시를 중지했습니다." : "공고를 반려했습니다.",
     };
   }
   if (result.status === "conflict") {

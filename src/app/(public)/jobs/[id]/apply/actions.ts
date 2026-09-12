@@ -1,18 +1,17 @@
 "use server";
 
+import { WRITE_RETRY_MESSAGE, SUSPENDED_WRITE_MESSAGE } from "@/lib/db/write-errors";
+
 import { getApprovedJobById } from "@/lib/db/jobs";
 import { createApplication } from "@/lib/db/applications";
-import { requireUser } from "@/lib/auth/guards";
+import { activeWriterError, requireUser } from "@/lib/auth/guards";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { notifyApplicationSubmitted } from "@/lib/notifications/dev";
-import { enforceUserPolicy } from "@/lib/rate-limit/service";
-import { RATE_LIMIT_POLICIES } from "@/lib/rate-limit/policies";
-import { rateLimitedResult } from "@/lib/rate-limit/types";
-import type { RateLimitedResult } from "@/lib/rate-limit/types";
 
-export type ApplicationFormState =
-  | { status: "idle" | "success" | "duplicate" | "error"; message: string }
-  | RateLimitedResult;
+export interface ApplicationFormState {
+  status: "idle" | "success" | "duplicate" | "error";
+  message: string;
+}
 
 export async function submitApplication(
   jobId: string,
@@ -21,6 +20,8 @@ export async function submitApplication(
 ): Promise<ApplicationFormState> {
   const applyPath = `/jobs/${encodeURIComponent(jobId)}/apply`;
   const user = await requireUser(applyPath);
+  const writerError = activeWriterError(user);
+  if (writerError) return writerError;
 
   if (user.role !== "seeker") {
     return {
@@ -49,14 +50,6 @@ export async function submitApplication(
     };
   }
 
-  // Rate-limit before any business DB work (job lookup / insert). A denied
-  // request performs no read and no mutation.
-  const limit = await enforceUserPolicy(
-    RATE_LIMIT_POLICIES.submitApplication,
-    user.id,
-  );
-  if (!limit.allowed) return rateLimitedResult(limit.retryAfterSeconds);
-
   try {
     const job = await getApprovedJobById(jobId);
     if (!job) {
@@ -78,6 +71,8 @@ export async function submitApplication(
     trimmedCoverNote || null,
   );
 
+  if (result.status === "rate_limited") return { status: "error", message: WRITE_RETRY_MESSAGE };
+  if (result.status === "suspended") return { status: "error", message: SUSPENDED_WRITE_MESSAGE };
   switch (result.status) {
     case "created":
       // Best-effort dev notification: a notify failure must never turn a

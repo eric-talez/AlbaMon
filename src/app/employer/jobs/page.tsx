@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/guards";
-import { getEmployerJobs } from "@/lib/db/employer-jobs";
+import { getEmployerJobs, getJobReviewNote } from "@/lib/db/employer-jobs";
 import { MODERATION_STATUS_LABELS } from "@/lib/types";
+
+import { changeEmployerJob } from "./[id]/edit/actions";
 
 export const metadata: Metadata = { title: "내 공고" };
 
@@ -13,9 +15,11 @@ function formatDate(value: string): string {
     : new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium" }).format(date);
 }
 
-export default async function EmployerJobsPage() {
+export default async function EmployerJobsPage({ searchParams }: { searchParams?: Promise<{ result?: string }> }) {
   const user = await requireRole("employer", "/employer/jobs");
   const result = await getEmployerJobs(user.id);
+  const outcome = (await searchParams)?.result;
+  const notes = new Map(result.status === "ok" ? await Promise.all(result.jobs.filter(job => ["rejected", "paused"].includes(job.moderationStatus)).map(async job => [job.id, await getJobReviewNote(job.id)] as const)) : []);
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
@@ -27,6 +31,7 @@ export default async function EmployerJobsPage() {
         <Link href="/employer/jobs/new" className="rounded-full bg-brand px-4 py-2 text-sm font-medium text-brand-foreground">새 공고 등록</Link>
       </div>
 
+      {outcome ? <p role={outcome === "updated" ? "status" : "alert"}>{outcome === "updated" ? "공고 상태를 변경했습니다." : outcome === "conflict" ? "다른 변경이 있습니다. 최신 상태를 확인해 주세요." : "상태를 변경할 수 없습니다."}</p> : null}
       {result.status !== "ok" ? (
         <section className="mt-6 rounded-xl border border-border bg-surface p-5" role="alert">
           <h2 className="font-semibold">공고 목록을 사용할 수 없습니다.</h2>
@@ -55,11 +60,21 @@ export default async function EmployerJobsPage() {
                   {MODERATION_STATUS_LABELS[job.moderationStatus]}
                 </span>
               </div>
+              {notes.get(job.id) ? <p className="mt-3">검토 사유 / Review note: {notes.get(job.id)?.reason}</p> : null}
+              <form action={changeEmployerJob} className="mt-4 flex flex-wrap gap-3 text-sm" aria-label={`${job.title} 상태 변경`}>
+                <input type="hidden" name="jobId" value={job.id} />
+                <input type="hidden" name="expectedUpdatedAt" value={job.updatedAt} />
+                <span>대상: {job.title}</span>
+                <Link href={`/employer/jobs/${job.id}/edit`} className="text-brand underline">편집 / Edit</Link>
+                {!["paused", "expired"].includes(job.moderationStatus) ? <button name="command" value="pause">게시 중지 / Pause</button> : null}
+                {job.moderationStatus !== "expired" ? <button name="command" value="close">마감 / Close</button> : null}
+                {["draft", "rejected", "paused", "expired"].includes(job.moderationStatus) ? <button name="command" value="resubmit">재심사 요청 / Resubmit</button> : null}
+              </form>
               <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4 text-sm">
-                {job.moderationStatus === "approved" ? (
+                {job.isOpen ? (
                   <Link href={`/jobs/${encodeURIComponent(job.id)}`} className="font-medium text-brand hover:underline">공개 공고 보기</Link>
                 ) : (
-                  <span className="text-muted">승인 전에는 공개되지 않습니다.</span>
+                  <span className="text-muted">현재 공개 중이 아닙니다. 편집 및 지원 기록은 계속 확인할 수 있습니다.</span>
                 )}
               </div>
             </li>

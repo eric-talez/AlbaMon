@@ -1,4 +1,6 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("next/navigation", () => ({
@@ -16,6 +18,7 @@ vi.mock("@/lib/auth/guards", () => ({
 import { requireUser } from "@/lib/auth/guards";
 import Home from "@/app/(public)/page";
 import JobsPage from "@/app/(public)/jobs/page";
+import { metadata as rootMetadata } from "@/app/layout";
 import JobDetailPage, {
   generateMetadata as generateJobMetadata,
 } from "@/app/(public)/jobs/[id]/page";
@@ -26,6 +29,8 @@ import PrivacyPage from "@/app/(public)/privacy/page";
 import PostingPolicyPage from "@/app/(public)/posting-policy/page";
 import WorkAuthorizationInfoPage from "@/app/(public)/work-authorization-info/page";
 import { getMockJobs } from "@/lib/mock/jobs";
+import { JobFilters } from "@/components/JobFilters";
+import { SiteFooter } from "@/components/SiteFooter";
 
 const mockRequireUser = vi.mocked(requireUser);
 const approvedJob = getMockJobs()[0];
@@ -44,6 +49,7 @@ beforeEach(() => {
     email: "user@example.com",
     role: "seeker",
     isDev: true,
+    aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
   });
 });
 
@@ -59,6 +65,13 @@ describe("homepage", () => {
     expect(html).toContain("K-Work US");
     expect(html).toContain('href="/jobs"');
     expect(html).toContain("법률 자문이 아닙니다");
+    expect(html).toContain("California");
+    expect(html).not.toMatch(/LA\s*\/\s*(?:OC|Orange County)/i);
+    expect(rootMetadata.description).toContain("캘리포니아");
+    expect(rootMetadata.description).not.toMatch(/LA\s*\/\s*OC/i);
+    expect(renderToStaticMarkup(createElement(SiteFooter))).not.toMatch(
+      /LA\s*\/\s*(?:OC|Orange County)/i,
+    );
   });
 });
 
@@ -74,10 +87,29 @@ describe("jobs browse page", () => {
     // Explicit label association on the filter controls.
     expect(html).toContain('for="filter-q"');
     expect(html).toContain('id="filter-q"');
-    // Expired / malformed-expiry approved jobs never reach the public list.
-    expect(html).not.toContain("/jobs/kw-011");
-    expect(html).not.toContain("/jobs/kw-012");
+    expect(html).not.toContain("/jobs/kw-103");
+    expect(html).not.toContain("/jobs/kw-104");
     expect(html).not.toContain("마감된 물류 창고");
+    expect(html).toContain('method="get"');
+    expect(html).toContain('maxLength="200"');
+    expect(html).toContain("San Jose");
+    expect(html).toContain("CA 전체");
+    expect(html).toContain("급여 단위 (Pay unit)");
+    expect(html).toContain('<option value="" selected="">전체 급여 단위</option>');
+  });
+
+  it("preserves filters while resetting pagination on GET submit", () => {
+    const html = renderToStaticMarkup(
+      createElement(JobFilters, {
+        cities: ["Irvine", "San Jose"],
+        values: { q: "서버", city: "Irvine", payUnit: "hour", payMin: 20, page: 2 },
+      }),
+    );
+    expect(html).toContain('value="서버"');
+    expect(html).toContain('<option value="Irvine" selected="">Irvine</option>');
+    expect(html).toContain('<option value="hour" selected="">시급</option>');
+    expect(html).not.toContain('name="page"');
+    expect(html).toContain('href="/jobs"');
   });
 });
 
@@ -99,13 +131,13 @@ describe("job detail page", () => {
   });
 
   it("404s for an approved-but-expired job, exactly like a non-public job", async () => {
-    // kw-011 is approved but past its expiry; kw-012 is approved with a
+    // kw-103 is approved but past its expiry; kw-104 is approved with a
     // malformed expiry. Both must resolve to the same 404 as an unknown id.
     await expect(
-      JobDetailPage({ params: Promise.resolve({ id: "kw-011" }) }),
+      JobDetailPage({ params: Promise.resolve({ id: "kw-103" }) }),
     ).rejects.toThrow("NOT_FOUND");
     await expect(
-      JobDetailPage({ params: Promise.resolve({ id: "kw-012" }) }),
+      JobDetailPage({ params: Promise.resolve({ id: "kw-104" }) }),
     ).rejects.toThrow("NOT_FOUND");
   });
 
@@ -150,6 +182,7 @@ describe("apply flow guard", () => {
       email: "employer@example.com",
       role: "employer",
       isDev: true,
+      aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
     });
     const html = renderToStaticMarkup(
       await ApplyPage({ params: Promise.resolve({ id: approvedJob.id }) }),
@@ -182,12 +215,12 @@ describe("policy pages", () => {
   it.each([
     ["terms", TermsPage, "이용약관", "법률 검토"],
     ["privacy", PrivacyPage, "개인정보처리방침", "법률 검토"],
-    ["posting-policy", PostingPolicyPage, "공고 등록 정책", "허용되지 않습니다"],
+    ["posting-policy", PostingPolicyPage, "공고 등록 정책", "허용하지 않습니다"],
     [
       "work-authorization-info",
       WorkAuthorizationInfoPage,
       "근로자격 안내",
-      "법률 자문이 아닙니다",
+      "법률 자문이나 판정이 아닙니다",
     ],
   ] as const)("renders /%s with an h1 and informational copy", (_route, Page, title, copy) => {
     const html = renderToStaticMarkup(Page());

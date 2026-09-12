@@ -1,7 +1,8 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("@/lib/auth/guards", () => ({ requireRole: vi.fn() }));
+vi.mock("@/lib/auth/guards", async (original) => ({ ...await original<object>(), requireRole: vi.fn() }));
 vi.mock("@/lib/db/applications", () => ({ updateApplicationStatus: vi.fn() }));
 vi.mock("@/lib/notifications/dev", () => ({
   notifyApplicationStatusChanged: vi.fn(),
@@ -25,6 +26,7 @@ beforeEach(() => {
     email: `${role}@example.com`,
     role,
     isDev: false,
+    aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
   }));
   mockUpdate.mockResolvedValue({
     status: "updated",
@@ -39,6 +41,7 @@ function form(status = "interview", id = applicationId): FormData {
   const data = new FormData();
   data.set("applicationId", id);
   data.set("status", status);
+  data.set("expectedUpdatedAt", "2026-09-09T01:02:03.123456Z");
   // A forged status-internal field must never influence the trusted write.
   data.set("seeker_id", "forged-seeker");
   return data;
@@ -52,7 +55,7 @@ describe("employer application status action", () => {
       "employer",
       "/employer/applications",
     );
-    expect(mockUpdate).toHaveBeenCalledWith(applicationId, "interview");
+    expect(mockUpdate).toHaveBeenCalledWith(applicationId, "interview", "2026-09-09T01:02:03.123456Z");
     expect(mockNotify).toHaveBeenCalledWith(
       applicationId,
       "submitted",
@@ -128,4 +131,12 @@ describe("employer application status action", () => {
     const unavailable = await updateEmployerApplicationStatus(idle, form());
     expect(unavailable.message).toContain("Supabase");
   });
+});
+
+it("rejects forged employer withdrawal and missing CAS tokens", async () => {
+  const missing = form(); missing.delete("expectedUpdatedAt");
+  for (const input of [form("withdrawn"), missing]) {
+    expect((await updateEmployerApplicationStatus(idle, input)).status).toBe("error");
+  }
+  expect(mockUpdate).not.toHaveBeenCalled();
 });

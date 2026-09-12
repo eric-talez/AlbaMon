@@ -15,7 +15,7 @@ export const MOCK_JOBS: Job[] = [
     employerVerified: true,
     category: "restaurant_cafe",
     jobType: "part_time",
-    city: "Los Angeles (Koreatown)",
+    city: "Los Angeles",
     state: "CA",
     addressDisplay: "Koreatown, Los Angeles, CA",
     addressDisplayMode: "city_only",
@@ -33,6 +33,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["식사 제공", "팁 별도", "유연한 스케줄"],
     moderationStatus: "approved",
     postedAt: "2026-06-18",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-002",
@@ -59,6 +60,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["의료보험", "유급휴가", "주말 휴무"],
     moderationStatus: "approved",
     postedAt: "2026-06-17",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-003",
@@ -85,6 +87,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["초과근무 수당", "성과급"],
     moderationStatus: "approved",
     postedAt: "2026-06-19",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-004",
@@ -111,6 +114,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["팁 별도", "높은 시급", "단골 고객"],
     moderationStatus: "approved",
     postedAt: "2026-06-15",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-005",
@@ -137,6 +141,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["유연한 시간", "강의 경력 인정"],
     moderationStatus: "approved",
     postedAt: "2026-06-14",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-006",
@@ -163,6 +168,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["팁 별도", "음료 제공"],
     moderationStatus: "approved",
     postedAt: "2026-06-16",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-007",
@@ -189,6 +195,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["직원 할인", "유연한 스케줄"],
     moderationStatus: "approved",
     postedAt: "2026-06-13",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-008",
@@ -215,6 +222,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["주말 휴무", "장기 근무 우대"],
     moderationStatus: "approved",
     postedAt: "2026-06-12",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-009",
@@ -241,6 +249,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["팁 별도", "교육 지원"],
     moderationStatus: "approved",
     postedAt: "2026-06-11",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     id: "kw-010",
@@ -249,7 +258,7 @@ export const MOCK_JOBS: Job[] = [
     employerVerified: false,
     category: "restaurant_cafe",
     jobType: "temporary",
-    city: "Los Angeles (Koreatown)",
+    city: "Los Angeles",
     state: "CA",
     addressDisplay: "Koreatown, Los Angeles, CA",
     addressDisplayMode: "city_only",
@@ -267,9 +276,86 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["식사 제공", "주차 지원"],
     moderationStatus: "approved",
     postedAt: "2026-06-19",
-    // Fixed far-future cutoff: still publicly active. Proves future-expiry jobs
-    // stay visible through the real data layer (getMockJobs / search).
-    expiresAt: "2099-01-01T00:00:00.000Z",
+    expiresAt: "2100-01-01T00:00:00Z",
+  },
+  {
+    id: "kw-011",
+    title: "급여 의미 테스트 literal * comma, open( close)",
+    companyName: "Bay Area Community Media",
+    employerVerified: false,
+    category: "office_admin",
+    jobType: "full_time",
+    city: "San Jose",
+    state: "CA",
+    addressDisplay: "San Jose, CA",
+    addressDisplayMode: "city_only",
+    payMin: 18,
+    payMax: 25,
+    payUnit: "hour",
+    tipsAvailable: false,
+    scheduleDays: "월–금",
+    scheduleTimeRange: "9:00 AM – 5:00 PM",
+    languageRequirement: "bilingual_preferred",
+    description:
+      "지역 커뮤니티 콘텐츠와 일정을 관리합니다. Literal percent % and underscore _ markers.",
+    responsibilities: ["콘텐츠 관리"],
+    requirements: ["업무 관련 한/영 소통"],
+    benefits: [],
+    moderationStatus: "approved",
+    postedAt: "2026-06-20T08:00:00Z",
+    expiresAt: "2100-01-01T00:00:00Z",
+  },
+  {
+    id: "kw-012",
+    title: "급여 의미 테스트 리테일 매장 운영 직원",
+    companyName: "Sacramento Community Market",
+    employerVerified: false,
+    category: "retail",
+    jobType: "full_time",
+    city: "Sacramento",
+    state: "CA",
+    addressDisplay: "Sacramento, CA",
+    addressDisplayMode: "city_only",
+    payMin: 22,
+    payMax: 25,
+    payUnit: "hour",
+    tipsAvailable: false,
+    scheduleDays: "주 5일",
+    scheduleTimeRange: "9:00 AM – 6:00 PM",
+    languageRequirement: "korean_helpful",
+    description: "매장 운영과 고객 안내를 담당합니다.",
+    responsibilities: ["매장 운영"],
+    requirements: ["고객 응대 가능"],
+    benefits: [],
+    moderationStatus: "approved",
+    postedAt: "2026-06-20T09:00:00Z",
+    expiresAt: "2100-01-01T00:00:00Z",
+  },
+  {
+    id: "kw-013",
+    title: "급여 의미 테스트 회계 사무 담당",
+    companyName: "San Diego Business Center",
+    employerVerified: false,
+    category: "office_admin",
+    jobType: "full_time",
+    city: "San Diego",
+    state: "CA",
+    addressDisplay: "San Diego, CA",
+    addressDisplayMode: "city_only",
+    payMin: 60000,
+    payMax: 60000,
+    payUnit: "year",
+    tipsAvailable: false,
+    scheduleDays: "월–금",
+    scheduleTimeRange: "9:00 AM – 5:00 PM",
+    languageRequirement: "english_required",
+    description: "회계 자료와 사무 업무를 관리합니다.",
+    responsibilities: ["회계 자료 관리"],
+    requirements: ["관련 업무 경험"],
+    benefits: [],
+    moderationStatus: "approved",
+    postedAt: "2026-06-20T10:00:00Z",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     // Pending — must NOT appear on public pages until an admin approves it.
@@ -296,6 +382,7 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["제품 할인"],
     moderationStatus: "pending",
     postedAt: "2026-06-20",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     // Draft — employer has not submitted for review yet. Never public.
@@ -322,11 +409,12 @@ export const MOCK_JOBS: Job[] = [
     benefits: ["주말 휴무"],
     moderationStatus: "draft",
     postedAt: "2026-06-20",
+    expiresAt: "2100-01-01T00:00:00Z",
   },
   {
     // Approved but EXPIRED — kept for employer/admin history, never public.
     // Fixed past cutoff so the exclusion is deterministic regardless of run date.
-    id: "kw-011",
+    id: "kw-103",
     title: "마감된 물류 창고 야간 근무 (지원 종료)",
     companyName: "Vernon Logistics Co.",
     employerVerified: false,
@@ -354,7 +442,7 @@ export const MOCK_JOBS: Job[] = [
   {
     // Approved with a MALFORMED expiresAt — must fail closed (excluded from all
     // public reads), never crash or leak.
-    id: "kw-012",
+    id: "kw-104",
     title: "잘못된 만료일 데이터 공고 (테스트)",
     companyName: "Torrance Office Partners",
     employerVerified: false,
@@ -381,31 +469,23 @@ export const MOCK_JOBS: Job[] = [
   },
 ];
 
-/**
- * Public-visibility rule for a job, mirroring the production
- * `public_job_listings` view / `jobs_select_public_approved` policy exactly:
- *
- *     approved AND (expiresAt is null/undefined OR expiresAt > now)
- *
- * `now` is injectable (epoch ms) so unit tests are deterministic and never
- * depend on dates close to today. The comparison is strict `>`, so a job whose
- * `expiresAt` equals `now` is already expired (matches SQL `expires_at > now()`).
- * A present-but-unparseable `expiresAt` fails closed (treated as expired).
+/** Expiry portion of launch visibility; public mock readers also restrict CA.
+ * Missing or malformed expiry fails closed. The clock is injectable for tests.
  */
 export function isJobPubliclyActive(
-  job: Pick<Job, "moderationStatus" | "expiresAt">,
+  job: Pick<Job, "moderationStatus"> & { expiresAt?: string | null },
   now: number = Date.now(),
 ): boolean {
-  if (job.moderationStatus !== "approved") return false;
-  if (job.expiresAt == null) return true;
-  const expiry = Date.parse(job.expiresAt);
-  return Number.isNaN(expiry) ? false : expiry > now;
+  if (job.moderationStatus !== "approved" || !job.expiresAt) return false;
+  return Date.parse(job.expiresAt) > now;
 }
 
 export function getMockJobs(): Job[] {
-  return MOCK_JOBS.filter((j) => isJobPubliclyActive(j));
+  return MOCK_JOBS.filter((j) => j.state === "CA" && isJobPubliclyActive(j));
 }
 
 export function getMockJobById(id: string): Job | undefined {
-  return MOCK_JOBS.find((j) => j.id === id && isJobPubliclyActive(j));
+  return MOCK_JOBS.find(
+    (j) => j.id === id && j.state === "CA" && isJobPubliclyActive(j),
+  );
 }

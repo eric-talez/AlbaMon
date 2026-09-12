@@ -253,15 +253,18 @@ describe("transactional admin audit migration (Slice 27)", () => {
     );
   });
 
-  it("extends the live employer-access review with the transactional audit write", () => {
+  it("keeps one trigger audit writer for the live employer-access review", () => {
     const finalReview = lastFunctionDefinition(
       allSql,
       "review_employer_access_request",
     );
-    expect(finalReview).toMatch(/insert into public\.audit_logs/i);
-    expect(finalReview).toMatch(/get diagnostics v_promoted_count = row_count/i);
-    expect(finalReview).toMatch(/v_role_promoted := v_promoted_count = 1/i);
-    expect(finalReview).toMatch(/'role_promoted', v_role_promoted/i);
+    // The actual uniqueness/rollback contract is covered by slice-27 SQL.
+    // Every RPC UPDATE reaches this trigger; a second INSERT would duplicate it.
+    expect(finalReview).not.toMatch(/insert into public\.audit_logs/i);
+    expect(allSql).toMatch(
+      /create trigger employer_access_audit_decision after update of status on public\.employer_access_requests for each row execute function public\.audit_moderation_decision\(\)/i,
+    );
+    expect(allSql).not.toMatch(/drop trigger(?: if exists)? employer_access_audit_decision/i);
     // Original review semantics survive the redefinition.
     expect(finalReview).toMatch(/target\.status <> 'pending'/i);
     expect(finalReview).toMatch(/reviewed_by = auth\.uid\(\)/i);

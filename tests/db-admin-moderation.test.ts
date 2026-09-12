@@ -64,27 +64,32 @@ describe("admin moderation reads", () => {
     });
   });
 
-  it("maps jobs and prioritizes pending before newest non-pending jobs", async () => {
+  it("maps the database ordered page and requests the pending filter and 20-row range", async () => {
     const companySelect = vi.fn().mockResolvedValue({
       data: [{ id: "company-1", name: "K-Work Cafe" }],
       error: null,
     });
     const order = vi.fn().mockResolvedValue({
       data: [
-        jobRow({ id: "approved", moderation_status: "approved", created_at: "2026-06-22T00:00:00Z" }),
         jobRow({ id: "pending", moderation_status: "pending", created_at: "2026-06-21T00:00:00Z" }),
+        jobRow({ id: "pending2", moderation_status: "pending", created_at: "2026-06-22T00:00:00Z" }),
       ],
       error: null,
     });
+    const queue = { eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(), range: order };
     const from = vi.fn()
-      .mockReturnValueOnce({ select: companySelect })
-      .mockReturnValueOnce({ select: vi.fn(() => ({ order })) });
+      .mockReturnValueOnce({ select: vi.fn(() => queue) })
+      .mockReturnValueOnce({ select: vi.fn(() => ({ in: companySelect })) });
     mockClient.mockResolvedValue({ from } as never);
 
     const result = await getAdminJobs();
+    expect(queue.eq).toHaveBeenCalledWith("moderation_status", "pending");
+    expect(queue.order).toHaveBeenNthCalledWith(1, "created_at", { ascending: true });
+    expect(queue.order).toHaveBeenNthCalledWith(2, "id", { ascending: true });
+    expect(queue.range).toHaveBeenCalledWith(0, 19);
     expect(result).toMatchObject({
       status: "ok",
-      jobs: [{ id: "pending" }, { id: "approved" }],
+      jobs: [{ id: "pending" }, { id: "pending2" }],
     });
   });
 
@@ -103,9 +108,10 @@ describe("admin moderation reads", () => {
       ],
       error: null,
     });
+    const queue = { eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(), range: order };
     const from = vi.fn()
-      .mockReturnValueOnce({ select: companySelect })
-      .mockReturnValueOnce({ select: vi.fn(() => ({ order })) });
+      .mockReturnValueOnce({ select: vi.fn(() => queue) })
+      .mockReturnValueOnce({ select: vi.fn(() => ({ in: companySelect })) });
     mockClient.mockResolvedValue({ from } as never);
 
     await expect(getAdminJobs()).resolves.toMatchObject({
@@ -144,7 +150,7 @@ describe("admin moderation reads", () => {
     });
     const profileSelect = vi.fn(() => ({ in: profileIn }));
     const from = vi.fn()
-      .mockReturnValueOnce({ select: vi.fn(() => ({ order: companyOrder })) })
+      .mockReturnValueOnce({ select: vi.fn(() => ({ eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(), range: companyOrder })) })
       .mockReturnValueOnce({ select: profileSelect });
     mockClient.mockResolvedValue({ from } as never);
 
@@ -179,37 +185,21 @@ describe("admin moderation reads", () => {
 });
 
 describe("admin moderation writes", () => {
-  it("delegates job approval to the transactional admin SQL function", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: "approved", error: null });
+  it("sends revision and reason to the database transition boundary", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: [{ status: "updated" }], error: null });
     mockClient.mockResolvedValue({ rpc } as never);
-
-    await expect(moderatePendingJob("job-1", "approve")).resolves.toEqual({
-      status: "updated",
-    });
-    expect(rpc).toHaveBeenCalledWith("moderate_pending_job", {
-      job_id: "job-1",
-      decision: "approved",
-    });
-  });
-
-  it("delegates job rejection and maps a stale review to a conflict", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: "conflict", error: null });
-    mockClient.mockResolvedValue({ rpc } as never);
-
-    await expect(moderatePendingJob("job-1", "reject")).resolves.toEqual({
-      status: "conflict",
-    });
-    expect(rpc).toHaveBeenCalledWith("moderate_pending_job", {
-      job_id: "job-1",
-      decision: "rejected",
-    });
+    await expect(moderatePendingJob("job-1", "approve", "2026-06-21T12:00:00.123456Z")).resolves.toEqual({ status: "updated" });
+    expect(rpc).toHaveBeenCalledWith("transition_job", {target_job_id:"job-1",command:"approve",expected_updated_at:"2026-06-21T12:00:00.123456Z",reason:null});
+    rpc.mockResolvedValue({ data: [{ status: "conflict" }], error: null });
+    await expect(moderatePendingJob("job-1", "reject", "2026-06-21T12:00:00Z", "Policy review")).resolves.toEqual({ status: "conflict" });
+    expect(rpc).toHaveBeenLastCalledWith("transition_job", {target_job_id:"job-1",command:"reject",expected_updated_at:"2026-06-21T12:00:00Z",reason:"Policy review"});
   });
 
   it("maps the job function's admin gate to a generic error", async () => {
     for (const code of ["P0001", "42501"]) {
       const rpc = vi.fn().mockResolvedValue({ data: null, error: { code } });
       mockClient.mockResolvedValue({ rpc } as never);
-      await expect(moderatePendingJob("job-1", "approve")).resolves.toEqual({
+      await expect(moderatePendingJob("job-1", "approve", "2026-06-21T12:00:00Z")).resolves.toEqual({
         status: "error",
       });
     }

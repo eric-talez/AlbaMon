@@ -1,3 +1,4 @@
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -13,6 +14,7 @@ import { NextRequest } from "next/server";
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: vi.fn(),
 }));
+vi.mock("@/lib/db/profiles", () => ({ getAuthProfileForUser: vi.fn() }));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((destination: string) => {
     throw new Error(`REDIRECT:${destination}`);
@@ -31,6 +33,9 @@ import {
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { GET as authCallback } from "@/app/auth/callback/route";
 import { signInDev } from "@/lib/auth/actions";
+
+import { getAuthProfileForUser } from "@/lib/db/profiles";
+const mockProfile = vi.mocked(getAuthProfileForUser);
 
 const mockServerClient = vi.mocked(createSupabaseServerClient);
 
@@ -92,7 +97,7 @@ describe("GET /auth/callback", () => {
   }
 
   function useExchangeResult(error: unknown): ReturnType<typeof vi.fn> {
-    const exchangeCodeForSession = vi.fn(async () => ({ error }));
+    const exchangeCodeForSession = vi.fn(async () => ({ error, data: { user: { id: "u1" } } }));
     mockServerClient.mockResolvedValue({
       auth: { exchangeCodeForSession },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -101,16 +106,40 @@ describe("GET /auth/callback", () => {
   }
 
   beforeEach(() => {
+    mockProfile.mockResolvedValue({ role: "seeker", ...acknowledgedPolicies, accountStatus: "active", displayName: "Kim" });
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", REAL_URL);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", REAL_KEY);
   });
 
+  it("sends an incomplete profile through onboarding with the original safe apply path", async () => {
+    useExchangeResult(null);
+    mockProfile.mockResolvedValue({ role: "seeker", ...acknowledgedPolicies, accountStatus: "active", displayName: "  " });
+    const response = await authCallback(request("?code=abc&next=/jobs/id/apply"));
+    const url = new URL(response.headers.get("location")!, "http://localhost:3000");
+    expect(url.pathname).toBe("/dashboard/profile");
+    expect(url.searchParams.get("next")).toBe("/jobs/id/apply");
+  });
+  it.each(["?code=abc", "?code=invalid", "", "?error=access_denied"])("never caches callback redirects %s", async (query) => {
+    useExchangeResult(query.includes("invalid") ? { message: "bad code" } : null);
+    const response = await authCallback(request(query));
+    expect(response.headers.get("cache-control")).toContain("private");
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(response.headers.get("expires")).toBe("0");
+    expect(response.headers.get("pragma")).toBe("no-cache");
+  });
+  it("fails closed if the exchanged user has no usable profile", async () => {
+    useExchangeResult(null);
+    mockProfile.mockResolvedValue(null);
+    const response = await authCallback(request("?code=abc&next=/jobs"));
+    expect(response.headers.get("location")).toBe("/login?error=auth_callback");
+    expect(response.headers.get("cache-control")).toContain("no-store");
+  });
   it("redirects to a safe next path after a successful exchange", async () => {
     const exchange = useExchangeResult(null);
     const response = await authCallback(request("?code=abc&next=/jobs"));
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/jobs",
+      "/jobs",
     );
     expect(exchange).toHaveBeenCalledWith("abc");
   });
@@ -125,7 +154,7 @@ describe("GET /auth/callback", () => {
       request(`?code=abc&next=${encodeURIComponent(next)}`),
     );
     expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/dashboard",
+      "/dashboard",
     );
   });
 
@@ -133,7 +162,7 @@ describe("GET /auth/callback", () => {
     useExchangeResult({ message: "bad code" });
     const response = await authCallback(request("?code=abc&next=/jobs"));
     expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/login?error=auth_callback",
+      "/login?error=auth_callback",
     );
   });
 
@@ -141,7 +170,7 @@ describe("GET /auth/callback", () => {
     const exchange = useExchangeResult(null);
     const response = await authCallback(request("?next=/jobs"));
     expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/login",
+      "/login",
     );
     expect(exchange).not.toHaveBeenCalled();
   });
@@ -151,9 +180,10 @@ describe("GET /auth/callback", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", PLACEHOLDER_KEY);
     const response = await authCallback(request("?code=abc&next=/jobs"));
     expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/login",
+      "/login",
     );
     expect(mockServerClient).not.toHaveBeenCalled();
+    expect(response.headers.get("cache-control")).toContain("no-store");
   });
 });
 

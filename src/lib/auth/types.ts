@@ -2,9 +2,17 @@ import type { Role } from "@/lib/types";
 
 /** The minimal authenticated user shape the app relies on. */
 export interface AuthUser {
+  policyIdentity: string | null;
+  termsVersion: string | null;
+  termsAcceptedAt: string | null;
+  privacyNoticeVersion: string | null;
+  privacyNoticeAcknowledgedAt: string | null;
   id: string;
   email: string;
   role: Role;
+  aal: "aal1" | "aal2";
+  accountStatus: "active" | "suspended";
+  displayName: string | null;
   /** True when this identity came from the dev-mode cookie, not Supabase. */
   isDev: boolean;
 }

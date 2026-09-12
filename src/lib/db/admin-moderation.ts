@@ -1,3 +1,4 @@
+import { normalizePage as adminPage, ADMIN_PAGE_SIZE } from "@/lib/pagination";
 import "server-only";
 
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -47,6 +48,7 @@ export interface AdminJob {
   moderationStatus: ModerationStatus;
   complianceFlags: ComplianceFlag[];
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface AdminCompany {
@@ -74,7 +76,7 @@ export type AdminCompaniesResult =
 
 export type AdminMutationResult =
   | { status: "updated" }
-  | { status: "conflict" | "unavailable" | "error" };
+  | { status: "conflict" | "not_allowed" | "unavailable" | "error" };
 
 type CompanyIdentityRow = Pick<CompanyRow, "id" | "name">;
 type OwnerProfileRow = Pick<ProfileRow, "id" | "display_name" | "email">;
@@ -83,7 +85,7 @@ const ADMIN_JOB_SELECT =
   "id, company_id, title, category, job_type, city, state, address_display, " +
   "address_display_mode, pay_min, pay_max, pay_unit, tips_available, " +
   "schedule_days, schedule_time_range, language_requirement, description, " +
-  "responsibilities, requirements, benefits, moderation_status, created_at";
+  "responsibilities, requirements, benefits, moderation_status, created_at, updated_at, expires_at";
 
 const ADMIN_COMPANY_SELECT =
   "id, owner_id, name, description, website, phone, city, state, " +
@@ -145,26 +147,23 @@ export async function getAdminQueueCounts(): Promise<AdminQueueCounts> {
   }
 }
 
-export async function getAdminJobs(): Promise<AdminJobsResult> {
+export async function getAdminJobs(page = 1, status: ModerationStatus | "all" = "pending", jobId?: string): Promise<AdminJobsResult> {
   if (!isSupabaseConfigured()) return { status: "unavailable" };
   try {
     const supabase = await createSupabaseServerClient();
-    const { data: companies, error: companyError } = await supabase
-      .from("companies")
-      .select("id, name");
-    if (companyError) throw companyError;
-
-    const companyNames = new Map(
-      ((companies ?? []) as unknown as CompanyIdentityRow[]).map((company) => [
-        company.id,
-        company.name,
-      ]),
-    );
-    const { data, error } = await supabase
-      .from("jobs")
-      .select(ADMIN_JOB_SELECT)
-      .order("created_at", { ascending: false });
+    let query = supabase.from("jobs").select(ADMIN_JOB_SELECT);
+    if (status !== "all") query = query.eq("moderation_status", status);
+    if (jobId) query = query.eq("id", jobId);
+    const start = (adminPage(page) - 1) * ADMIN_PAGE_SIZE;
+    const { data, error } = await query.order("created_at", { ascending: true }).order("id", { ascending: true }).range(start, start + ADMIN_PAGE_SIZE - 1);
     if (error) throw error;
+    const companyIds = [...new Set(((data ?? []) as unknown as JobRow[]).map(job => job.company_id))];
+    const companyNames = new Map<string, string>();
+    if (companyIds.length) {
+      const { data: companies, error: companyError } = await supabase.from("companies").select("id, name").in("id", companyIds);
+      if (companyError) throw companyError;
+      for (const company of (companies ?? []) as unknown as CompanyIdentityRow[]) companyNames.set(company.id, company.name);
+    }
 
     const jobs = ((data ?? []) as unknown as JobRow[])
       .map((job): AdminJob => ({
@@ -197,13 +196,8 @@ export async function getAdminJobs(): Promise<AdminJobsResult> {
           ...(job.benefits ?? []),
         ].join("\n")),
         createdAt: job.created_at,
-      }))
-      .sort((a, b) => {
-        const pendingDifference =
-          Number(b.moderationStatus === "pending") -
-          Number(a.moderationStatus === "pending");
-        return pendingDifference || b.createdAt.localeCompare(a.createdAt);
-      });
+        updatedAt: job.updated_at,
+      }));
     return { status: "ok", jobs };
   } catch {
     console.error("[db] getAdminJobs failed");
@@ -211,14 +205,14 @@ export async function getAdminJobs(): Promise<AdminJobsResult> {
   }
 }
 
-export async function getAdminCompanies(): Promise<AdminCompaniesResult> {
+export async function getAdminCompanies(page = 1, verified: boolean | "all" = false): Promise<AdminCompaniesResult> {
   if (!isSupabaseConfigured()) return { status: "unavailable" };
   try {
     const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("companies")
-      .select(ADMIN_COMPANY_SELECT)
-      .order("created_at", { ascending: false });
+    let query = supabase.from("companies").select(ADMIN_COMPANY_SELECT);
+    if (verified !== "all") query = query.eq("is_verified", verified);
+    const start = (adminPage(page) - 1) * ADMIN_PAGE_SIZE;
+    const { data, error } = await query.order("created_at", { ascending: true }).order("id", { ascending: true }).range(start, start + ADMIN_PAGE_SIZE - 1);
     if (error) throw error;
 
     const companyRows = (data ?? []) as unknown as CompanyRow[];
@@ -252,11 +246,6 @@ export async function getAdminCompanies(): Promise<AdminCompaniesResult> {
           ownerEmail: owner?.email ?? null,
           createdAt: company.created_at,
         };
-      })
-      .sort((a, b) => {
-        const verificationDifference =
-          Number(a.isVerified) - Number(b.isVerified);
-        return verificationDifference || b.createdAt.localeCompare(a.createdAt);
       });
     return { status: "ok", companies };
   } catch {
@@ -267,32 +256,19 @@ export async function getAdminCompanies(): Promise<AdminCompaniesResult> {
 
 export async function moderatePendingJob(
   jobId: string,
-  decision: "approve" | "reject",
+  decision: "approve" | "reject" | "pause",
+  expectedUpdatedAt: string,
+  reason: string | null = null,
 ): Promise<AdminMutationResult> {
   if (!isSupabaseConfigured()) return { status: "unavailable" };
   try {
     const supabase = await createSupabaseServerClient();
-    // Admin-only SQL function: mutates the job and records the audit entry in
-    // one transaction. Approval timestamps posted_at inside Postgres.
-    const { data, error } = await supabase.rpc("moderate_pending_job", {
-      job_id: jobId,
-      decision: decision === "approve" ? "approved" : "rejected",
+    const { data, error } = await supabase.rpc("transition_job", {
+      target_job_id: jobId, command: decision, expected_updated_at: expectedUpdatedAt, reason,
     });
-    if (error) {
-      // P0001 = the function's own admin/decision exceptions; 42501 = execute
-      // privilege missing. requireRole("admin") makes both unreachable in
-      // normal flows, so they surface as a generic error.
-      if (error.code === "P0001" || error.code === "42501") {
-        console.error("[db] moderatePendingJob blocked:", error.code);
-        return { status: "error" };
-      }
-      throw error;
-    }
-    if (data === "conflict") return { status: "conflict" };
-    if (data === "approved" || data === "rejected") {
-      return { status: "updated" };
-    }
-    throw new Error(`Unexpected moderation result: ${String(data)}`);
+    if (error) throw error;
+    const status = data?.[0]?.status;
+    return { status: ["updated", "conflict", "not_allowed"].includes(status) ? status : "error" };
   } catch {
     console.error("[db] moderatePendingJob failed");
     return { status: "error" };
@@ -329,4 +305,39 @@ export async function setCompanyVerification(
     console.error("[db] setCompanyVerification failed");
     return { status: "error" };
   }
+}
+
+export async function changeAccountStatus(userId: string, command: "suspend_account" | "restore_account", reason: string): Promise<AdminMutationResult> {
+  if (!isSupabaseConfigured()) return { status: "unavailable" };
+  try {
+    const client = await createSupabaseServerClient();
+    const { error } = await client.rpc(command, { target_user_id: userId, reason });
+    if (error) return { status: error.code === "40001" ? "conflict" : error.code === "42501" ? "not_allowed" : "error" };
+    return { status: "updated" };
+  } catch { return { status: "error" }; }
+}
+
+export type AdminAccount = Pick<ProfileRow, "id" | "display_name" | "email" | "role" | "account_status" | "created_at">;
+export async function getAdminAccounts(page = 1, status: "active" | "suspended" = "active"): Promise<{ status: "ok"; accounts: AdminAccount[] } | { status: "error" | "unavailable" }> {
+  if (!isSupabaseConfigured()) return { status: "unavailable" };
+  try {
+    const client = await createSupabaseServerClient();
+    const start = (adminPage(page) - 1) * ADMIN_PAGE_SIZE;
+    const { data, error } = await client.from("profiles").select("id, display_name, email, role, account_status, created_at")
+      .eq("account_status", status).order("created_at", { ascending: true }).order("id", { ascending: true }).range(start, start + ADMIN_PAGE_SIZE - 1);
+    if (error) return { status: "error" };
+    return { status: "ok", accounts: (data ?? []) as AdminAccount[] };
+  } catch { return { status: "error" }; }
+}
+
+export interface AccountAuditEntry { id: string; actor_id: string | null; entity_id: string; action: string; created_at: string; reason: string | null }
+export async function getAccountAudit(userIds: string[]): Promise<AccountAuditEntry[] | null> {
+  if (!userIds.length) return [];
+  try {
+    const client = await createSupabaseServerClient();
+    const { data, error } = await client.from("audit_logs").select("id, actor_id, entity_id, action, created_at, reason:metadata->>reason")
+      .eq("entity_type", "profile").in("entity_id", userIds.slice(0,20)).in("action", ["account.suspended", "account.restored"])
+      .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(20);
+    return error ? null : data as AccountAuditEntry[];
+  } catch { return null; }
 }

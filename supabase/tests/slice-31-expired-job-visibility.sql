@@ -1,8 +1,8 @@
 -- ============================================================================
 -- Slice 31 — live verification for the expired-job public-visibility invariant
 -- ============================================================================
--- Proves, against a REAL Postgres (grants + RLS actually enforced), that after
--- 20260715000000_expired_job_visibility.sql an approved-but-EXPIRED job:
+-- Proves the final launch schema retains July expiry protection while adding
+-- strict future expiry and active owners. An approved-but-EXPIRED job:
 --   A. is absent from public.public_job_listings for anon;
 --   B. is unreadable via the public jobs RLS policy for anon;
 --   C. cannot receive a new seeker application (insert WITH CHECK fails);
@@ -11,7 +11,7 @@
 --      accepts a seeker application (so the predicate is not over-blocking).
 --
 -- Run ONLY against a disposable LOCAL stack (never hosted):
---   supabase start && supabase db reset            # applies migrations + seed
+--   node scripts/test-database.mjs  # after disposable migrations and seed
 --   psql "$(supabase status -o env | grep DB_URL | cut -d= -f2- | tr -d '\"')" \
 --        -v ON_ERROR_STOP=1 -f supabase/tests/slice-31-expired-job-visibility.sql
 --
@@ -24,9 +24,11 @@
 -- test principal is left behind. Role is simulated via SET LOCAL ROLE + the
 -- request.jwt.claims GUC that auth.uid() reads. Depends on supabase/seed.sql
 -- (approved job bbbb..0001 owned by employer 1111..; approved job bbbb..0002
--- owned by employer 2222..).
+-- owned by employer 2222..). F/G also prove NULL expiry and inactive-owner
+-- jobs cannot leak through the public view/base table or application admission.
 
 begin;
+\ir database/helpers/policy-fixtures.inc
 
 -- --- Provision a throwaway seeker principal (inside the rolled-back tx) -------
 insert into auth.users (
@@ -35,7 +37,7 @@ insert into auth.users (
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at
 ) values
   ('00000000-0000-0000-0000-000000000000',
-   '66666666-6666-6666-6666-666666666666',
+   'c3100000-0000-4000-8000-000000000001',
    'authenticated', 'authenticated', 'slice31-seeker@example.com',
    crypt('x', gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}', '{}', now(), now())
@@ -47,6 +49,10 @@ on conflict (id) do nothing;
 update public.jobs
   set expires_at = now() - interval '1 day'
   where id = 'bbbbbbbb-0000-0000-0000-000000000001';
+
+-- Explicit current fixture horizon keeps the positive control independent of seed age.
+update public.jobs set expires_at=now()+interval '30 days'
+where id in ('bbbbbbbb-0000-0000-0000-000000000002','bbbbbbbb-0000-0000-0000-000000000004');
 
 -- --- A. anon: expired job absent from the public view ------------------------
 set local role anon;
@@ -77,15 +83,16 @@ reset role;
 -- --- C. seeker: cannot insert an application for the expired job -------------
 select set_config(
   'request.jwt.claims',
-  '{"sub":"66666666-6666-6666-6666-666666666666","role":"authenticated"}',
+  '{"sub":"c3100000-0000-4000-8000-000000000001","role":"authenticated"}',
   true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 do $$
 begin
   begin
     insert into public.applications (job_id, seeker_id, status)
     values ('bbbbbbbb-0000-0000-0000-000000000001',
-            '66666666-6666-6666-6666-666666666666', 'submitted');
+            'c3100000-0000-4000-8000-000000000001', 'submitted');
     raise exception 'FAIL C: seeker inserted an application for an expired job';
   exception when insufficient_privilege then
     raise notice 'PASS C: seeker application to the expired job was rejected (%)', sqlerrm;
@@ -98,6 +105,7 @@ select set_config(
   'request.jwt.claims',
   '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}',
   true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 do $$
 declare n int;
@@ -128,15 +136,67 @@ reset role;
 
 select set_config(
   'request.jwt.claims',
-  '{"sub":"66666666-6666-6666-6666-666666666666","role":"authenticated"}',
+  '{"sub":"c3100000-0000-4000-8000-000000000001","role":"authenticated"}',
   true);
+select pg_temp.acknowledge_test_actor();
 set local role authenticated;
 do $$
 begin
   insert into public.applications (job_id, seeker_id, status)
   values ('bbbbbbbb-0000-0000-0000-000000000002',
-          '66666666-6666-6666-6666-666666666666', 'submitted');
+          'c3100000-0000-4000-8000-000000000001', 'submitted');
   raise notice 'PASS E2: seeker application to the approved unexpired job accepted';
+end $$;
+reset role;
+
+-- --- F/G. NULL expiry and inactive-owner jobs stay private -------------------
+select set_config('request.jwt.claims','{}',true);
+update public.jobs set expires_at=null where id='bbbbbbbb-0000-0000-0000-000000000003';
+update public.profiles set account_status='suspended' where id='22222222-2222-2222-2222-222222222222';
+set local role anon;
+do $$
+begin
+  if exists(select 1 from public.public_job_listings where id in (
+    'bbbbbbbb-0000-0000-0000-000000000003','bbbbbbbb-0000-0000-0000-000000000004'))
+    or exists(select 1 from public.jobs where id in (
+    'bbbbbbbb-0000-0000-0000-000000000003','bbbbbbbb-0000-0000-0000-000000000004')) then
+    raise exception 'FAIL F/G: NULL expiry or inactive-owner job is public';
+  end if;
+  raise notice 'PASS F/G1: NULL expiry and inactive-owner jobs hidden in view and base RLS';
+end $$;
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub":"c3100000-0000-4000-8000-000000000001","role":"authenticated"}',true);
+select pg_temp.acknowledge_test_actor();
+set local role authenticated;
+do $$
+declare target uuid; denied boolean;
+begin
+  foreach target in array array[
+    'bbbbbbbb-0000-0000-0000-000000000003'::uuid,
+    'bbbbbbbb-0000-0000-0000-000000000004'::uuid
+  ] loop
+    denied:=false;
+    begin
+      insert into public.applications(job_id,seeker_id) values(target,auth.uid());
+    exception when insufficient_privilege then
+      if sqlerrm <> 'Application not allowed' then raise; end if;
+      denied:=true;
+    end;
+    if not denied then raise exception 'FAIL F/G: application admitted without open publication'; end if;
+  end loop;
+  raise notice 'PASS F/G2: NULL expiry and inactive-owner application attempts rejected';
+end $$;
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}',true);
+set local role authenticated;
+do $$
+begin
+  if not exists(select 1 from public.jobs where id='bbbbbbbb-0000-0000-0000-000000000004') then
+    raise exception 'FAIL G: inactive owner lost job history';
+  end if;
+  raise notice 'PASS G3: inactive owner retains private job history';
 end $$;
 reset role;
 

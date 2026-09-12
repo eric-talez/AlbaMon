@@ -15,8 +15,17 @@ export function AccountBar({ user }: { user: AuthUser }) {
           </span>
           <span className="text-base font-bold tracking-tight">{SITE_NAME}</span>
         </Link>
-        <div className="flex items-center gap-3">
-          <span className="hidden text-sm text-muted sm:inline">
+        <AccountControls user={user} />
+      </div>
+    </header>
+  );
+}
+
+/** Shared verified-session controls for protected and public navigation. */
+export function AccountControls({ user }: { user: AuthUser }) {
+  return (
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="hidden max-w-60 truncate text-sm text-muted sm:inline">
             {user.email}
           </span>
           <span className="rounded-full bg-brand-soft px-2.5 py-1 text-xs font-medium text-brand">
@@ -24,7 +33,5 @@ export function AccountBar({ user }: { user: AuthUser }) {
           </span>
           <SignOutButton />
         </div>
-      </div>
-    </header>
   );
 }

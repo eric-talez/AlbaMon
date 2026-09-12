@@ -1,11 +1,10 @@
+import { policyAcceptanceIdentity } from "../src/lib/policy-publication.mjs";
+import { acknowledgedPolicies } from "./fixtures/policies";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("@/lib/auth/guards", () => ({ requireRole: vi.fn() }));
-vi.mock("@/lib/supabase/config", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/supabase/config")>();
-  return { ...actual, isSupabaseConfigured: vi.fn() };
-});
+vi.mock("@/lib/auth/guards", async (original) => ({ ...await original<object>(), requireRole: vi.fn() }));
+vi.mock("@/lib/supabase/config", async (original) => ({ ...await original<object>(), isSupabaseConfigured: vi.fn() }));
 vi.mock("@/lib/db/companies", () => ({
   createEmployerCompany: vi.fn(),
   getOwnedEmployerCompany: vi.fn(),
@@ -64,6 +63,8 @@ function jobForm(companyId = "company-1"): FormData {
   form.set("languageRequirement", "korean_helpful");
   form.set("description", "고객 응대 업무");
   form.set("complianceAcknowledgement", "on");
+  form.set("postingPolicyVersion", "ca-launch-v1");
+  form.set("postingPolicyIdentity", policyAcceptanceIdentity());
   form.set("moderation_status", "approved");
   form.set("boost", "featured");
   form.set("owner_id", "forged-owner");
@@ -76,6 +77,7 @@ beforeEach(() => {
     email: "employer@example.com",
     role: "employer",
     isDev: false,
+    aal: "aal2" as const, ...acknowledgedPolicies, accountStatus: "active" as const, displayName: null,
   });
   mockConfigured.mockReturnValue(true);
   mockCreateCompany.mockResolvedValue({ status: "created", companyId: "company-1" });

@@ -45,7 +45,7 @@ test.describe("dev-auth sign-in and route access matrix", () => {
     await expect(page).toHaveURL(/\/employer\/request-access$/);
   });
 
-  test("employer: employer home OK, admin forbidden, seeker-only page forbidden", async ({
+  test("employer: employer home and own application history OK, admin forbidden", async ({
     page,
   }) => {
     await devLogin(page, "employer");
@@ -54,9 +54,12 @@ test.describe("dev-auth sign-in and route access matrix", () => {
     await page.goto("/admin");
     await expect(page).toHaveURL(/\/forbidden$/);
 
-    // /dashboard/applications is seeker-only (exact requireRole).
+    // A promoted applicant keeps access to their own history. Development
+    // auth has no DB records and must show the explicit unavailable state.
     await page.goto("/dashboard/applications");
-    await expect(page).toHaveURL(/\/forbidden$/);
+    await expect(page).toHaveURL(/\/dashboard\/applications$/);
+    await expect(page.getByRole("heading", { name: "내 지원 내역", exact: true })).toBeVisible();
+    await expect(page.getByRole("main").getByRole("alert")).toContainText("지원 내역을 사용할 수 없습니다.");
   });
 
   test("admin: admin OK, but forbidden on employer sub-pages (exact role)", async ({

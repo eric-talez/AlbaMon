@@ -7,7 +7,7 @@ import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 
 /**
  * The shared /login + /signup card: social provider buttons, the phone OTP
- * flow (or its setup-required note), and — in dev mode only — the dev
+ * flow when enabled, and — in dev mode only — the dev
  * role-picker form.
  *
  * Error codes from the query string map to fixed bilingual messages; the raw
@@ -52,36 +52,17 @@ export function AuthCard({ mode, next, error }: AuthCardProps) {
         </p>
       ) : null}
 
+      <p className="mt-4 text-sm">인증 후 프로필에서 <Link href="/terms" className="underline">이용약관 동의</Link>와 <Link href="/privacy" className="underline">개인정보 안내 확인</Link>을 각각 받습니다. (Authentication alone does not record agreement.)</p>
       <div className="mt-5">
         <SocialAuthButtons providers={getSocialProviders()} next={next} />
       </div>
 
-      <div
-        className="mt-5 flex items-center gap-3 text-xs text-muted"
-        aria-hidden="true"
-      >
-        <span className="h-px flex-1 bg-border" />
-        또는 (or)
-        <span className="h-px flex-1 bg-border" />
-      </div>
-
-      <section className="mt-5">
-        <h2 className="text-sm font-semibold">
-          휴대폰으로 로그인 (Sign in with phone)
-        </h2>
-        {isPhoneAuthEnabled() ? (
-          <PhoneOtpForm
-            next={next}
-            requestOtp={requestPhoneOtp}
-            verifyOtp={verifyPhoneOtpAction}
-          />
-        ) : (
-          <p className="mt-2 text-xs text-muted">
-            휴대폰 인증은 SMS 설정 후 이용 가능합니다. (Phone verification
-            requires SMS setup.)
-          </p>
-        )}
-      </section>
+      {isPhoneAuthEnabled() ? (
+        <section className="mt-5">
+          <h2 className="text-sm font-semibold">휴대폰으로 로그인 (Sign in with phone)</h2>
+          <PhoneOtpForm next={next} requestOtp={requestPhoneOtp} verifyOtp={verifyPhoneOtpAction} />
+        </section>
+      ) : null}
 
       <DevAuthForm mode={mode} next={next} />
 
@@ -89,14 +70,14 @@ export function AuthCard({ mode, next, error }: AuthCardProps) {
         {isLogin ? (
           <>
             계정이 없으신가요?{" "}
-            <Link href="/signup" className="font-medium text-brand">
+            <Link href={next ? `/signup?next=${encodeURIComponent(next)}` : "/signup"} className="font-medium text-brand">
               회원가입
             </Link>
           </>
         ) : (
           <>
             이미 계정이 있으신가요?{" "}
-            <Link href="/login" className="font-medium text-brand">
+            <Link href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"} className="font-medium text-brand">
               로그인
             </Link>
           </>

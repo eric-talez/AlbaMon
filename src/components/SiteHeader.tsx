@@ -1,3 +1,6 @@
+import type { AuthUser } from "@/lib/auth/types";
+import { roleHome } from "@/lib/auth/access";
+import { AccountControls } from "@/components/auth/AccountBar";
 import Link from "next/link";
 import { SITE_NAME } from "@/lib/site";
 
@@ -7,7 +10,7 @@ const NAV_LINKS = [
   { href: "/employer", label: "고용주" },
 ];
 
-export function SiteHeader() {
+export function SiteHeader({ user }: { user: AuthUser | null }) {
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
       <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4">
@@ -29,21 +32,12 @@ export function SiteHeader() {
               {link.label}
             </Link>
           ))}
-          <Link
-            href="/login"
-            className="ml-1 rounded-full bg-brand px-4 py-1.5 text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90"
-          >
-            로그인
-          </Link>
+          {user ? <Link href={roleHome(user.role)} className="px-3 py-2 text-sm text-brand">내 대시보드</Link> : null}
         </nav>
 
-        {/* Mobile: login only; primary nav lives in the bottom bar */}
-        <Link
-          href="/login"
-          className="rounded-full bg-brand px-4 py-1.5 text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90 sm:hidden"
-        >
-          로그인
-        </Link>
+        {user ? <AccountControls user={user} /> : (
+          <Link href="/login" className="rounded-full bg-brand px-4 py-2 text-sm font-medium text-brand-foreground">로그인</Link>
+        )}
       </div>
     </header>
   );

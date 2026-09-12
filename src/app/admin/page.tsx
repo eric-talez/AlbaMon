@@ -1,3 +1,4 @@
+import { getSuspendedAccountCount } from "@/lib/db/admin-analytics";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/guards";
@@ -12,6 +13,7 @@ import {
   type HealthCheckStatus,
   type HealthChecks,
 } from "@/lib/ops/health";
+import { getNotificationQueueHealth } from "@/lib/db/notifications";
 import { Badge } from "@/components/Badge";
 import {
   AUDIT_ACTION_LABELS,
@@ -29,6 +31,7 @@ const ADMIN_NAV_LINKS = [
     href: "/admin/employer-requests",
     label: "Employer access requests / 고용주 권한 요청",
   },
+  { href: "/admin/users", label: "Accounts / 계정 정지·해제" },
   { href: "/admin/reports", label: "Reports / 신고 큐" },
   { href: "/admin/analytics", label: "Analytics / KPI dashboard" },
 ] as const;
@@ -117,10 +120,12 @@ function QueueCard({
 
 export default async function AdminHomePage() {
   await requireRole("admin", "/admin");
-  const [queues, employerRequests, audit] = await Promise.all([
+  const [queues, employerRequests, audit, notifications, suspended] = await Promise.all([
     getAdminQueueCounts(),
     getPendingEmployerAccessRequestCount(),
     getRecentAdminAuditLogs(),
+    getNotificationQueueHealth(),
+    getSuspendedAccountCount(),
   ]);
   // Presence only, never env values — same report the public /api/health serves.
   const health = buildHealthReport();
@@ -218,6 +223,7 @@ export default async function AdminHomePage() {
       <section className="mt-8">
         <h2 className="text-lg font-semibold">Queue status / 큐 현황</h2>
         <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <QueueCard href="/admin/users?status=suspended" title="Suspended accounts / 정지 계정" description="Review account restrictions / 계정 제재를 검토합니다." cta="Manage accounts" result={suspended} />
           <QueueCard
             href="/admin/jobs"
             title="Pending jobs / 검토 대기 공고"
@@ -284,7 +290,16 @@ export default async function AdminHomePage() {
         </div>
       </section>
 
-      <section className="mt-8">
+      <section className="mt-8 rounded-xl border border-border bg-surface p-5">
+        <h2 className="text-lg font-semibold">Email delivery / 이메일 발송</h2>
+        {notifications ? <>
+          <p className="mt-2">대기 / Pending: {notifications.pending} · 실패 / Failed: {notifications.failed}</p>
+          <p className="mt-2 text-sm">가장 오래된 예정 시각 / Oldest available: {notifications.oldest_available_at ?? "—"}</p>
+          {notifications.overdue ? <p role="alert" className="mt-2 text-danger">이메일 큐가 10분 이상 지연되었습니다. / Email queue delayed over 10 minutes.</p> : null}
+        </> : <p className="mt-2 text-sm">발송 현황을 불러올 수 없습니다. / Email queue unavailable.</p>}
+      </section>
+
+      <section id="activity" className="mt-8">
         <h2 className="text-lg font-semibold">
           Recent admin activity / 최근 관리자 활동
         </h2>
@@ -293,8 +308,7 @@ export default async function AdminHomePage() {
             <div className="mt-3 rounded-xl border border-dashed border-border p-6 text-center">
               <p className="font-medium">아직 기록된 활동이 없습니다.</p>
               <p className="mt-2 text-sm text-muted">
-                No admin activity recorded yet — moderation decisions appear
-                here automatically.
+                No admin activity recorded yet.
               </p>
             </div>
           ) : (

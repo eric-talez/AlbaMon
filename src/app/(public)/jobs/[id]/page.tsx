@@ -1,3 +1,4 @@
+import { buildJobPosting, serializeJobPosting } from "@/lib/jobs/structured-data";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -7,7 +8,7 @@ import {
   JOB_CATEGORY_LABELS,
   LANGUAGE_REQUIREMENT_LABELS,
 } from "@/lib/types";
-import { getApprovedJobById, getApprovedJobs } from "@/lib/db/jobs";
+import { getApprovedJobById } from "@/lib/db/jobs";
 import {
   Badge,
   CompanyVerificationBadge,
@@ -16,6 +17,17 @@ import {
 import { WorkAuthorizationDisclaimer } from "@/components/WorkAuthorizationDisclaimer";
 
 type Params = { id: string };
+
+export const dynamic = "force-dynamic";
+
+function formatJobTime(value: string): string {
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "America/Los_Angeles",
+    dateStyle: "medium",
+    timeStyle: "short",
+    hourCycle: "h23",
+  }).format(new Date(value)) + " PT";
+}
 
 export async function generateMetadata({
   params,
@@ -34,11 +46,6 @@ export async function generateMetadata({
     )} · ${job.companyName}`,
     alternates: { canonical: `/jobs/${encodeURIComponent(job.id)}` },
   };
-}
-
-export async function generateStaticParams() {
-  const jobs = await getApprovedJobs();
-  return jobs.map((job) => ({ id: job.id }));
 }
 
 function Section({
@@ -72,6 +79,7 @@ export default async function JobDetailPage({
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-6">
+      {job.postedAt && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJobPosting(buildJobPosting(job)) }} />}
       <Link
         href="/jobs"
         className="text-sm text-muted transition-colors hover:text-brand"
@@ -122,7 +130,7 @@ export default async function JobDetailPage({
           </div>
           <div>
             <dt className="text-xs text-muted">근무지</dt>
-            <dd className="text-sm">{job.addressDisplay}</dd>
+            <dd className="text-sm">{job.addressDisplayMode === "full" && job.addressDisplay ? `${job.addressDisplay}, ${job.city}, ${job.state}` : `${job.city}, ${job.state}`}</dd>
           </div>
           <div>
             <dt className="text-xs text-muted">근무 요일</dt>
@@ -139,6 +147,8 @@ export default async function JobDetailPage({
             </dd>
           </div>
         </dl>
+
+        <p className="mt-4 text-xs text-muted">게시일 / Posted: <time dateTime={job.postedAt}>{job.postedAt ? formatJobTime(job.postedAt) : "기록 없음"}</time><br />마감 / Expires: <time dateTime={job.expiresAt}>{formatJobTime(job.expiresAt)}</time></p>
 
         <section className="mt-6">
           <h2 className="text-base font-semibold">상세 설명</h2>
@@ -160,7 +170,7 @@ export default async function JobDetailPage({
           authorization eligibility.
         </p>
 
-        <div className="sticky bottom-20 mt-6 sm:static sm:bottom-auto">
+        <div className="sticky bottom-[var(--mobile-bottom-offset)] mt-6 sm:static sm:bottom-auto">
           <Link
             href={`/jobs/${encodeURIComponent(job.id)}/apply`}
             className="flex h-12 w-full items-center justify-center rounded-full bg-brand px-6 font-medium text-brand-foreground transition-opacity hover:opacity-90"

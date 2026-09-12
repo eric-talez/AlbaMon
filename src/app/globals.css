@@ -5,6 +5,7 @@
  * Brand: trustworthy, bilingual, community-friendly local hiring.
  */
 :root {
+  --mobile-bottom-offset: calc(5rem + env(safe-area-inset-bottom));
   /*
    * Korean-first system font stack — no web-font fetch, no bundled binaries.
    * Falls through native Korean UI fonts (macOS/iOS, Windows, common installs)

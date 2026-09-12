@@ -115,14 +115,8 @@ export interface Job {
   requirements: string[];
   benefits: string[];
   moderationStatus: ModerationStatus;
-  postedAt: string; // ISO date
-  /**
-   * Optional public-visibility cutoff. A job is publicly active only while
-   * approved AND (expiresAt is null/undefined OR expiresAt > now). Not rendered
-   * in the UI: production filters expiry in the `public_job_listings` view, and
-   * the mock layer mirrors that rule via `isJobPubliclyActive`.
-   */
-  expiresAt?: string | null;
+  postedAt: string; // ISO timestamp
+  expiresAt: string; // Full ISO timestamp
 }
 
 /* --- Korean-first label maps (bilingual where useful) --- */

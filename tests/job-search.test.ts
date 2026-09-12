@@ -6,11 +6,12 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import {
+  filterAndSortMockJobs,
   getApprovedJobById,
   getApprovedJobs,
+  getPublicJobCities,
   parseJobSearchParams,
   searchApprovedJobs,
-  filterAndSortMockJobs,
 } from "@/lib/db/jobs";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -66,14 +67,16 @@ function dbJobRow(overrides: Record<string, unknown> = {}) {
 describe("searchApprovedJobs — mock fallback", () => {
   it("returns approved jobs only; never pending/draft/expired", async () => {
     setUnconfigured();
-    const jobs = await searchApprovedJobs({});
-    expect(jobs.length).toBe(10);
+    const { jobs, page, hasNext } = await searchApprovedJobs({});
+    expect(jobs.length).toBe(13);
+    expect(page).toBe(1);
+    expect(hasNext).toBe(false);
     expect(jobs.every((j) => j.moderationStatus === "approved")).toBe(true);
     const ids = new Set(jobs.map((j) => j.id));
     expect(ids.has("kw-101")).toBe(false); // pending
     expect(ids.has("kw-102")).toBe(false); // draft
-    expect(ids.has("kw-011")).toBe(false); // approved but expired
-    expect(ids.has("kw-012")).toBe(false); // approved but malformed expiry
+    expect(ids.has("kw-103")).toBe(false); // approved but expired
+    expect(ids.has("kw-104")).toBe(false); // approved but malformed expiry
   });
 
   it("never returns an expired or malformed-expiry job through any search", async () => {
@@ -81,63 +84,75 @@ describe("searchApprovedJobs — mock fallback", () => {
     // Broad and targeted searches alike must exclude the hidden fixtures.
     for (const params of [
       {},
-      { category: "logistics_warehouse" as const }, // kw-011's category
-      { city: "Torrance" }, // kw-012's city
-      { q: "마감된" }, // kw-011's title fragment
-      { q: "잘못된 만료일" }, // kw-012's title fragment
+      { category: "logistics_warehouse" as const }, // kw-103's category
+      { city: "Torrance" }, // kw-104's city
+      { q: "마감된" }, // kw-103's title fragment
+      { q: "잘못된 만료일" }, // kw-104's title fragment
     ]) {
-      const ids = (await searchApprovedJobs(params)).map((j) => j.id);
-      expect(ids).not.toContain("kw-011");
-      expect(ids).not.toContain("kw-012");
+      const ids = (await searchApprovedJobs(params)).jobs.map((j) => j.id);
+      expect(ids).not.toContain("kw-103");
+      expect(ids).not.toContain("kw-104");
     }
   });
 
   it("keyword search matches title, company, and description (case-insensitive)", async () => {
     setUnconfigured();
     // Company name "강남 키친" → kw-001.
-    const byCompany = await searchApprovedJobs({ q: "강남" });
+    const { jobs: byCompany } = await searchApprovedJobs({ q: "강남" });
     expect(byCompany.map((j) => j.id)).toEqual(["kw-001"]);
     // Title "카페 바리스타" → kw-006.
-    const byTitle = await searchApprovedJobs({ q: "바리스타" });
+    const { jobs: byTitle } = await searchApprovedJobs({ q: "바리스타" });
     expect(byTitle.map((j) => j.id)).toEqual(["kw-006"]);
+  });
+
+  it("treats punctuation in a keyword as literal text", async () => {
+    setUnconfigured();
+    for (const query of ["*", ",", "open(", "close)", "%", "_"]) {
+      const { jobs } = await searchApprovedJobs({ q: query });
+      expect(jobs.map((job) => job.id)).toEqual(["kw-011"]);
+    }
   });
 
   it("filters by city", async () => {
     setUnconfigured();
-    const jobs = await searchApprovedJobs({ city: "Irvine" });
+    const { jobs } = await searchApprovedJobs({ city: "Irvine" });
     expect(jobs.map((j) => j.id)).toEqual(["kw-002"]);
   });
 
   it("filters by category", async () => {
     setUnconfigured();
-    const jobs = await searchApprovedJobs({ category: "beauty_nail_hair" });
+    const { jobs } = await searchApprovedJobs({ category: "beauty_nail_hair" });
     expect(jobs.map((j) => j.id).sort()).toEqual(["kw-004", "kw-009"]);
   });
 
   it("filters by job type", async () => {
     setUnconfigured();
-    const jobs = await searchApprovedJobs({ jobType: "temporary" });
+    const { jobs } = await searchApprovedJobs({ jobType: "temporary" });
     expect(jobs.map((j) => j.id)).toEqual(["kw-010"]);
   });
 
   it("filters by language requirement", async () => {
     setUnconfigured();
-    const jobs = await searchApprovedJobs({
+    const { jobs } = await searchApprovedJobs({
       languageRequirement: "english_required",
     });
-    expect(jobs.map((j) => j.id)).toEqual(["kw-006"]);
+    expect(jobs.map((j) => j.id).sort()).toEqual(["kw-006", "kw-013"]);
   });
 
-  it("filters by minimum pay (job's pay_max >= payMin)", async () => {
+  it("compares the exact minimum only among jobs with the same pay unit", async () => {
     setUnconfigured();
-    const jobs = await searchApprovedJobs({ payMin: 28 });
-    expect(jobs.map((j) => j.id).sort()).toEqual(["kw-004", "kw-005", "kw-009"]);
-    expect(jobs.every((j) => j.payMax >= 28)).toBe(true);
+    const { jobs } = await searchApprovedJobs({
+      q: "급여 의미 테스트",
+      payMin: 20,
+      payUnit: "hour",
+    });
+    expect(jobs.map((j) => j.id)).toEqual(["kw-012"]);
+    expect(jobs[0]).toMatchObject({ payMin: 22, payMax: 25, payUnit: "hour" });
   });
 
   it("combines filters (AND semantics)", async () => {
     setUnconfigured();
-    const jobs = await searchApprovedJobs({
+    const { jobs } = await searchApprovedJobs({
       category: "restaurant_cafe",
       jobType: "part_time",
     });
@@ -146,8 +161,12 @@ describe("searchApprovedJobs — mock fallback", () => {
 
   it("sorts newest first by default", async () => {
     setUnconfigured();
-    const jobs = await searchApprovedJobs({});
-    expect(jobs[0].postedAt).toBe("2026-06-19");
+    const { jobs } = await searchApprovedJobs({});
+    expect(jobs.slice(0, 3).map((job) => job.id)).toEqual([
+      "kw-013",
+      "kw-012",
+      "kw-011",
+    ]);
     // Non-increasing postedAt across the list.
     for (let i = 1; i < jobs.length; i++) {
       expect(jobs[i - 1].postedAt >= jobs[i].postedAt).toBe(true);
@@ -156,16 +175,17 @@ describe("searchApprovedJobs — mock fallback", () => {
 
   it("sorts by highest pay", async () => {
     setUnconfigured();
-    const jobs = await searchApprovedJobs({ sort: "pay_high" });
-    expect(jobs[0].payMax).toBe(35); // kw-005
+    const { jobs } = await searchApprovedJobs({ sort: "pay_high" });
+    expect(jobs[0].payMin).toBe(25); // kw-005
+    expect(jobs.every((job) => job.payUnit === "hour")).toBe(true);
     for (let i = 1; i < jobs.length; i++) {
-      expect(jobs[i - 1].payMax >= jobs[i].payMax).toBe(true);
+      expect(jobs[i - 1].payMin >= jobs[i].payMin).toBe(true);
     }
   });
 
   it("sorts by lowest pay", async () => {
     setUnconfigured();
-    const jobs = await searchApprovedJobs({ sort: "pay_low" });
+    const { jobs } = await searchApprovedJobs({ sort: "pay_low" });
     expect(jobs[0].payMin).toBe(17);
     for (let i = 1; i < jobs.length; i++) {
       expect(jobs[i - 1].payMin <= jobs[i].payMin).toBe(true);
@@ -174,13 +194,13 @@ describe("searchApprovedJobs — mock fallback", () => {
 
   it("returns empty when no job matches", async () => {
     setUnconfigured();
-    const jobs = await searchApprovedJobs({ city: "Nowhere" });
+    const { jobs } = await searchApprovedJobs({ city: "Nowhere" });
     expect(jobs).toEqual([]);
   });
 });
 
 describe("searchApprovedJobs — Supabase configured", () => {
-  it("matches q against title, joined company name, and description", async () => {
+  it("passes literal keywords to the search RPC without PostgREST filter grammar", async () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", REAL_URL);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", REAL_KEY);
 
@@ -201,9 +221,20 @@ describe("searchApprovedJobs — Supabase configured", () => {
         company_is_verified: true,
       }),
     ];
-    const fetchMock = vi.fn(async (_input: string | URL | Request) => {
-      void _input;
-      return new Response(JSON.stringify(rows), {
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const query = JSON.parse(String(init?.body)).search_query;
+      const matchingRows = new Map([
+        ["warehouse associate", [rows[0]]],
+        ["irvine smile", [rows[1]]],
+        ["coffee preparation", [rows[2]]],
+        ["pacific trade", [rows[0]]],
+        ["*", []],
+        [",", []],
+        ["(", []],
+        [")", []],
+      ]).get(query) ?? [];
+      expect(String(input)).toContain("/rest/v1/rpc/search_public_jobs");
+      return new Response(JSON.stringify(matchingRows), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
@@ -219,35 +250,61 @@ describe("searchApprovedJobs — Supabase configured", () => {
       ["coffee preparation", rows[2].id],
     ];
     for (const [query, expectedId] of cases) {
-      const jobs = await searchApprovedJobs({ q: query });
+      const { jobs } = await searchApprovedJobs({ q: query });
       expect(jobs.map((job) => job.id)).toEqual([expectedId]);
     }
-    const unverifiedCompanyJobs = await searchApprovedJobs({ q: "pacific trade" });
+    const { jobs: unverifiedCompanyJobs } = await searchApprovedJobs({ q: "pacific trade" });
     expect(unverifiedCompanyJobs).toHaveLength(1);
     expect(unverifiedCompanyJobs[0]).toMatchObject({
       companyName: "Pacific Trade Logistics",
       employerVerified: false,
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(cases.length + 1);
-    for (const [request] of fetchMock.mock.calls) {
-      expect(String(request)).toContain("/rest/v1/public_job_listings?");
-      expect(String(request)).toContain("company_name.ilike");
+    for (const query of ["*", ",", "(", ")"]) {
+      await expect(searchApprovedJobs({ q: query })).resolves.toMatchObject({ jobs: [] });
     }
+    expect(fetchMock).toHaveBeenCalledTimes(cases.length + 5);
+  });
+
+  it("keeps the twenty-first database row only as the next-page signal", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", REAL_URL);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", REAL_KEY);
+    const rows = Array.from({ length: 21 }, (_, index) =>
+      dbJobRow({
+        id: `${String(index + 1).padStart(8, "0")}-1111-4111-8111-111111111111`,
+        posted_at: `2026-06-20T${String(23 - index).padStart(2, "0")}:00:00Z`,
+      }),
+    );
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify(rows), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(
+      createClient(REAL_URL, REAL_KEY, { global: { fetch: fetchMock } }),
+    );
+
+    const result = await searchApprovedJobs({ page: 2, sort: "newest" });
+    expect(result).toMatchObject({ page: 2, hasNext: true });
+    expect(result.jobs).toHaveLength(20);
+    expect(result.jobs[0].postedAt).toBe("2026-06-20T23:00:00Z");
   });
 });
 
 describe("public jobs — production fallback safety", () => {
-  it("keeps deterministic mocks available during a production build", async () => {
+  it("rejects mock fallbacks during a production build", async () => {
     setUnconfigured();
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("NEXT_PHASE", "phase-production-build");
 
-    expect((await getApprovedJobs()).length).toBeGreaterThan(0);
-    expect(await getApprovedJobById("kw-001")).toBeDefined();
-    expect((await searchApprovedJobs({ q: "강남" })).map((job) => job.id)).toEqual([
-      "kw-001",
-    ]);
+    await expect(getApprovedJobs()).rejects.toThrow(/mock job fallback is disabled/i);
+    await expect(
+      getApprovedJobById("11111111-1111-4111-8111-111111111111"),
+    ).rejects.toThrow(/mock job fallback is disabled/i);
+    await expect(searchApprovedJobs({ q: "강남" })).rejects.toThrow(
+      /mock job fallback is disabled/i,
+    );
   });
 
   it("rejects an unconfigured production runtime instead of showing mocks", async () => {
@@ -256,7 +313,9 @@ describe("public jobs — production fallback safety", () => {
     vi.stubEnv("NEXT_PHASE", "phase-production-server");
 
     await expect(getApprovedJobs()).rejects.toThrow(/mock job fallback is disabled/i);
-    await expect(getApprovedJobById("kw-001")).rejects.toThrow(
+    await expect(
+      getApprovedJobById("11111111-1111-4111-8111-111111111111"),
+    ).rejects.toThrow(
       /mock job fallback is disabled/i,
     );
     await expect(searchApprovedJobs({})).rejects.toThrow(
@@ -274,20 +333,30 @@ describe("public jobs — production fallback safety", () => {
     const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     await expect(getApprovedJobs()).rejects.toBe(failure);
-    await expect(getApprovedJobById("kw-001")).rejects.toBe(failure);
+    await expect(
+      getApprovedJobById("11111111-1111-4111-8111-111111111111"),
+    ).rejects.toBe(failure);
     await expect(searchApprovedJobs({})).rejects.toBe(failure);
     expect(errorLog).toHaveBeenCalledTimes(3);
     errorLog.mockRestore();
+  });
+
+  it("does not send malformed ids to Supabase", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", REAL_URL);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", REAL_KEY);
+
+    expect(await getApprovedJobById("not-a-uuid")).toBeUndefined();
+    expect(createSupabaseServerClient).not.toHaveBeenCalled();
   });
 });
 
 describe("filterAndSortMockJobs — pure helper", () => {
   it("does not mutate the underlying mock array order", () => {
-    const high = filterAndSortMockJobs({ sort: "pay_high" });
+    const high = filterAndSortMockJobs({ sort: "pay_high", payUnit: "hour" });
     const newest = filterAndSortMockJobs({ sort: "newest" });
     // Independent sorts: a fresh call is unaffected by a previous one.
-    expect(high[0].payMax).toBe(35);
-    expect(newest[0].postedAt).toBe("2026-06-19");
+    expect(high[0].payMin).toBe(25);
+    expect(newest[0].postedAt).toBe("2026-06-20T10:00:00Z");
   });
 });
 
@@ -300,8 +369,10 @@ describe("parseJobSearchParams — validation", () => {
         category: "restaurant_cafe",
         jobType: "part_time",
         languageRequirement: "korean_required",
+        payUnit: "year",
         payMin: "20",
         sort: "pay_high",
+        page: "2",
       }),
     ).toEqual({
       q: "서버",
@@ -309,9 +380,28 @@ describe("parseJobSearchParams — validation", () => {
       category: "restaurant_cafe",
       jobType: "part_time",
       languageRequirement: "korean_required",
+      payUnit: "year",
       payMin: 20,
       sort: "pay_high",
+      page: 2,
     });
+  });
+
+  it("treats a pay filter or sort without a unit as hourly", () => {
+    expect(parseJobSearchParams({ payMin: "20", sort: "pay_high" })).toMatchObject({
+      payMin: 20,
+      payUnit: "hour",
+      sort: "pay_high",
+    });
+    expect(parseJobSearchParams({ sort: "pay_low" }).payUnit).toBe("hour");
+  });
+
+  it("bounds text and page inputs", () => {
+    expect(parseJobSearchParams({ page: "-1" }).page).toBe(1);
+    expect(parseJobSearchParams({ page: "501" }).page).toBe(1);
+    expect(parseJobSearchParams({ page: "3.5" }).page).toBe(1);
+    expect(parseJobSearchParams({ q: "q".repeat(201) }).q).toHaveLength(200);
+    expect(parseJobSearchParams({ city: "c".repeat(101) }).city).toHaveLength(100);
   });
 
   it("ignores invalid enum values", () => {
@@ -319,10 +409,12 @@ describe("parseJobSearchParams — validation", () => {
       category: "bogus",
       jobType: "permanent",
       languageRequirement: "klingon",
+      payUnit: "minute",
     });
     expect(params.category).toBeUndefined();
     expect(params.jobType).toBeUndefined();
     expect(params.languageRequirement).toBeUndefined();
+    expect(params.payUnit).toBeUndefined();
   });
 
   it("ignores non-numeric or negative payMin", () => {
@@ -341,6 +433,16 @@ describe("parseJobSearchParams — validation", () => {
   });
 
   it("drops empty / whitespace-only strings", () => {
-    expect(parseJobSearchParams({ q: "", city: "   " })).toEqual({});
+    expect(parseJobSearchParams({ q: "", city: "   " })).toEqual({ page: 1 });
+  });
+});
+
+describe("getPublicJobCities — mock fallback", () => {
+  it("returns distinct normalized California cities in display order", async () => {
+    setUnconfigured();
+    const cities = await getPublicJobCities();
+    expect(cities).toContain("Los Angeles");
+    expect(cities).toContain("San Jose");
+    expect(cities).toEqual([...new Set(cities)].sort((a, b) => a.localeCompare(b)));
   });
 });

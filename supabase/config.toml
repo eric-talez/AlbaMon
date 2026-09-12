@@ -1,14 +1,48 @@
-# Minimal Supabase CLI config for K-Work US.
-# Enables `supabase db reset` / `supabase db push` against migrations/ and seed.sql.
-# This file holds NO secrets — real credentials live in environment variables.
+# Isolated disposable launch-test stack; never reset a hosted database.
+project_id = "albalmon-ca-launch"
 
-project_id = "k-work-us"
+[api]
+port = 55321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
 
 [db]
-# Port for the local Postgres started by `supabase start`.
-port = 54322
+port = 55322
+shadow_port = 55328
 major_version = 15
 
 [db.seed]
 enabled = true
 sql_paths = ["./seed.sql"]
+
+[db.pooler]
+enabled = false
+port = 55329
+
+[studio]
+enabled = true
+port = 55323
+api_url = "http://127.0.0.1"
+
+[local_smtp]
+enabled = true
+port = 55324
+smtp_port = 55325
+pop3_port = 55326
+
+[analytics]
+enabled = true
+port = 55327
+backend = "postgres"
+
+[auth]
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["http://localhost:3000/**", "http://127.0.0.1:3000/**", "http://127.0.0.1:3100/auth/callback"]
+
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true

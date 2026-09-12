@@ -1,33 +1,27 @@
+import { WRITE_RETRY_MESSAGE, SUSPENDED_WRITE_MESSAGE } from "@/lib/db/write-errors";
+
 import "server-only";
 
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth/guards";
+import { activeWriterError, requireUser } from "@/lib/auth/guards";
 import { sendApplicationMessage } from "@/lib/db/messages";
 import { notifyNewMessage } from "@/lib/notifications/dev";
-import { enforceUserPolicy } from "@/lib/rate-limit/service";
-import { RATE_LIMIT_POLICIES } from "@/lib/rate-limit/policies";
-import { rateLimitedResult } from "@/lib/rate-limit/types";
-import type { RateLimitedResult } from "@/lib/rate-limit/types";
 
-export type MessageFormState =
-  | { status: "idle" | "success" | "error"; message: string }
-  | RateLimitedResult;
-
-type ParticipantRole = "seeker" | "employer";
+export interface MessageFormState {
+  status: "idle" | "success" | "error";
+  message: string;
+}
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export async function sendMessageForRole(
-  role: ParticipantRole,
-  basePath: "/dashboard/applications" | "/employer/applications",
+export async function sendMessageForParticipant(
   formData: FormData,
 ): Promise<MessageFormState> {
   const applicationId = formData.get("applicationId");
-  const threadPath = typeof applicationId === "string" && UUID_PATTERN.test(applicationId)
-    ? `${basePath}/${applicationId}/messages`
-    : basePath;
-  const user = await requireRole(role, threadPath);
+  const user = await requireUser("/dashboard/applications");
+  const writerError = activeWriterError(user);
+  if (writerError) return writerError;
 
   const bodyValue = formData.get("body");
   if (typeof applicationId !== "string" || !UUID_PATTERN.test(applicationId)) {
@@ -44,15 +38,14 @@ export async function sendMessageForRole(
     };
   }
 
-  const limit = await enforceUserPolicy(RATE_LIMIT_POLICIES.sendMessage, user.id);
-  if (!limit.allowed) return rateLimitedResult(limit.retryAfterSeconds);
-
   const result = await sendApplicationMessage(applicationId, user.id, body);
+  if (result.status === "rate_limited") return { status: "error", message: WRITE_RETRY_MESSAGE };
+  if (result.status === "suspended") return { status: "error", message: SUSPENDED_WRITE_MESSAGE };
   if (result.status === "sent") {
     // Best-effort dev notification: a notify failure must never turn a
     // successfully sent message into an error for the user.
     try {
-      notifyNewMessage(applicationId, result.messageId, role);
+      notifyNewMessage(applicationId, result.messageId, result.recipientId, result.recipientSide);
     } catch (err) {
       console.error("[notification] new_message failed:", err);
     }
