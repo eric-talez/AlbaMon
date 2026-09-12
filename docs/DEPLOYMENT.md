@@ -65,7 +65,7 @@ build. Never relabel a staging artifact as Production.
 
 ## Current migration inventory
 
-The current source contains 25 migrations, in this exact filename order.
+The current source contains 26 migrations, in this exact filename order.
 The checksum manifest is `docs/launch-evidence/migrations.sha256`; dated prior
 execution reports retain the inventory that was actually tested then. New
 upstream July files are historical relative to the September launch files, so
@@ -87,26 +87,32 @@ history, reset, seed or use `--include-all` as a hosted launch shortcut.
 | 11 | `20260713000000_restrict_company_public_reads.sql` |
 | 12 | `20260714000000_transactional_admin_audit_logs.sql` |
 | 13 | `20260714010000_server_rate_limiting.sql` |
-| 14 | `20260909000050_private_company_access.sql` |
-| 15 | `20260909000100_profile_and_admin_security.sql` |
-| 16 | `20260909000200_ca_job_search.sql` |
-| 17 | `20260909000300_job_lifecycle.sql` |
-| 18 | `20260909000400_application_lifecycle.sql` |
-| 19 | `20260909000500_notification_outbox.sql` |
-| 20 | `20260909000510_notification_claim_recovery.sql` |
-| 21 | `20260909000600_abuse_controls.sql` |
-| 22 | `20260909000700_policy_acknowledgements.sql` |
-| 23 | `20260909000710_policy_publication_identity.sql` |
-| 24 | `20260909000800_marketplace_signals.sql` |
-| 25 | `20260911000000_main_launch_compatibility.sql` |
+| 14 | `20260715000000_expired_job_visibility.sql` |
+| 15 | `20260909000050_private_company_access.sql` |
+| 16 | `20260909000100_profile_and_admin_security.sql` |
+| 17 | `20260909000200_ca_job_search.sql` |
+| 18 | `20260909000300_job_lifecycle.sql` |
+| 19 | `20260909000400_application_lifecycle.sql` |
+| 20 | `20260909000500_notification_outbox.sql` |
+| 21 | `20260909000510_notification_claim_recovery.sql` |
+| 22 | `20260909000600_abuse_controls.sql` |
+| 23 | `20260909000700_policy_acknowledgements.sql` |
+| 24 | `20260909000710_policy_publication_identity.sql` |
+| 25 | `20260909000800_marketplace_signals.sql` |
+| 26 | `20260911000000_main_launch_compatibility.sql` |
 
 The final compatibility migration retires `moderate_pending_job`, retains
 `transition_job` revision/reason checks, and makes existing September triggers
 the sole audit writers for company/report/employer-access decisions. Active
 AAL2/current-policy checks and transaction locks remain in the admin RPCs.
-Replay all files in order on a fresh disposable local stack before relying on
-this inventory. Existing local data requires a separately recorded, non-reset
-upgrade rehearsal; see [local migration handling](LOCAL_SUPABASE.md#5-applying-migrations-and-seed).
+The incoming July15 expiry migration is superseded in filename order by the
+September search/lifecycle migrations: final public reads and new applications
+require `is_job_open`, including a non-null future expiry and active owner.
+There is no additional expiry compatibility migration. Replay the full history
+on a fresh disposable local stack and rehearse an upgrade from actual upstream
+history. The preserved September local snapshot cannot apply July15 late with
+`--include-all`: its older view would remove launch columns. Do not reset it,
+drop the view or repair history; see [local migration handling](LOCAL_SUPABASE.md#5-applying-migrations-and-seed).
 
 ## Staging migrations
 

@@ -8,8 +8,8 @@
 -- Compliance: language requirements are framed as job-related only. No
 -- Korean-only / nationality / visa-status / under-the-table-cash phrasing.
 --
--- Apply AFTER the migration. On Supabase:  supabase db reset  (runs migration +
--- this seed automatically), or paste this file into the SQL editor.
+-- Apply after migrations ONLY on an explicitly disposable local test database.
+-- Never run this fixture seed in a hosted SQL editor or against retained user data.
 --
 -- Owner identities use fixed UUIDs so the seed is deterministic. Inserting into
 -- auth.users fires on_auth_user_created, which auto-creates a profiles row; we

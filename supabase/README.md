@@ -43,13 +43,19 @@ shortcut is part of the launch procedure.
 The incoming July files precede already released September files. A populated
 local stack with the older launch-only history needs a separately recorded
 upgrade rehearsal; a hosted history mismatch requires an explicit migration
-plan. Fresh ordered replay and existing-data upgrade are different checks.
+plan. In particular, July15 cannot be applied late over the retained September
+view, because its historical definition omits added launch columns. Preserve that
+snapshot; do not force `--include-all`, drop the view, reset data or repair history.
+Fresh ordered replay and an upgrade from actual upstream main are separate checks.
 
 ## Current database behavior
 
 See [DATABASE.md](../docs/DATABASE.md) for tables and authorization boundaries.
 Public jobs use the canonical California/approved/unexpired/eligible-owner
-predicate. Company base-table fields remain private; public identity comes only
+predicate. Null or elapsed expiry hides the job and blocks new applications while
+retaining employer/admin history; expiry itself does not mutate moderation status.
+The September lifecycle migration supersedes the historical July15 rule.
+Company base-table fields remain private; public identity comes only
 through the safe listing view. Production builds and runtimes never use mocks.
 
 Caller-authenticated writes enforce current roles, active status, policy identity,

@@ -40,6 +40,7 @@ for (const file of [
   "slice-25-company-read-restriction.sql",
   "slice-27-admin-audit-writes.sql",
   "slice-28-rate-limiting.sql",
+  "slice-31-expired-job-visibility.sql",
 ]) {
   // Environment keeps local credentials out of process arguments and logs.
   run("psql", ["--no-psqlrc", "-v", "ON_ERROR_STOP=1", "-f", `supabase/tests/${file}`], {

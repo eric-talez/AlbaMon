@@ -33,8 +33,12 @@ policy, outbox and webhook history according to the actual retention decision.
 
 `public_job_listings`, `search_public_jobs` and the cookie-free sitemap use the
 canonical `is_job_open` rule: California workplace, approved status, unexpired
-listing and eligible owner. Unknown historical publication/expiry values are not
-invented for hosted data. Company identity is exposed through the safe listing
+listing and active owner. A null expiry is closed; expiry at the current instant
+is closed. Expiry hides the listing and blocks new applications without changing
+its moderation status or erasing employer/admin history. The incoming Slice31
+July migration's nullable-expiry rule is superseded by the September launch
+migrations in the ordered history; final SQL uses `is_job_open` consistently.
+Unknown historical publication/expiry values are not invented for hosted data. Company identity is exposed through the safe listing
 view; `companies` base-table phone/contact/owner fields are not public.
 
 `transition_job(target_job_id, command, expected_updated_at, reason)` locks the

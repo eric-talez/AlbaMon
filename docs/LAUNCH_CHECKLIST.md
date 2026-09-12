@@ -41,6 +41,7 @@ Use [first 30 days](operations/first-30-days.md) only after an actual public T0.
 - [ ] Database write quotas remain enforced for authenticated callers; disabled production phone sign-in does not require the optional local OTP HMAC secret.
 - [ ] 390px/1440px and required physical devices, keyboard/assistive interaction, session/callback/expiry, owner/job/app/message/report/suspension journeys and real performance measured.
 - [ ] Cookie-free sitemap public predicate, real publication/expiry/location, request-origin versus canonical-origin and no production noindex verified.
+- [ ] Expired and null-expiry jobs are absent from public reads/detail and reject new applications; owner/admin history is retained without an automatic moderation-status change.
 
 ## 6. Policy publication and operations
 

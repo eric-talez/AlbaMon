@@ -78,13 +78,14 @@ The seed contains three fictional employers/companies and 13 jobs: 11 approved,
 one pending, one draft. Those are local fixtures, never hosted launch content.
 
 **Existing September database:** incoming July migrations precede its applied
-history. Stop at a mismatch and preserve the volume. Rehearse both a fresh
-ordered replay and an upgrade from the previous launch history on separately
-identified disposable databases, then review the exact missing versions and
-forward compatibility migration. A narrowly scoped local `--include-all`
-application is permissible only as that recorded upgrade procedure after the
-rehearsals; it is not a hosted deployment command or generic repair. Never reset,
-seed or mark historical versions as applied to bypass the mismatch.
+history. Stop at a mismatch and preserve the volume. For the new July15 expiry
+migration, do not use the prior local `--include-all` procedure: its historical
+view cannot replace the later launch view without dropping added columns.
+Preserve the owned 553xx snapshot unchanged. Rehearse the full ordered history and
+the actual upstream-main-to-launch upgrade on separately identified disposable
+databases. Do not reset or seed the populated stack, drop the view as a bridge,
+rewrite migration files or mark missing versions as applied. A future supported
+upgrade path needs its own verified migration design before touching that data.
 
 `setup:local-policy` accepts only API 55321/DB 55322. It advances the immutable
 initial draft pointer via CAS to the checked-in bundle, or no-ops when equal.

@@ -411,14 +411,81 @@ export const MOCK_JOBS: Job[] = [
     postedAt: "2026-06-20",
     expiresAt: "2100-01-01T00:00:00Z",
   },
+  {
+    // Approved but EXPIRED — kept for employer/admin history, never public.
+    // Fixed past cutoff so the exclusion is deterministic regardless of run date.
+    id: "kw-103",
+    title: "마감된 물류 창고 야간 근무 (지원 종료)",
+    companyName: "Vernon Logistics Co.",
+    employerVerified: false,
+    category: "logistics_warehouse",
+    jobType: "full_time",
+    city: "Vernon",
+    state: "CA",
+    addressDisplay: "Vernon, CA",
+    addressDisplayMode: "city_only",
+    payMin: 19,
+    payMax: 23,
+    payUnit: "hour",
+    tipsAvailable: false,
+    scheduleDays: "주 5일",
+    scheduleTimeRange: "10:00 PM – 6:00 AM",
+    languageRequirement: "korean_helpful",
+    description: "이미 마감된 공고입니다. 히스토리 확인용으로만 남아 있습니다.",
+    responsibilities: ["입출고 처리", "재고 정리"],
+    requirements: ["야간 근무 가능"],
+    benefits: ["야간 수당"],
+    moderationStatus: "approved",
+    postedAt: "2026-05-01",
+    expiresAt: "2020-01-01T00:00:00.000Z",
+  },
+  {
+    // Approved with a MALFORMED expiresAt — must fail closed (excluded from all
+    // public reads), never crash or leak.
+    id: "kw-104",
+    title: "잘못된 만료일 데이터 공고 (테스트)",
+    companyName: "Torrance Office Partners",
+    employerVerified: false,
+    category: "office_admin",
+    jobType: "part_time",
+    city: "Torrance",
+    state: "CA",
+    addressDisplay: "Torrance, CA",
+    addressDisplayMode: "city_only",
+    payMin: 20,
+    payMax: 22,
+    payUnit: "hour",
+    tipsAvailable: false,
+    scheduleDays: "주 3일",
+    scheduleTimeRange: "9:00 AM – 2:00 PM",
+    languageRequirement: "bilingual_preferred",
+    description: "만료일 데이터가 손상된 경우의 안전 동작을 검증하기 위한 공고입니다.",
+    responsibilities: ["서류 정리"],
+    requirements: ["기본 사무 능력"],
+    benefits: ["주말 휴무"],
+    moderationStatus: "approved",
+    postedAt: "2026-05-02",
+    expiresAt: "not-a-real-date",
+  },
 ];
 
+/** Expiry portion of launch visibility; public mock readers also restrict CA.
+ * Missing or malformed expiry fails closed. The clock is injectable for tests.
+ */
+export function isJobPubliclyActive(
+  job: Pick<Job, "moderationStatus"> & { expiresAt?: string | null },
+  now: number = Date.now(),
+): boolean {
+  if (job.moderationStatus !== "approved" || !job.expiresAt) return false;
+  return Date.parse(job.expiresAt) > now;
+}
+
 export function getMockJobs(): Job[] {
-  return MOCK_JOBS.filter((j) => j.moderationStatus === "approved" && j.state === "CA" && new Date(j.expiresAt).getTime() > Date.now());
+  return MOCK_JOBS.filter((j) => j.state === "CA" && isJobPubliclyActive(j));
 }
 
 export function getMockJobById(id: string): Job | undefined {
   return MOCK_JOBS.find(
-    (j) => j.id === id && j.moderationStatus === "approved" && j.state === "CA" && new Date(j.expiresAt).getTime() > Date.now(),
+    (j) => j.id === id && j.state === "CA" && isJobPubliclyActive(j),
   );
 }

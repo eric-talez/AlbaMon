@@ -65,7 +65,7 @@ function dbJobRow(overrides: Record<string, unknown> = {}) {
 }
 
 describe("searchApprovedJobs — mock fallback", () => {
-  it("returns approved jobs only; never pending/draft", async () => {
+  it("returns approved jobs only; never pending/draft/expired", async () => {
     setUnconfigured();
     const { jobs, page, hasNext } = await searchApprovedJobs({});
     expect(jobs.length).toBe(13);
@@ -75,6 +75,24 @@ describe("searchApprovedJobs — mock fallback", () => {
     const ids = new Set(jobs.map((j) => j.id));
     expect(ids.has("kw-101")).toBe(false); // pending
     expect(ids.has("kw-102")).toBe(false); // draft
+    expect(ids.has("kw-103")).toBe(false); // approved but expired
+    expect(ids.has("kw-104")).toBe(false); // approved but malformed expiry
+  });
+
+  it("never returns an expired or malformed-expiry job through any search", async () => {
+    setUnconfigured();
+    // Broad and targeted searches alike must exclude the hidden fixtures.
+    for (const params of [
+      {},
+      { category: "logistics_warehouse" as const }, // kw-103's category
+      { city: "Torrance" }, // kw-104's city
+      { q: "마감된" }, // kw-103's title fragment
+      { q: "잘못된 만료일" }, // kw-104's title fragment
+    ]) {
+      const ids = (await searchApprovedJobs(params)).jobs.map((j) => j.id);
+      expect(ids).not.toContain("kw-103");
+      expect(ids).not.toContain("kw-104");
+    }
   });
 
   it("keyword search matches title, company, and description (case-insensitive)", async () => {
